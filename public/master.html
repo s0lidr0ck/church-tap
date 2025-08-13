@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Church Tap - Master Portal</title>
+  <link href="/css/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="h-full overflow-x-hidden">
+  
+  <!-- Master Login Screen -->
+  <div id="masterLoginScreen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900">
+    <div class="max-w-md w-full space-y-8 px-4">
+      <div class="text-center">
+        <div class="mx-auto h-16 w-16 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-2xl shadow-lg">
+          🚀
+        </div>
+        <h2 class="mt-6 text-center text-3xl font-extrabold text-white">Master Portal</h2>
+        <p class="mt-2 text-center text-sm text-gray-300">Manage Church Tap organizations</p>
+      </div>
+      <div class="modern-card p-8">
+        <form id="masterLoginForm" class="space-y-6">
+          <div>
+            <label for="masterUsername" class="block text-sm font-medium text-gray-700">Username</label>
+            <input id="masterUsername" name="username" type="text" required 
+                   class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                   placeholder="Enter username">
+          </div>
+          <div>
+            <label for="masterPassword" class="block text-sm font-medium text-gray-700">Password</label>
+            <input id="masterPassword" name="password" type="password" required 
+                   class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                   placeholder="Enter password">
+          </div>
+          <div>
+            <button type="submit" class="w-full btn-primary-modern">
+              🔑 Sign In to Master Portal
+            </button>
+          </div>
+          <div id="masterLoginError" class="hidden text-red-600 text-sm text-center bg-red-50 p-3 rounded-lg"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Master Portal Dashboard -->
+  <div id="masterDashboard" class="hidden">
+    <div class="flex h-screen" style="background: radial-gradient(1200px 600px at 30% -10%, var(--brand-bg), color-mix(in srgb, var(--brand-primary) 10%, white))">
+      
+      <!-- Master Sidebar -->
+      <div class="flex lg:flex-shrink-0">
+        <div class="flex flex-col w-80">
+          <!-- Sidebar Header -->
+          <div class="flex items-center h-16 flex-shrink-0 px-6 sidebar-header border-b">
+            <div class="flex items-center">
+              <span class="text-2xl mr-3">🚀</span>
+              <div>
+                <div class="text-lg font-semibold">Master Portal</div>
+                <div class="text-sm text-white/80">Church Tap SaaS</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Sidebar Navigation -->
+          <div class="flex flex-col flex-1 overflow-y-auto admin-sidebar">
+            <nav class="flex-1 px-4 py-6 space-y-2">
+              <a href="#" id="dashboardMasterNav" class="nav-item active group flex items-center px-3 py-2 text-sm font-medium rounded-lg">
+                <span class="mr-3 text-lg">📊</span>
+                Dashboard
+              </a>
+              
+              <a href="#" id="organizationsMasterNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-lg">
+                <span class="mr-3 text-lg">🏢</span>
+                Organizations
+              </a>
+              
+              <a href="#" id="billingMasterNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-lg">
+                <span class="mr-3 text-lg">💳</span>
+                Billing & Plans
+              </a>
+              
+              <a href="#" id="analyticsMasterNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-lg">
+                <span class="mr-3 text-lg">📈</span>
+                Global Analytics
+              </a>
+              
+              <a href="#" id="supportMasterNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-lg">
+                <span class="mr-3 text-lg">🎧</span>
+                Support
+              </a>
+              
+              <a href="#" id="systemMasterNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-lg">
+                <span class="mr-3 text-lg">⚙️</span>
+                System Settings
+              </a>
+            </nav>
+            
+            <!-- Sidebar Footer -->
+            <div class="flex-shrink-0 sidebar-footer border-t p-4">
+          <div class="flex items-center">
+            <div class="flex-shrink-0">
+              <div class="h-8 w-8 rounded-full avatar-brand flex items-center justify-center text-white text-sm font-medium">M</div>
+            </div>
+            <div class="ml-3 min-w-0 flex-1">
+              <div class="text-sm font-medium text-white" id="masterAdminUsername"></div>
+              <div class="text-xs text-white/80">Master Admin</div>
+            </div>
+            <button id="masterLogoutBtn" class="ml-3 p-1 rounded-full text-white/70 hover:text-white">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Top Header -->
+        <header class="w-full admin-header-divider">
+          <div class="relative z-10 flex-shrink-0 h-16 admin-header flex">
+            <div class="flex-1 flex justify-between px-4 sm:px-6 lg:px-8">
+              <div class="flex-1 flex items-center">
+                <h1 class="text-3xl font-bold text-white" id="masterPageTitle">Dashboard</h1>
+              </div>
+              <div class="flex items-center space-x-4">
+                <button id="menuThemeToggle" class="hidden md:inline-flex px-3 py-1 rounded-md text-sm bg-white/10 hover:bg-white/20 text-white">Toggle Menu Text</button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 relative overflow-y-auto focus:outline-none">
+          <div class="py-6 px-4 sm:px-6 lg:px-8">
+      
+            <!-- Master Dashboard Tab -->
+            <div id="dashboardMasterContent" class="tab-content">
+              
+              <!-- Key Metrics -->
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="modern-card p-6">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                        <span class="text-white text-lg">🏢</span>
+                      </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Total Organizations</dt>
+                        <dd id="totalOrganizations" class="text-2xl font-bold text-gray-900">--</dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="modern-card p-6">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <div class="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                        <span class="text-white text-lg">✅</span>
+                      </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Active Organizations</dt>
+                        <dd id="activeOrganizations" class="text-2xl font-bold text-gray-900">--</dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="modern-card p-6">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <div class="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+                        <span class="text-white text-lg">💰</span>
+                      </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Monthly Revenue</dt>
+                        <dd id="monthlyRevenue" class="text-2xl font-bold text-gray-900">$--</dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="modern-card p-6">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <div class="w-10 h-10 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center">
+                        <span class="text-white text-lg">👥</span>
+                      </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Total Users</dt>
+                        <dd id="totalUsers" class="text-2xl font-bold text-gray-900">--</dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Global 7-Day Activity -->
+              <div class="modern-card p-6 mb-8">
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="text-lg font-medium text-gray-900">📊 Global Activity (7 days)</h3>
+                </div>
+                <div class="relative">
+                  <canvas id="globalActivityChart" height="90"></canvas>
+                </div>
+              </div>
+              
+              <!-- Recent Activity -->
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="modern-card p-6">
+                  <h3 class="text-lg font-medium text-gray-900 mb-4">📈 Recent Organizations</h3>
+                  <div id="recentOrganizations" class="space-y-3">
+                    <!-- Recent orgs will load here -->
+                  </div>
+                </div>
+                
+                <div class="modern-card p-6">
+                  <h3 class="text-lg font-medium text-gray-900 mb-4">🚨 System Alerts</h3>
+                  <div id="systemAlerts" class="space-y-3">
+                    <!-- System alerts will load here -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Organizations Tab -->
+            <div id="organizationsMasterContent" class="tab-content hidden">
+              <div class="mb-6 flex justify-between items-center">
+                <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">🏢 Organizations</h1>
+                <button id="addOrganizationBtn" class="btn-primary-modern">✨ Add New Organization</button>
+              </div>
+
+            <!-- Organizations List -->
+            <div class="modern-card overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                  <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-medium text-gray-900">All Organizations</h3>
+                    <div class="flex items-center space-x-2">
+                      <input type="text" id="organizationSearch" placeholder="Search organizations..." 
+                             class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                      <select id="organizationFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Plans</option>
+                        <option value="basic">Basic</option>
+                        <option value="premium">Premium</option>
+                        <option value="enterprise">Enterprise</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200 admin-table">
+                    <thead>
+                      <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Organization</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Subdomain</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Plan</th>
+                      <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Verses</th>
+                      <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Admins</th>
+                      <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Users</th>
+                      <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Last Activity</th>
+                      <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Views (7d)</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Created</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="organizationsTable" class="bg-white divide-y divide-gray-200">
+                      <!-- Organizations will be loaded here -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Other tab contents... -->
+            <div id="billingMasterContent" class="tab-content hidden">
+              <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-8">💳 Billing & Plans</h1>
+              <div class="modern-card p-6">
+                <p class="text-gray-600">Billing management coming soon...</p>
+              </div>
+            </div>
+
+            <div id="analyticsMasterContent" class="tab-content hidden">
+              <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-8">📈 Global Analytics</h1>
+              <div class="modern-card p-6">
+                <p class="text-gray-600">Global analytics dashboard coming soon...</p>
+              </div>
+            </div>
+
+            <div id="supportMasterContent" class="tab-content hidden">
+              <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-8">🎧 Support</h1>
+              <div class="modern-card p-6">
+                <p class="text-gray-600">Support management coming soon...</p>
+              </div>
+            </div>
+
+            <div id="systemMasterContent" class="tab-content hidden">
+              <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-8">⚙️ System Settings</h1>
+              <div class="modern-card p-6">
+                <p class="text-gray-600">System settings coming soon...</p>
+              </div>
+            </div>
+
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Organization Modal -->
+  <div id="organizationModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-xl bg-white">
+      <div class="mt-3">
+        <h3 id="organizationModalTitle" class="text-lg font-medium text-gray-900 mb-4">✨ Add New Organization</h3>
+        
+        <form id="organizationForm" class="space-y-4">
+          <input type="hidden" id="organizationId">
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="organizationName" class="block text-sm font-medium text-gray-700">Organization Name</label>
+              <input type="text" id="organizationName" required 
+                     class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                     placeholder="e.g., First Baptist Church">
+            </div>
+            
+            <div>
+              <label for="organizationSubdomain" class="block text-sm font-medium text-gray-700">Subdomain</label>
+              <input type="text" id="organizationSubdomain" required 
+                     class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                     placeholder="e.g., firstbaptist">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="organizationEmail" class="block text-sm font-medium text-gray-700">Contact Email</label>
+              <input type="email" id="organizationEmail" 
+                     class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                     placeholder="pastor@church.org">
+            </div>
+            
+            <div>
+              <label for="organizationPlan" class="block text-sm font-medium text-gray-700">Plan</label>
+              <select id="organizationPlan" required 
+                      class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                <option value="basic">Basic - $29/month</option>
+                <option value="premium">Premium - $79/month</option>
+                <option value="enterprise">Enterprise - $199/month</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label for="organizationCustomDomain" class="block text-sm font-medium text-gray-700">Custom Domain (Optional)</label>
+            <input type="text" id="organizationCustomDomain" 
+                   class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="verses.yourchurch.org">
+          </div>
+
+          
+
+          <div class="flex justify-end space-x-3 pt-4">
+            <button type="button" id="cancelOrganizationModal" class="btn-secondary-modern">Cancel</button>
+            <button type="submit" class="btn-primary-modern">Create Organization</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/master.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</body>
+</html>

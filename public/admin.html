@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Church Tap - Admin Dashboard</title>
+  <link href="/css/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="h-full bg-gray-50">
+  <!-- Login Screen -->
+  <div id="loginScreen" class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+      <div>
+        <div class="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-primary-600 text-white text-xl">✞</div>
+        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Admin Dashboard</h2>
+        <p class="mt-2 text-center text-sm text-gray-600">Sign in to manage Church Tap</p>
+      </div>
+      <form id="loginForm" class="mt-8 space-y-6">
+        <div class="rounded-md shadow-sm -space-y-px">
+          <div>
+            <label for="username" class="sr-only">Username</label>
+            <input id="username" name="username" type="text" required 
+                   class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm" 
+                   placeholder="Username">
+          </div>
+          <div>
+            <label for="password" class="sr-only">Password</label>
+            <input id="password" name="password" type="password" required 
+                   class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm" 
+                   placeholder="Password">
+          </div>
+        </div>
+        <div>
+          <button type="submit" 
+                  class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+            Sign in
+          </button>
+        </div>
+        <div id="loginError" class="hidden text-red-600 text-sm text-center"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin Dashboard -->
+  <div id="adminDashboard" class="hidden">
+        <div class="flex h-screen" style="background: radial-gradient(1200px 600px at 30% -10%, var(--brand-bg), color-mix(in srgb, var(--brand-primary) 10%, white))">
+      <!-- Desktop Sidebar -->
+      <div class="flex lg:flex-shrink-0">
+        <div class="flex flex-col w-72">
+          <!-- Sidebar Header -->
+          <div class="flex items-center h-16 flex-shrink-0 px-6 sidebar-header border-r border-gray-200">
+            <div class="flex items-center">
+              <span class="text-2xl mr-3">✞</span>
+              <div>
+                 <div class="text-lg font-semibold">Church Tap</div>
+                 <div class="text-sm text-white/80">Admin Dashboard</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Sidebar Navigation -->
+          <div class="flex flex-col flex-1 overflow-y-auto admin-sidebar">
+            <nav class="flex-1 px-4 py-6 space-y-2">
+              <a href="#" id="dashboardNav" class="nav-item active group flex items-center px-3 py-2 text-sm font-medium rounded-md">
+                <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                Dashboard
+              </a>
+              
+              <a href="#" id="versesNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-md">
+                <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                Verses
+              </a>
+              
+              <a href="#" id="analyticsNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-md">
+                <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                Analytics
+              </a>
+              
+              <a href="#" id="communityNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-md">
+                <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
+                Community
+              </a>
+              
+              <a href="#" id="usersNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-md">
+                <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m3 5.197a4 4 0 11-6.708-3.23"></path>
+                </svg>
+                Users
+              </a>
+              
+              <a href="#" id="settingsNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-md">
+                <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Settings
+              </a>
+            </nav>
+            
+            <!-- Sidebar Footer -->
+            <div class="flex-shrink-0 sidebar-footer border-t p-4">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <div class="h-8 w-8 rounded-full avatar-brand flex items-center justify-center text-white text-sm font-medium" id="adminAvatar">A</div>
+                </div>
+                <div class="ml-3 min-w-0 flex-1">
+                  <div class="text-sm font-medium text-white" id="adminUsername"></div>
+                  <div class="text-xs text-white/80">Administrator</div>
+                </div>
+                <button id="logoutBtn" class="ml-3 p-1 rounded-full text-white/70 hover:text-white">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile Menu Overlay -->
+      <div class="lg:hidden fixed inset-0 z-40 hidden" id="mobileMenuOverlay">
+        <div class="fixed inset-0 bg-gray-600 bg-opacity-75"></div>
+        <div class="relative flex-1 flex flex-col max-w-xs w-full bg-white">
+          <!-- Mobile menu content (same as desktop sidebar) -->
+        </div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Top Navigation (Mobile + Desktop Header) -->
+        <header class="w-full">
+          <div class="relative z-10 flex-shrink-0 h-16 admin-header flex">
+            <!-- Mobile menu button -->
+            <button class="md:hidden px-4 border-r border-gray-200 text-gray-400 focus:outline-none focus:text-gray-600" id="mobileMenuBtn">
+              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+              </svg>
+            </button>
+            
+            <!-- Desktop header content -->
+            <div class="flex-1 flex justify-between px-4 sm:px-6 lg:px-8">
+              <div class="flex-1 flex items-center">
+                <div>
+                  <h1 class="text-xl font-semibold text-white" id="pageTitle">Dashboard</h1>
+                  <div class="text-sm text-white/80" id="organizationContext"></div>
+                </div>
+              </div>
+              <div class="flex items-center space-x-4">
+                <!-- Mobile admin info -->
+                <div class="md:hidden flex items-center space-x-3">
+                  <span class="text-sm text-gray-700" id="mobileAdminUsername"></span>
+                  <button id="mobileLogoutBtn" class="text-sm text-gray-500 hover:text-gray-700">Logout</button>
+                </div>
+                <button id="menuThemeToggle" class="hidden md:inline-flex px-3 py-1 rounded-md text-sm bg-white/10 hover:bg-white/20 text-white">Toggle Menu Text</button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 relative overflow-y-auto focus:outline-none">
+          <div class="py-6 px-4 sm:px-6 lg:px-8">
+      
+      <!-- Dashboard Tab -->
+      <div id="dashboardContent" class="tab-content hidden">
+        <h1 class="sr-only">Dashboard</h1>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <div class="modern-card p-6">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                  <span class="text-white text-sm">📖</span>
+                </div>
+              </div>
+              <div class="ml-5 w-0 flex-1">
+                <dl>
+                  <dt class="text-sm font-medium text-gray-500 truncate">Total Verses</dt>
+                  <dd class="text-lg font-medium text-gray-900">--</dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+          
+          <div class="modern-card p-6">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <div class="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                  <span class="text-white text-sm">👥</span>
+                </div>
+              </div>
+              <div class="ml-5 w-0 flex-1">
+                <dl>
+                  <dt class="text-sm font-medium text-gray-500 truncate">Active Users</dt>
+                  <dd class="text-lg font-medium text-gray-900">--</dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+          
+          <div class="modern-card p-6">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                  <span class="text-white text-sm">❤️</span>
+                </div>
+              </div>
+              <div class="ml-5 w-0 flex-1">
+                <dl>
+                  <dt class="text-sm font-medium text-gray-500 truncate">Total Hearts</dt>
+                  <dd class="text-lg font-medium text-gray-900">--</dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="modern-card p-6">
+          <h3 class="text-lg font-medium text-gray-900 mb-4">🚀 Quick Actions</h3>
+          <div class="flex flex-wrap gap-3">
+            <button class="btn-primary-modern">Create New Verse</button>
+            <button class="btn-secondary-modern">View Analytics</button>
+            <button class="btn-secondary-modern">Manage Community</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verses Tab -->
+      <div id="versesContent" class="tab-content">
+        <div class="mb-6 flex flex-col gap-4">
+          <div class="flex justify-between items-center">
+            <h1 class="sr-only">Manage Verses</h1>
+            <button id="addVerseBtn" class="btn-primary-modern">✨ Add New Verse</button>
+          </div>
+          <div class="modern-card p-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label for="verseSearch" class="block text-sm font-medium text-brand-black mb-1">Search</label>
+                <input id="verseSearch" type="text" placeholder="Search text or reference..." class="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none sm:text-sm" style="border-color: var(--brand-muted)" />
+              </div>
+              <div>
+                <label for="verseTypeFilter" class="block text-sm font-medium text-brand-black mb-1">Type</label>
+                <select id="verseTypeFilter" class="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none sm:text-sm" style="border-color: var(--brand-muted)">
+                  <option value="all" selected>All</option>
+                  <option value="text">Text</option>
+                  <option value="image">Image</option>
+                </select>
+              </div>
+              <div>
+                <label for="verseStatusFilter" class="block text-sm font-medium text-brand-black mb-1">Status</label>
+                <select id="verseStatusFilter" class="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none sm:text-sm" style="border-color: var(--brand-muted)">
+                  <option value="all" selected>All</option>
+                  <option value="published">Published</option>
+                  <option value="draft">Draft</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Verses List -->
+        <div class="modern-card overflow-hidden">
+          <!-- Desktop Table View -->
+          <div class="block">
+            <table class="min-w-full divide-y divide-gray-200 admin-table responsive-table">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Content
+                  </th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Reference
+                  </th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Hearts
+                  </th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th scope="col" class="relative px-6 py-3">
+                    <span class="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="versesTable" class="bg-white divide-y divide-gray-200">
+                <!-- Verses will be loaded here -->
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- Mobile Card View -->
+          <div class="hidden">
+            <div id="versesList" class="divide-y divide-gray-200">
+              <!-- Verses will be loaded here -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Analytics Tab -->
+      <div id="analyticsContent" class="tab-content hidden">
+        <h1 class="sr-only">Analytics Dashboard</h1>
+        
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <div class="w-8 h-8 bg-primary-500 rounded-md flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Total Views (7 days)</dt>
+                    <dd id="totalViews" class="text-lg font-medium text-gray-900">--</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Unique Visitors</dt>
+                    <dd id="uniqueVisitors" class="text-lg font-medium text-gray-900">--</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <div class="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Total Hearts</dt>
+                    <dd id="totalHearts" class="text-lg font-medium text-gray-900">--</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top Verses -->
+        <div class="bg-white shadow overflow-hidden sm:rounded-md">
+          <div class="px-4 py-5 sm:px-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">Most Viewed Verses (Last 7 Days)</h3>
+          </div>
+          <ul id="topVersesList" class="divide-y divide-gray-200">
+            <!-- Top verses will be loaded here -->
+          </ul>
+        </div>
+      </div>
+
+      <!-- Community Tab -->
+      <div id="communityContent" class="tab-content hidden">
+        <h1 class="sr-only">Community Management</h1>
+        
+        <!-- Filter Controls -->
+        <div class="mb-6 bg-white shadow sm:rounded-lg p-4">
+          <div class="flex items-center space-x-4">
+            <select id="communityDaysFilter" class="border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500">
+              <option value="1">Last 24 hours</option>
+              <option value="7" selected>Last 7 days</option>
+              <option value="30">Last 30 days</option>
+            </select>
+            <button id="refreshCommunity" class="btn-secondary">Refresh</button>
+          </div>
+        </div>
+
+        <!-- Community Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <span class="text-2xl">🙏</span>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Prayer Requests</dt>
+                    <dd id="totalPrayerRequests" class="text-lg font-medium text-gray-900">--</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <span class="text-2xl">🎉</span>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Praise Reports</dt>
+                    <dd id="totalPraiseReports" class="text-lg font-medium text-gray-900">--</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prayer Requests Management -->
+        <div class="bg-white shadow overflow-hidden sm:rounded-md mb-8">
+          <div class="px-4 py-5 sm:px-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">Prayer Requests</h3>
+            <p class="mt-1 max-w-2xl text-sm text-gray-500">Manage and moderate prayer requests</p>
+          </div>
+          <div id="prayerRequestsAdminList" class="divide-y divide-gray-200">
+            <!-- Prayer requests will be loaded here -->
+          </div>
+        </div>
+
+        <!-- Praise Reports Management -->
+        <div class="bg-white shadow overflow-hidden sm:rounded-md">
+          <div class="px-4 py-5 sm:px-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">Praise Reports</h3>
+            <p class="mt-1 max-w-2xl text-sm text-gray-500">Manage and moderate praise reports</p>
+          </div>
+          <div id="praiseReportsAdminList" class="divide-y divide-gray-200">
+            <!-- Praise reports will be loaded here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Users Tab -->
+      <div id="usersContent" class="tab-content hidden">
+        <h1 class="sr-only">User Management</h1>
+        <div class="bg-white shadow sm:rounded-lg p-6">
+          <p class="text-gray-600">User management panel coming soon...</p>
+        </div>
+      </div>
+
+      <!-- Settings Tab -->
+      <div id="settingsContent" class="tab-content hidden">
+        <h1 class="sr-only">Settings</h1>
+          <div class="modern-card p-6">
+          <div class="mb-4">
+            <h2 class="text-lg font-semibold">Brand Colors</h2>
+            <p class="text-sm text-brand-muted">Customize your church’s theme. Changes save locally and apply instantly.</p>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-1">Primary</label>
+              <input id="brandPrimary" type="color" value="#345995" class="w-full h-10 p-0 border rounded" style="border-color: var(--brand-muted)">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Accent</label>
+              <input id="brandAccent" type="color" value="#EAC435" class="w-full h-10 p-0 border rounded" style="border-color: var(--brand-muted)">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Background</label>
+              <input id="brandBg" type="color" value="#FCF7FF" class="w-full h-10 p-0 border rounded" style="border-color: var(--brand-muted)">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Muted</label>
+              <input id="brandMuted" type="color" value="#C4CAD0" class="w-full h-10 p-0 border rounded" style="border-color: var(--brand-muted)">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Success</label>
+              <input id="brandSuccess" type="color" value="#53917E" class="w-full h-10 p-0 border rounded" style="border-color: var(--brand-muted)">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Black</label>
+              <input id="brandBlack" type="color" value="#101916" class="w-full h-10 p-0 border rounded" style="border-color: var(--brand-muted)">
+            </div>
+          </div>
+          <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="modern-card p-4">
+              <h3 class="text-brand-primary font-semibold mb-3">Typography Preview</h3>
+              <p class="text-sm text-brand-muted mb-3">This preview updates with your theme.</p>
+              <h1 class="text-3xl font-bold mb-2" style="color: var(--brand-primary)">Heading 1</h1>
+              <h2 class="text-2xl font-semibold mb-2" style="color: var(--brand-primary)">Heading 2</h2>
+              <p class="mb-3">Body text uses <span class="text-brand-black">brand black</span>. Links use <a href="#" class="link-brand">link-brand</a>.</p>
+              <div class="flex gap-2 text-sm">
+                <span class="status-badge status-published">Published</span>
+                <span class="status-badge status-draft">Draft</span>
+              </div>
+            </div>
+            <div class="flex items-end gap-3">
+              <button id="resetThemeBtn" class="btn-secondary-modern">Reset to defaults</button>
+              <button id="exportThemeBtn" class="btn-secondary-modern">Export JSON</button>
+              <label class="btn-secondary-modern cursor-pointer">
+                <input id="importThemeInput" type="file" accept="application/json" class="hidden" />
+                Import JSON
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Verse Modal -->
+  <div id="verseModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+      <div class="mt-3">
+        <h3 id="modalTitle" class="text-lg font-medium text-gray-900 mb-4">Add New Verse</h3>
+        
+        <form id="verseForm" class="space-y-4">
+          <input type="hidden" id="verseId">
+          
+          <!-- Date -->
+          <div>
+            <label for="verseDate" class="block text-sm font-medium text-gray-700">Date</label>
+            <input type="date" id="verseDate" required 
+                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm">
+          </div>
+
+          <!-- Content Type -->
+          <div>
+            <label for="contentType" class="block text-sm font-medium text-gray-700">Content Type</label>
+            <select id="contentType" required 
+                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm">
+              <option value="text">Text Verse</option>
+              <option value="image">Image Verse</option>
+            </select>
+          </div>
+
+          <!-- Text Verse Fields -->
+          <div id="textFields">
+            <label for="verseText" class="block text-sm font-medium text-gray-700">Verse Text</label>
+            <textarea id="verseText" rows="4" 
+                      class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      placeholder="Enter the verse text..."></textarea>
+          </div>
+
+          <!-- Image Verse Fields -->
+          <div id="imageFields" class="hidden">
+            <label for="verseImage" class="block text-sm font-medium text-gray-700">Verse Image</label>
+            <input type="file" id="verseImage" accept="image/*" 
+                   class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100">
+            <p class="mt-1 text-xs text-gray-500">Recommended: 9:16 aspect ratio (portrait)</p>
+          </div>
+
+          <!-- Bible Reference -->
+          <div>
+            <label for="bibleReference" class="block text-sm font-medium text-gray-700">Bible Reference</label>
+            <input type="text" id="bibleReference" 
+                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                   placeholder="e.g., John 3:16">
+          </div>
+
+          <!-- Context -->
+          <div>
+            <label for="verseContext" class="block text-sm font-medium text-gray-700">Context/Commentary (Optional)</label>
+            <textarea id="verseContext" rows="3" 
+                      class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      placeholder="Additional context or commentary..."></textarea>
+          </div>
+
+          <!-- Tags -->
+          <div>
+            <label for="verseTags" class="block text-sm font-medium text-gray-700">Tags</label>
+            <input type="text" id="verseTags" 
+                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                   placeholder="hope, comfort, strength (comma-separated)">
+          </div>
+
+          <!-- Published -->
+          <div class="flex items-center">
+            <input type="checkbox" id="versePublished" 
+                   class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded">
+            <label for="versePublished" class="ml-2 block text-sm text-gray-900">
+              Publish immediately (or schedule for auto-publish at midnight)
+            </label>
+          </div>
+
+          <!-- Form Actions -->
+          <div class="flex justify-end space-x-3 pt-4">
+            <button type="button" id="cancelModal" class="btn-secondary">Cancel</button>
+            <button type="submit" class="btn-primary">Save Verse</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>

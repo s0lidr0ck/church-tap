@@ -1,0 +1,309 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    color: var(--brand-black);
+  }
+
+  :root {
+    /* Palette tokens */
+    --saffron: #EAC435;       /* saffron */
+    --yinmn-blue: #345995;    /* primary blue */
+    --magnolia: #FCF7FF;      /* soft background */
+    --french-gray: #C4CAD0;   /* muted gray */
+    --viridian: #53917E;      /* success teal */
+    --eerie-black: #101916;   /* deep black */
+
+    /* Brand tokens (used throughout UI) */
+    --brand-primary: var(--yinmn-blue);
+    --brand-accent: var(--saffron);
+    --brand-bg: var(--magnolia);
+    --brand-muted: var(--french-gray);
+    --brand-success: var(--viridian);
+    --brand-black: var(--eerie-black);
+    /* Sidebar menu text color: defaults to background for high contrast on dark menu */
+    --menu-text: var(--brand-bg);
+  }
+}
+
+@layer components {
+  .verse-container {
+    @apply bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mx-4 my-8;
+    transition: all 0.3s ease;
+  }
+  
+  .verse-text {
+    @apply font-verse text-lg md:text-xl leading-relaxed text-center;
+    transition: font-size 0.2s ease;
+  }
+  
+  .verse-text.size-small {
+    @apply text-base md:text-lg;
+  }
+  
+  .verse-text.size-large {
+    @apply text-xl md:text-2xl;
+  }
+  
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+  }
+  
+  .heart-btn {
+    @apply text-red-500 hover:text-red-600 transition-colors duration-200;
+  }
+  
+  .heart-btn.active {
+    @apply text-red-600;
+  }
+
+  /* Admin/Master UI dividers */
+  .content-divider {
+    @apply border-l border-gray-200;
+  }
+
+  .admin-header-divider {
+    @apply border-b border-gray-200;
+  }
+
+  /* Sidebar background to visually separate menu from content */
+  .admin-sidebar {
+    @apply bg-white dark:bg-gray-900 shadow-sm;
+  }
+
+  /* Navigation item tweaks: no sticky backgrounds */
+  .nav-item {
+    @apply hover:bg-transparent;
+  }
+
+  .nav-item.active {
+    @apply bg-transparent border-l-4 border-blue-500 text-blue-700;
+  }
+
+  .nav-item.active .nav-icon {
+    @apply text-blue-500;
+  }
+
+  /* Softer header title color */
+  #masterPageTitle {
+    @apply text-gray-700;
+  }
+
+  /* Modern admin UI components */
+  .modern-card {
+    background-image: linear-gradient(180deg, var(--brand-bg), #ffffff);
+    @apply rounded-xl shadow-md border dark:border-gray-700 transition-colors;
+    border-color: var(--brand-muted);
+  }
+
+  .btn-primary-modern {
+    background-color: var(--brand-accent);
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white shadow-md focus:outline-none focus:ring-2 transition-colors duration-200;
+  }
+  .btn-primary-modern:hover,
+  .btn-primary-modern:active {
+    background-color: var(--brand-primary);
+  }
+
+  .btn-secondary-modern {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 dark:text-gray-200 bg-gradient-to-r from-white to-gray-50 dark:from-gray-800 dark:to-gray-700 border border-gray-300 dark:border-gray-700 hover:from-gray-50 hover:to-white dark:hover:from-gray-700 dark:hover:to-gray-600 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600;
+  }
+
+  .admin-table thead {
+    background-image: linear-gradient(90deg, color-mix(in srgb, var(--brand-muted) 20%, white), var(--brand-bg));
+  }
+
+  .admin-table thead th {
+    @apply px-6 py-3 text-left text-xs font-medium uppercase tracking-wider;
+    color: var(--brand-primary);
+  }
+
+  .admin-table tbody tr:nth-child(even) {
+    @apply bg-indigo-50/20 dark:bg-gray-800/30;
+  }
+
+  .admin-table tbody tr:hover {
+    @apply bg-indigo-50/40 dark:bg-gray-800/80;
+  }
+
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .status-badge.status-published {
+    background-color: color-mix(in srgb, var(--brand-success) 15%, white);
+    color: color-mix(in srgb, var(--brand-success) 70%, black);
+  }
+
+  .status-badge.status-draft {
+    background-color: color-mix(in srgb, var(--brand-accent) 20%, white);
+    color: color-mix(in srgb, var(--brand-accent) 65%, black);
+  }
+
+  .admin-header {
+    backdrop-filter: blur(10px);
+    background-image: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-accent) 100%);
+    @apply text-white border-b border-transparent;
+  }
+
+  .admin-header .text-gray-900,
+  .admin-header .text-gray-800,
+  .admin-header .text-gray-700,
+  .admin-header .text-gray-600,
+  .admin-header .text-gray-500,
+  .admin-header .text-gray-400 {
+    @apply text-white;
+  }
+
+  .admin-header .text-gray-500 { @apply text-white/90; }
+  .admin-header .text-gray-400 { @apply text-white/80; }
+
+  .admin-sidebar {
+    background-image: linear-gradient(180deg, var(--brand-primary) 0%, var(--brand-primary) 100%);
+    @apply text-white shadow-sm;
+  }
+
+  .sidebar-header {
+    background-image: linear-gradient(180deg, var(--brand-primary) 0%, color-mix(in srgb, var(--brand-primary) 85%, black) 100%);
+    color: white;
+  }
+
+  .sidebar-footer { border-top-color: var(--brand-muted) !important; }
+  .avatar-brand { background-color: var(--brand-primary) !important; color: #fff !important; }
+
+  .nav-item { color: var(--menu-text); opacity: 0.9; }
+  .nav-item .nav-icon { color: var(--menu-text); opacity: 0.7; }
+  .nav-item:hover { @apply bg-white/10; }
+
+  .nav-item.active {
+    @apply bg-white/10 text-white border-l-2 border-white/70;
+  }
+
+  .nav-item.active .nav-icon { @apply text-white; }
+}
+
+@layer utilities {
+  .text-brand-primary { color: var(--brand-primary) !important; }
+  .text-brand-accent { color: var(--brand-accent) !important; }
+  .text-brand-muted { color: var(--brand-muted) !important; }
+  .text-brand-success { color: var(--brand-success) !important; }
+  .text-brand-black { color: var(--brand-black) !important; }
+
+  .link-brand {
+    color: var(--brand-primary);
+    text-decoration: none;
+    transition: color .2s ease;
+  }
+  .link-brand:hover {
+    color: color-mix(in srgb, var(--brand-primary) 80%, black);
+  }
+
+  .glass-effect {
+    backdrop-filter: blur(10px);
+    @apply bg-white/80 dark:bg-gray-800/80;
+  }
+  
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100 dark:bg-gray-800;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-gray-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400 dark:bg-gray-500;
+}
+
+/* PWA splash screen styles */
+.splash-screen {
+  @apply fixed inset-0 bg-primary-600 flex items-center justify-center z-50;
+}
+
+.splash-logo {
+  @apply text-white text-4xl font-bold animate-pulse;
+}
+
+/* Verse image styles */
+.verse-image {
+  @apply w-full max-w-sm mx-auto rounded-lg shadow-md;
+  aspect-ratio: 9/16;
+  object-fit: cover;
+}
+
+/* Navigation styles */
+.nav-dots {
+  @apply flex justify-center space-x-2 mt-4;
+}
+
+.nav-dot {
+  @apply w-2 h-2 bg-gray-300 dark:bg-gray-600 rounded-full transition-colors duration-200;
+}
+
+.nav-dot.active {
+  @apply bg-primary-500;
+}
+
+/* Responsive table helper: allow horizontal scroll on small screens */
+.responsive-table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* Animation classes */
+.fade-in-up {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.slide-in-left {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}

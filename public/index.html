@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0ea5e9">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Church Tap">
+  
+  <title>Church Tap</title>
+  <meta name="description" content="NFC-powered daily engagement for your church.">
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  
+  <!-- Apple Touch Icons -->
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-192x192.png">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Styles -->
+  <link href="/css/style.css" rel="stylesheet">
+  
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(registration => console.log('SW registered'))
+          .catch(error => console.log('SW registration failed'));
+      });
+    }
+  </script>
+</head>
+<body class="h-full overflow-x-hidden">
+  <!-- Splash Screen -->
+  <div id="splash" class="splash-screen">
+    <div class="text-center">
+      <div class="splash-logo">✞</div>
+      <div class="text-white text-lg mt-4">Church Tap</div>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app" class="hidden min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <!-- Header -->
+    <header class="glass-effect sticky top-0 z-40 px-4 py-3 border-b border-white/20">
+      <div class="flex items-center justify-between max-w-lg mx-auto">
+        <!-- Logo/Title -->
+        <div class="flex items-center space-x-2">
+          <span class="text-2xl">⛪</span>
+          <h1 class="text-lg font-semibold text-gray-800 dark:text-white">Church Tap</h1>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex items-center space-x-2">
+          <!-- Text Size Toggle -->
+          <button id="textSizeBtn" class="p-2 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+
+          <!-- Theme Toggle -->
+          <button id="themeToggle" class="p-2 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation">
+            <svg id="sunIcon" class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+            </svg>
+            <svg id="moonIcon" class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+            </svg>
+          </button>
+
+          <!-- User Account -->
+          <div id="userAccountSection">
+            <!-- Logged Out -->
+            <button id="loginBtn" class="p-2 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+              </svg>
+            </button>
+
+            <!-- Logged In -->
+            <button id="userMenuBtn" class="hidden p-2 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation">
+              <div class="w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center text-white text-xs font-medium" id="userAvatar">
+                <!-- User initials will be inserted here -->
+              </div>
+            </button>
+          </div>
+
+          <!-- Menu Toggle -->
+          <button id="menuToggle" class="p-2 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Quick Menu -->
+    <div id="quickMenu" class="hidden fixed top-16 right-4 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 min-w-48">
+      <div class="p-4 space-y-3">
+        <button id="randomVerseBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+          🎲 Random Verse
+        </button>
+        <button id="favoritesBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+          ❤️ My Favorites
+        </button>
+        <button id="shareBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+          📤 Share Verse
+        </button>
+        <button id="downloadBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+          💾 Download Image
+        </button>
+        <button id="searchBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+          🔍 Search Verses
+        </button>
+        
+        <!-- User-specific menu items -->
+        <div id="userMenuItems" class="hidden border-t border-gray-200 dark:border-gray-600 pt-3">
+          <button id="collectionsBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+            📚 My Collections
+          </button>
+          <button id="personalPrayersBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+            🙏 My Prayers
+          </button>
+          <button id="profileBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+            👤 Profile
+          </button>
+          <button id="logoutBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-red-600 dark:text-red-400">
+            🚪 Logout
+          </button>
+        </div>
+        
+        <!-- Guest menu items -->
+        <div id="guestMenuItems" class="border-t border-gray-200 dark:border-gray-600 pt-3">
+          <button id="loginMenuBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-primary-600 dark:text-primary-400">
+            🔑 Login
+          </button>
+          <button id="registerMenuBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-primary-600 dark:text-primary-400">
+            ✨ Create Account
+          </button>
+        </div>
+        
+        <button id="feedbackBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+          💬 Send Feedback
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="pb-20">
+      <!-- Date Navigation -->
+      <div class="px-4 py-3">
+        <div class="flex items-center justify-between max-w-lg mx-auto">
+          <button id="prevDay" class="p-3 rounded-full bg-white dark:bg-gray-800 shadow-md text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors touch-manipulation">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+          </button>
+          
+          <div class="text-center">
+            <div id="currentDate" class="text-lg font-medium text-gray-800 dark:text-white"></div>
+            <div class="text-sm text-gray-500 dark:text-gray-400" id="dateDescription">Today's Verse</div>
+          </div>
+          
+          <button id="nextDay" class="p-3 rounded-full bg-white dark:bg-gray-800 shadow-md text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors touch-manipulation">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Verse Container -->
+      <div id="verseContainer" class="px-4">
+        <div class="verse-container max-w-lg mx-auto fade-in-up">
+          <!-- Loading State -->
+          <div id="loadingVerse" class="text-center py-12">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+            <p class="mt-4 text-gray-600 dark:text-gray-400">Loading verse...</p>
+          </div>
+
+          <!-- Verse Content -->
+          <div id="verseContent" class="hidden">
+            <!-- Text Verse -->
+            <div id="textVerse" class="hidden">
+              <blockquote id="verseText" class="verse-text text-gray-800 dark:text-gray-200 mb-6"></blockquote>
+              <div id="verseReference" class="text-right text-sm font-medium text-primary-600 dark:text-primary-400 mb-4"></div>
+              <div id="verseContext" class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed hidden"></div>
+            </div>
+
+            <!-- Image Verse -->
+            <div id="imageVerse" class="hidden text-center">
+              <img id="verseImage" class="verse-image mx-auto" alt="Daily verse image">
+              <div id="imageReference" class="text-right text-sm font-medium text-primary-600 dark:text-primary-400 mt-4 mb-4"></div>
+              <div id="imageContext" class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed hidden"></div>
+            </div>
+
+            <!-- Personalization Badge -->
+            <div id="personalizationBadge" class="hidden mt-4 mb-2">
+              <div class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-800 dark:text-primary-200">
+                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                <span id="personalizationText">Personalized for you</span>
+              </div>
+            </div>
+
+            <!-- Verse Tags -->
+            <div id="verseTags" class="flex flex-wrap gap-2 mt-4 hidden"></div>
+          </div>
+
+          <!-- No Verse State -->
+          <div id="noVerse" class="hidden text-center py-12">
+            <div class="text-6xl mb-4">📖</div>
+            <h3 class="text-lg font-medium text-gray-800 dark:text-white mb-2">No verse for this date</h3>
+            <p class="text-gray-600 dark:text-gray-400 mb-4">Check back tomorrow for a new verse!</p>
+            <button id="backToToday" class="btn-primary">Back to Today</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Engagement Actions -->
+      <div id="engagementActions" class="px-4 mt-6 hidden">
+        <div class="flex items-center justify-center space-x-6 max-w-lg mx-auto">
+          <!-- Heart Button -->
+          <button id="heartBtn" class="flex flex-col items-center space-y-1 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation">
+            <svg class="w-6 h-6 heart-btn" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+            </svg>
+            <span id="heartCount" class="text-xs text-gray-600 dark:text-gray-400">0</span>
+          </button>
+
+          <!-- Favorite Button -->
+          <button id="favoriteBtn" class="flex flex-col items-center space-y-1 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation">
+            <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
+            </svg>
+            <span class="text-xs text-gray-600 dark:text-gray-400">Save</span>
+          </button>
+
+          <!-- QR Code Button -->
+          <button id="qrBtn" class="flex flex-col items-center space-y-1 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation">
+            <svg class="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+            </svg>
+            <span class="text-xs text-gray-600 dark:text-gray-400">QR</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Community Section -->
+      <div id="communitySection" class="px-4 mt-8 hidden">
+        <div class="max-w-lg mx-auto">
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-center">
+              Today's Community
+            </h3>
+            
+            <!-- Submit Buttons -->
+            <div class="flex space-x-3 mb-6">
+              <button id="submitPrayerBtn" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center space-x-2">
+                <span>🙏</span>
+                <span>Prayer Request</span>
+              </button>
+              <button id="submitPraiseBtn" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center space-x-2">
+                <span>🎉</span>
+                <span>Praise Report</span>
+              </button>
+            </div>
+
+            <!-- Community Content -->
+            <div id="communityContent">
+              <!-- Loading -->
+              <div id="loadingCommunity" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading community...</p>
+              </div>
+
+              <!-- Prayer Requests -->
+              <div id="prayerRequestsSection" class="hidden">
+                <h4 class="text-md font-medium text-gray-800 dark:text-white mb-3 flex items-center">
+                  <span class="mr-2">🙏</span>
+                  Prayer Requests
+                </h4>
+                <div id="prayerRequestsList" class="space-y-3 mb-6">
+                  <!-- Prayer requests will be loaded here -->
+                </div>
+              </div>
+
+              <!-- Praise Reports -->
+              <div id="praiseReportsSection" class="hidden">
+                <h4 class="text-md font-medium text-gray-800 dark:text-white mb-3 flex items-center">
+                  <span class="mr-2">🎉</span>
+                  Praise Reports
+                </h4>
+                <div id="praiseReportsList" class="space-y-3">
+                  <!-- Praise reports will be loaded here -->
+                </div>
+              </div>
+
+              <!-- Empty State -->
+              <div id="emptyCommunity" class="hidden text-center py-8">
+                <div class="text-4xl mb-2">💝</div>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">Be the first to share today!</p>
+                <p class="text-sm text-gray-500 dark:text-gray-500">Submit a prayer request or praise report to build community.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="fixed bottom-0 left-0 right-0 glass-effect border-t border-white/20 px-4 py-2 z-30">
+      <div class="flex items-center justify-around max-w-lg mx-auto">
+        <button id="todayBtn" class="flex flex-col items-center space-y-1 p-2 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation">
+          <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+          </svg>
+          <span class="text-xs text-gray-600 dark:text-gray-400">Today</span>
+        </button>
+        
+        <button id="historyBtn" class="flex flex-col items-center space-y-1 p-2 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation">
+          <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span class="text-xs text-gray-600 dark:text-gray-400">History</span>
+        </button>
+        
+        <button id="refreshBtn" class="flex flex-col items-center space-y-1 p-2 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation">
+          <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          <span class="text-xs text-gray-600 dark:text-gray-400">Refresh</span>
+        </button>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Modals and Overlays will be added by JavaScript -->
+  
+  <!-- Scripts -->
+  <script src="/js/app.js"></script>
+</body>
+</html>
