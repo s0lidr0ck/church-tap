@@ -1,6 +1,5 @@
 require('dotenv').config();
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
@@ -15,10 +14,14 @@ const cookieParser = require('cookie-parser');
 const compression = require('compression');
 const createRateLimiter = require('./middleware/rateLimit');
 
+// Trust reverse proxy (required for secure cookies behind App Runner/ELB)
+// Ensures req.secure reflects the original HTTPS and session cookies can be set with secure: true
+// See: https://expressjs.com/en/guide/behind-proxies.html
+const app = express();
+app.set('trust proxy', 1);
+
 // JWT secret (in production, use environment variable)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this';
-
-const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
@@ -45,252 +48,16 @@ app.use(session({
   saveUninitialized: false,
   cookie: { 
     secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
 
-// Database setup
-const db = new sqlite3.Database('./database.db');
+// Database setup (Postgres via adapter)
+const db = require('./db-adapter');
 
-// Migration system
-const MigrationSystem = require('./migrations/migration-system');
-
-// Run migrations on startup
-async function runMigrationsOnStartup() {
-  const migrationSystem = new MigrationSystem('./database.db');
-  try {
-    console.log('🔄 Checking for database migrations...');
-    await migrationSystem.migrate();
-  } catch (error) {
-    console.error('❌ Migration failed:', error);
-    process.exit(1);
-  } finally {
-    migrationSystem.close();
-  }
-}
-
-// Initialize database tables
-db.serialize(() => {
-  // Verses table
-  db.run(`CREATE TABLE IF NOT EXISTS verses (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT UNIQUE NOT NULL,
-    content_type TEXT NOT NULL,
-    verse_text TEXT,
-    image_path TEXT,
-    bible_reference TEXT,
-    context TEXT,
-    tags TEXT,
-    hearts INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    published BOOLEAN DEFAULT 0
-  )`);
-
-  // Admin users table
-  db.run(`CREATE TABLE IF NOT EXISTS admin_users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    role TEXT DEFAULT 'admin',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  // Analytics table
-  db.run(`CREATE TABLE IF NOT EXISTS analytics (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    verse_id INTEGER,
-    action TEXT NOT NULL,
-    ip_address TEXT,
-    user_agent TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (verse_id) REFERENCES verses (id)
-  )`);
-
-  // Favorites table (using localStorage IDs)
-  db.run(`CREATE TABLE IF NOT EXISTS favorites (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    verse_id INTEGER,
-    user_token TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (verse_id) REFERENCES verses (id)
-  )`);
-
-  // Prayer requests table
-  db.run(`CREATE TABLE IF NOT EXISTS prayer_requests (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT NOT NULL,
-    content TEXT NOT NULL,
-    prayer_count INTEGER DEFAULT 0,
-    user_token TEXT,
-    ip_address TEXT,
-    is_approved BOOLEAN DEFAULT 1,
-    is_hidden BOOLEAN DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  // Praise reports table
-  db.run(`CREATE TABLE IF NOT EXISTS praise_reports (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT NOT NULL,
-    content TEXT NOT NULL,
-    celebration_count INTEGER DEFAULT 0,
-    user_token TEXT,
-    ip_address TEXT,
-    is_approved BOOLEAN DEFAULT 1,
-    is_hidden BOOLEAN DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  // Prayer interactions table (to track who prayed for what)
-  db.run(`CREATE TABLE IF NOT EXISTS prayer_interactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    prayer_request_id INTEGER,
-    user_token TEXT NOT NULL,
-    ip_address TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (prayer_request_id) REFERENCES prayer_requests (id)
-  )`);
-
-  // Celebration interactions table (to track who celebrated what)
-  db.run(`CREATE TABLE IF NOT EXISTS celebration_interactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    praise_report_id INTEGER,
-    user_token TEXT NOT NULL,
-    ip_address TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (praise_report_id) REFERENCES praise_reports (id)
-  )`);
-
-  // Users table for Phase 3
-  db.run(`CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    first_name TEXT,
-    last_name TEXT,
-    display_name TEXT,
-    phone TEXT,
-    date_of_birth DATE,
-    profile_image TEXT,
-    is_verified BOOLEAN DEFAULT 0,
-    verification_token TEXT,
-    reset_token TEXT,
-    reset_token_expires DATETIME,
-    last_login DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  // User preferences and personalization
-  db.run(`CREATE TABLE IF NOT EXISTS user_preferences (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER UNIQUE NOT NULL,
-    life_stage TEXT, -- young_adult, married, parent, senior, etc.
-    interests TEXT, -- JSON array: ["faith_growth", "relationships", "anxiety", "hope"]
-    struggles TEXT, -- JSON array: ["depression", "addiction", "loss", "finances"]
-    prayer_frequency TEXT, -- daily, weekly, as_needed
-    preferred_translation TEXT, -- NIV, ESV, NLT, etc.
-    notification_enabled BOOLEAN DEFAULT 1,
-    notification_time TIME DEFAULT '08:00:00',
-    timezone TEXT DEFAULT 'America/Chicago',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-  )`);
-
-  // User verse collections
-  db.run(`CREATE TABLE IF NOT EXISTS user_collections (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    description TEXT,
-    is_private BOOLEAN DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-  )`);
-
-  // Collection verses (many-to-many)
-  db.run(`CREATE TABLE IF NOT EXISTS collection_verses (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    collection_id INTEGER NOT NULL,
-    verse_id INTEGER NOT NULL,
-    notes TEXT,
-    added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (collection_id) REFERENCES user_collections (id) ON DELETE CASCADE,
-    FOREIGN KEY (verse_id) REFERENCES verses (id) ON DELETE CASCADE,
-    UNIQUE(collection_id, verse_id)
-  )`);
-
-  // User verse history and interactions
-  db.run(`CREATE TABLE IF NOT EXISTS user_verse_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    verse_id INTEGER NOT NULL,
-    viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    time_spent INTEGER,
-    shared BOOLEAN DEFAULT 0,
-    favorited BOOLEAN DEFAULT 0,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-    FOREIGN KEY (verse_id) REFERENCES verses (id) ON DELETE CASCADE
-  )`);
-
-  // Prayer partnerships and connections
-  db.run(`CREATE TABLE IF NOT EXISTS prayer_partnerships (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    requester_id INTEGER NOT NULL,
-    partner_id INTEGER NOT NULL,
-    status TEXT DEFAULT 'pending',
-    message TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (requester_id) REFERENCES users (id) ON DELETE CASCADE,
-    FOREIGN KEY (partner_id) REFERENCES users (id) ON DELETE CASCADE,
-    UNIQUE(requester_id, partner_id)
-  )`);
-
-  // Personal prayer requests (different from anonymous community ones)
-  db.run(`CREATE TABLE IF NOT EXISTS personal_prayer_requests (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    category TEXT,
-    is_private BOOLEAN DEFAULT 1,
-    is_answered BOOLEAN DEFAULT 0,
-    answered_at DATETIME,
-    answer_description TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-  )`);
-
-  // Prayer request sharing (who can see personal prayer requests)
-  db.run(`CREATE TABLE IF NOT EXISTS prayer_request_shares (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    prayer_request_id INTEGER NOT NULL,
-    shared_with_user_id INTEGER NOT NULL,
-    permission_level TEXT DEFAULT 'view',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (prayer_request_id) REFERENCES personal_prayer_requests (id) ON DELETE CASCADE,
-    FOREIGN KEY (shared_with_user_id) REFERENCES users (id) ON DELETE CASCADE,
-    UNIQUE(prayer_request_id, shared_with_user_id)
-  )`);
-
-  // User sessions for authentication
-  db.run(`CREATE TABLE IF NOT EXISTS user_sessions (
-    id TEXT PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    expires_at DATETIME NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-  )`);
-
-  // Create default admin user (username: admin, password: admin123)
-  const defaultPassword = bcrypt.hashSync('admin123', 10);
-  db.run(`INSERT OR IGNORE INTO admin_users (username, password_hash) VALUES (?, ?)`, 
-    ['admin', defaultPassword]);
-});
+// Note: Postgres schema (CT_* tables) should be created separately.
 
 // Resolve organization context for each request based on host, custom domain, or override hints
 const resolveOrganization = (req, res, next) => {
@@ -2214,30 +1981,7 @@ app.post('/api/praise-report', rateLimiter('praise_submit'));
 app.post('/api/prayer-request/pray', rateLimiter('pray_action'));
 app.post('/api/praise-report/celebrate', rateLimiter('celebrate_action'));
 
-// Start server after running migrations
-async function startServer() {
-  try {
-    await runMigrationsOnStartup();
-    // Ensure default master admin credentials are set (helpful for dev)
-    await new Promise((resolve) => {
-      const defaultMasterPassword = process.env.DEFAULT_MASTER_PASSWORD || 'master123';
-      const passwordHash = bcrypt.hashSync(defaultMasterPassword, 12);
-      db.run(
-        `UPDATE master_admins SET password_hash = ? WHERE username = 'master'`,
-        [passwordHash],
-        () => resolve()
-      );
-    });
-    
-    app.listen(PORT, () => {
-      console.log(`Church Tap app running on http://localhost:${PORT}`);
-      console.log('Default admin login: admin / admin123');
-      console.log('🚀 Multi-tenant system ready!');
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  }
-}
-
-startServer();
+app.listen(PORT, () => {
+  console.log(`Church Tap app running on http://localhost:${PORT}`);
+  console.log('🚀 Multi-tenant system ready!');
+});
