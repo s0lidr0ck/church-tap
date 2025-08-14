@@ -2,6 +2,8 @@ require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const db = require('../db-adapter');
 
+console.log('🔧 Setting up initial data for PostgreSQL database...');
+
 async function setupInitialData() {
   console.log('🚀 Setting up initial data...');
 

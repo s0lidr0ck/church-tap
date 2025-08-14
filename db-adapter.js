@@ -1,38 +1,20 @@
-// Lightweight DB adapter that supports both SQLite and PostgreSQL
-// - For PostgreSQL: Rewrites table names to CT_ prefixed equivalents and converts placeholders
-// - For SQLite: Uses direct SQLite3 with original table names
-// - Exposes get/all/run with sqlite-like callbacks
+// PostgreSQL adapter with table name translation
+// - Maps legacy table names to CT_ prefixed equivalents for multi-tenant support
+// - Converts '?' placeholders to $1, $2, ... for PostgreSQL compatibility
+// - Exposes get/all/run methods with sqlite-like callback interface
+
+const { Pool } = require('pg');
 
 const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL;
 if (!DATABASE_URL) {
-  throw new Error('[db-adapter] DATABASE_URL is required. Set it to your database connection string.');
+  throw new Error('[db-adapter] DATABASE_URL is required. Set it to your PostgreSQL connection string.');
 }
 
-// Detect database type
-const isPostgreSQL = DATABASE_URL.startsWith('postgresql://') || DATABASE_URL.startsWith('postgres://');
-const isSQLite = DATABASE_URL.startsWith('sqlite:');
-
-let pool, db;
-
-try {
-  if (isPostgreSQL) {
-    const { Pool } = require('pg');
-    pool = new Pool({ 
-      connectionString: DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-    });
-  } else if (isSQLite) {
-    // Only require sqlite3 when actually using SQLite
-    const sqlite3 = require('sqlite3').verbose();
-    const dbPath = DATABASE_URL.replace('sqlite:', '');
-    db = new sqlite3.Database(dbPath);
-  } else {
-    throw new Error('[db-adapter] Unsupported database URL format. Use postgresql:// or sqlite: prefix.');
-  }
-} catch (error) {
-  console.error('[db-adapter] Database initialization error:', error);
-  throw error;
-}
+// Initialize PostgreSQL connection pool
+const pool = new Pool({ 
+  connectionString: DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
 const tableMap = new Map([
   ['organizations', 'CT_organizations'],
@@ -95,77 +77,40 @@ function translate(sql) {
 }
 
 async function query(sql, params) {
-  if (isPostgreSQL) {
-    const text = translate(sql);
-    return pool.query(text, params || []);
-  } else {
-    // For SQLite, use direct query without translation
-    return new Promise((resolve, reject) => {
-      const method = sql.trim().toLowerCase().startsWith('select') ? 'all' : 'run';
-      db[method](sql, params || [], function(err, rows) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve({
-            rows: rows || [],
-            rowCount: this ? this.changes : (rows ? rows.length : 0),
-            lastID: this ? this.lastID : null
-          });
-        }
-      });
-    });
-  }
+  const text = translate(sql);
+  return pool.query(text, params || []);
 }
 
 module.exports = {
   get(sql, params, cb) {
-    if (isSQLite) {
-      // Direct SQLite query
-      db.get(sql, params || [], cb);
-    } else {
-      // PostgreSQL query with translation
-      query(sql, params)
-        .then((res) => cb(null, res.rows[0]))
-        .catch((err) => cb(err));
-    }
+    query(sql, params)
+      .then((res) => cb(null, res.rows[0]))
+      .catch((err) => cb(err));
   },
   all(sql, params, cb) {
-    if (isSQLite) {
-      // Direct SQLite query
-      db.all(sql, params || [], cb);
-    } else {
-      // PostgreSQL query with translation
-      query(sql, params)
-        .then((res) => cb(null, res.rows))
-        .catch((err) => cb(err));
-    }
+    query(sql, params)
+      .then((res) => cb(null, res.rows))
+      .catch((err) => cb(err));
   },
   run(sql, params, cb) {
-    if (isSQLite) {
-      // Direct SQLite query
-      db.run(sql, params || [], cb);
-    } else {
-      // PostgreSQL query with translation and RETURNING clause
-      const isInsert = /^\s*insert\s+into/i.test(sql);
-      const needsReturning = isInsert && !/returning\s+\w+/i.test(sql);
-      const sqlWithReturning = needsReturning ? `${sql} RETURNING id` : sql;
-      query(sqlWithReturning, params)
-        .then((res) => {
-          const context = {
-            lastID: isInsert ? (res.rows?.[0]?.id ?? null) : null,
-            changes: typeof res.rowCount === 'number' ? res.rowCount : null,
-          };
-          if (typeof cb === 'function') cb.call(context, null);
-        })
-        .catch((err) => {
-          if (typeof cb === 'function') cb(err);
-        });
-    }
+    const isInsert = /^\s*insert\s+into/i.test(sql);
+    const needsReturning = isInsert && !/returning\s+\w+/i.test(sql);
+    const sqlWithReturning = needsReturning ? `${sql} RETURNING id` : sql;
+    query(sqlWithReturning, params)
+      .then((res) => {
+        const context = {
+          lastID: isInsert ? (res.rows?.[0]?.id ?? null) : null,
+          changes: typeof res.rowCount === 'number' ? res.rowCount : null,
+        };
+        if (typeof cb === 'function') cb.call(context, null);
+      })
+      .catch((err) => {
+        if (typeof cb === 'function') cb(err);
+      });
   },
   // Expose direct query for advanced cases
   _query: query,
-  _pool: pool,
-  _db: db
+  _pool: pool
 };
 
 
