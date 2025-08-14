@@ -193,18 +193,35 @@
             <!-- Text Verse -->
             <div id="textVerse" class="hidden">
               <blockquote id="verseText" class="verse-text text-gray-800 dark:text-gray-200 mb-6"></blockquote>
-              <div class="flex justify-between items-center mb-4">
-                <div class="flex space-x-2">
-                  <button id="textChapterBtn" onclick="app.readFullChapter(app.currentVerse?.bible_reference)" 
-                          class="text-xs bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 px-3 py-1 rounded-full hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors">
-                    📖 Read Full Chapter
-                  </button>
-                  <button id="textTranslationBtn" onclick="app.viewInTranslation(app.currentVerse?.bible_reference)" 
-                          class="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors">
-                    📚 View in <span id="textTranslationName">NASB</span>
-                  </button>
+              <div class="mb-4">
+                <!-- Mobile: Stack buttons and reference vertically -->
+                <div class="flex flex-col space-y-3 sm:hidden">
+                  <div class="flex flex-col space-y-2">
+                    <button id="textChapterBtn" onclick="app.readFullChapter(app.currentVerse?.bible_reference)" 
+                            class="text-xs bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 px-3 py-2 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors">
+                      📖 Read Full Chapter
+                    </button>
+                    <button id="textTranslationBtn" onclick="app.viewInTranslation(app.currentVerse?.bible_reference)" 
+                            class="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-3 py-2 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors">
+                      📚 View in Translation
+                    </button>
+                  </div>
+                  <div id="verseReference" class="text-sm font-medium text-primary-600 dark:text-primary-400 text-center"></div>
                 </div>
-                <div id="verseReference" class="text-sm font-medium text-primary-600 dark:text-primary-400"></div>
+                <!-- Desktop: Keep horizontal layout -->
+                <div class="hidden sm:flex justify-between items-center">
+                  <div class="flex space-x-2">
+                    <button id="textChapterBtnDesktop" onclick="app.readFullChapter(app.currentVerse?.bible_reference)" 
+                            class="text-xs bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 px-3 py-1 rounded-full hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors">
+                      📖 Read Full Chapter
+                    </button>
+                    <button id="textTranslationBtnDesktop" onclick="app.viewInTranslation(app.currentVerse?.bible_reference)" 
+                            class="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors">
+                      📚 View in Translation
+                    </button>
+                  </div>
+                  <div id="verseReferenceDesktop" class="text-sm font-medium text-primary-600 dark:text-primary-400"></div>
+                </div>
               </div>
               <div id="verseContext" class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed hidden"></div>
             </div>
@@ -212,18 +229,35 @@
             <!-- Image Verse -->
             <div id="imageVerse" class="hidden text-center">
               <img id="verseImage" class="verse-image mx-auto" alt="Daily verse image">
-              <div class="flex justify-between items-center mt-4 mb-4">
-                <div class="flex space-x-2">
-                  <button id="imageChapterBtn" onclick="app.readFullChapter(app.currentVerse?.bible_reference)" 
-                          class="text-xs bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 px-3 py-1 rounded-full hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors">
-                    📖 Read Full Chapter
-                  </button>
-                  <button id="imageTranslationBtn" onclick="app.viewInTranslation(app.currentVerse?.bible_reference)" 
-                          class="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors">
-                    📚 View in <span id="imageTranslationName">NASB</span>
-                  </button>
+              <div class="mt-4 mb-4">
+                <!-- Mobile: Stack buttons and reference vertically -->
+                <div class="flex flex-col space-y-3 sm:hidden">
+                  <div class="flex flex-col space-y-2">
+                    <button id="imageChapterBtn" onclick="app.readFullChapter(app.currentVerse?.bible_reference)" 
+                            class="text-xs bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 px-3 py-2 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors">
+                      📖 Read Full Chapter
+                    </button>
+                    <button id="imageTranslationBtn" onclick="app.viewInTranslation(app.currentVerse?.bible_reference)" 
+                            class="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-3 py-2 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors">
+                      📚 View in Translation
+                    </button>
+                  </div>
+                  <div id="imageReference" class="text-sm font-medium text-primary-600 dark:text-primary-400 text-center"></div>
                 </div>
-                <div id="imageReference" class="text-sm font-medium text-primary-600 dark:text-primary-400"></div>
+                <!-- Desktop: Keep horizontal layout -->
+                <div class="hidden sm:flex justify-between items-center">
+                  <div class="flex space-x-2">
+                    <button id="imageChapterBtnDesktop" onclick="app.readFullChapter(app.currentVerse?.bible_reference)" 
+                            class="text-xs bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 px-3 py-1 rounded-full hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors">
+                      📖 Read Full Chapter
+                    </button>
+                    <button id="imageTranslationBtnDesktop" onclick="app.viewInTranslation(app.currentVerse?.bible_reference)" 
+                            class="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors">
+                      📚 View in Translation
+                    </button>
+                  </div>
+                  <div id="imageReferenceDesktop" class="text-sm font-medium text-primary-600 dark:text-primary-400"></div>
+                </div>
               </div>
               <div id="imageContext" class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed hidden"></div>
             </div>
