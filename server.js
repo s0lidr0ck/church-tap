@@ -48,10 +48,10 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: { 
-    secure: process.env.NODE_ENV === 'production',
+    secure: false, // Set to false for App Runner compatibility - sessions work over HTTP/HTTPS
     sameSite: 'lax',
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
 
@@ -618,6 +618,7 @@ const requireOrgAuth = (req, res, next) => {
 // Master Admin Authentication Middleware
 const requireMasterAuth = (req, res, next) => {
   if (!req.session.masterAdminId) {
+    console.error('Master auth failed - Session:', req.session ? 'exists' : 'missing', 'MasterAdminId:', req.session?.masterAdminId);
     return res.status(401).json({ success: false, error: 'Master authentication required' });
   }
   next();
@@ -1126,13 +1127,19 @@ app.get('/api/master/dashboard', requireMasterAuth, (req, res) => {
 
 // Get all organizations
 app.get('/api/master/organizations', requireMasterAuth, (req, res) => {
-  db.all(`SELECT * FROM organizations ORDER BY created_at DESC`, (err, rows) => {
-    if (err) {
-      return res.status(500).json({ success: false, error: 'Database error' });
-    }
-    
-    res.json({ success: true, organizations: rows });
-  });
+  try {
+    db.all(`SELECT * FROM organizations ORDER BY created_at DESC`, (err, rows) => {
+      if (err) {
+        console.error('Master organizations query error:', err);
+        return res.status(500).json({ success: false, error: 'Database error' });
+      }
+      
+      res.json({ success: true, organizations: rows });
+    });
+  } catch (error) {
+    console.error('Master organizations endpoint error:', error);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
 });
 
 // List admins for a specific organization (master scope)
@@ -1194,14 +1201,15 @@ app.put('/api/master/organizations/:id/admins/:adminId', requireMasterAuth, (req
 
 // Create new organization
 app.post('/api/master/organizations', requireMasterAuth, (req, res) => {
-  const { name, subdomain, contact_email, plan_type, custom_domain } = req.body;
-  
-  if (!name || !subdomain || !plan_type) {
-    return res.status(400).json({ success: false, error: 'Name, subdomain, and plan are required' });
-  }
-  
-  // Check if subdomain is already taken
-  db.get(`SELECT id FROM organizations WHERE subdomain = ?`, [subdomain], (err, existing) => {
+  try {
+    const { name, subdomain, contact_email, plan_type, custom_domain } = req.body;
+    
+    if (!name || !subdomain || !plan_type) {
+      return res.status(400).json({ success: false, error: 'Name, subdomain, and plan are required' });
+    }
+    
+    // Check if subdomain is already taken
+    db.get(`SELECT id FROM organizations WHERE subdomain = ?`, [subdomain], (err, existing) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -1244,6 +1252,10 @@ app.post('/api/master/organizations', requireMasterAuth, (req, res) => {
       res.json({ success: true, organization_id: this.lastID });
     });
   });
+  } catch (error) {
+    console.error('Master create organization endpoint error:', error);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
 });
 
 // Update organization

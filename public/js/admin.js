@@ -692,20 +692,19 @@ class AdminDashboard {
   }
 
   toggleContentFields(contentType) {
-    const textFields = document.getElementById('textFields');
     const imageFields = document.getElementById('imageFields');
     const verseText = document.getElementById('verseText');
     const verseImage = document.getElementById('verseImage');
     
+    // Verse text is always visible and required for searchability
+    verseText.required = true;
+    
     if (contentType === 'text') {
-      textFields.classList.remove('hidden');
       imageFields.classList.add('hidden');
-      verseText.required = true;
       verseImage.required = false;
     } else {
-      textFields.classList.add('hidden');
+      // For image verses, show image upload field AND keep text field visible
       imageFields.classList.remove('hidden');
-      verseText.required = false;
       verseImage.required = !this.currentEditingVerse; // Only required for new image verses
     }
   }
