@@ -380,17 +380,34 @@ app.post('/api/sync-analytics', (req, res) => {
   const { events } = req.body || {};
 
   if (Array.isArray(events) && events.length > 0) {
-    const stmt = db.prepare(`INSERT INTO analytics (verse_id, action, ip_address, user_agent, organization_id) VALUES (?, ?, ?, ?, ?)`);
-    for (const ev of events) {
-      stmt.run([ev.verse_id || null, ev.action || 'bg_event', ip, userAgent, orgId]);
-    }
-    stmt.finalize((err) => {
-      if (err) {
-        console.error('Background sync batch error:', err);
-        return res.status(500).json({ success: false });
+    // Process events sequentially for PostgreSQL compatibility
+    let processed = 0;
+    let errors = [];
+    
+    const processEvent = (index) => {
+      if (index >= events.length) {
+        if (errors.length > 0) {
+          console.error('Background sync batch errors:', errors);
+          return res.status(500).json({ success: false });
+        }
+        return res.json({ success: true, processed });
       }
-      return res.json({ success: true, processed: events.length });
-    });
+      
+      const ev = events[index];
+      db.run(`INSERT INTO analytics (verse_id, action, ip_address, user_agent, organization_id) VALUES (?, ?, ?, ?, ?)`,
+        [ev.verse_id || null, ev.action || 'bg_event', ip, userAgent, orgId],
+        (err) => {
+          if (err) {
+            errors.push(`Event ${index}: ${err.message}`);
+          } else {
+            processed++;
+          }
+          processEvent(index + 1);
+        }
+      );
+    };
+    
+    processEvent(0);
   } else {
     db.run(
       `INSERT INTO analytics (verse_id, action, ip_address, user_agent, organization_id) VALUES (?, ?, ?, ?, ?)`,
@@ -1290,30 +1307,26 @@ app.get('/api/master/overview', requireMasterAuth, (req, res) => {
   const sevenDaysAgoISO = sevenDaysAgo.toISOString();
 
   const getTotals = new Promise((resolve, reject) => {
-    db.serialize(() => {
-      const totals = {};
-      db.get(`SELECT COUNT(*) AS total FROM organizations`, (err, row) => {
-        if (err) return reject(err);
-        totals.totalOrganizations = row?.total || 0;
-      });
-      db.get(`SELECT COUNT(*) AS active FROM organizations WHERE is_active = TRUE`, (err, row) => {
-        if (err) return reject(err);
-        totals.activeOrganizations = row?.active || 0;
-      });
-      db.get(`SELECT COUNT(*) AS total FROM users`, (err, row) => {
-        if (err) return reject(err);
-        totals.totalUsers = row?.total || 0;
-      });
-      db.get(`SELECT COUNT(*) AS total FROM verses`, (err, row) => {
-        if (err) return reject(err);
-        totals.totalVerses = row?.total || 0;
-      });
-      db.get(`SELECT COUNT(*) AS views, COUNT(DISTINCT ip_address) AS uniques FROM analytics WHERE action = 'verse_view' AND timestamp >= ?`, [sevenDaysAgoISO], (err, row) => {
-        if (err) return reject(err);
-        totals.totalViews7d = row?.views || 0;
-        totals.uniqueVisitors7d = row?.uniques || 0;
-        resolve(totals);
-      });
+    // Get all totals in a single query for PostgreSQL compatibility
+    db.get(`
+      SELECT 
+        (SELECT COUNT(*) FROM organizations) AS total_orgs,
+        (SELECT COUNT(*) FROM organizations WHERE is_active = TRUE) AS active_orgs,
+        (SELECT COUNT(*) FROM users) AS total_users,
+        (SELECT COUNT(*) FROM verses) AS total_verses,
+        (SELECT COUNT(*) FROM analytics WHERE action = 'verse_view' AND timestamp >= ?) AS total_views_7d,
+        (SELECT COUNT(DISTINCT ip_address) FROM analytics WHERE action = 'verse_view' AND timestamp >= ?) AS unique_visitors_7d
+    `, [sevenDaysAgoISO, sevenDaysAgoISO], (err, row) => {
+      if (err) return reject(err);
+      const totals = {
+        totalOrganizations: parseInt(row?.total_orgs || 0),
+        activeOrganizations: parseInt(row?.active_orgs || 0),
+        totalUsers: parseInt(row?.total_users || 0),
+        totalVerses: parseInt(row?.total_verses || 0),
+        totalViews7d: parseInt(row?.total_views_7d || 0),
+        uniqueVisitors7d: parseInt(row?.unique_visitors_7d || 0)
+      };
+      resolve(totals);
     });
   });
 
