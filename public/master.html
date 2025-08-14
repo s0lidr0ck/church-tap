@@ -48,8 +48,8 @@
   <div id="masterDashboard" class="hidden">
     <div class="flex h-screen" style="background: radial-gradient(1200px 600px at 30% -10%, var(--brand-bg), color-mix(in srgb, var(--brand-primary) 10%, white))">
       
-      <!-- Master Sidebar -->
-      <div class="flex lg:flex-shrink-0">
+      <!-- Master Sidebar (Hidden on mobile) -->
+      <div class="hidden lg:flex lg:flex-shrink-0">
         <div class="flex flex-col w-80">
           <!-- Sidebar Header -->
           <div class="flex items-center h-16 flex-shrink-0 px-6 sidebar-header border-b">
@@ -117,11 +117,93 @@
         </div>
       </div>
 
+      <!-- Mobile Menu Overlay -->
+      <div class="lg:hidden fixed inset-0 z-40 hidden" id="masterMobileMenuOverlay">
+        <div class="fixed inset-0 bg-gray-600 bg-opacity-75" id="masterMobileMenuBackdrop"></div>
+        <div class="relative flex-1 flex flex-col max-w-xs w-full">
+          <div class="flex flex-col h-full admin-sidebar">
+            <!-- Mobile Sidebar Header -->
+            <div class="flex items-center justify-between h-16 flex-shrink-0 px-6 sidebar-header">
+              <div class="flex items-center">
+                <span class="text-2xl mr-3">🚀</span>
+                <div>
+                  <div class="text-lg font-semibold">Master Portal</div>
+                  <div class="text-sm text-white/80">SaaS</div>
+                </div>
+              </div>
+              <button id="closeMasterMobileMenu" class="p-2 rounded-md text-white/70 hover:text-white">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+            
+            <!-- Mobile Navigation -->
+            <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+              <a href="#" class="master-mobile-nav-item group flex items-center px-3 py-3 text-sm font-medium rounded-lg" data-target="dashboardMasterContent">
+                <span class="mr-3 text-lg">📊</span>
+                Dashboard
+              </a>
+              
+              <a href="#" class="master-mobile-nav-item group flex items-center px-3 py-3 text-sm font-medium rounded-lg" data-target="organizationsMasterContent">
+                <span class="mr-3 text-lg">🏢</span>
+                Organizations
+              </a>
+              
+              <a href="#" class="master-mobile-nav-item group flex items-center px-3 py-3 text-sm font-medium rounded-lg" data-target="billingMasterContent">
+                <span class="mr-3 text-lg">💳</span>
+                Billing
+              </a>
+              
+              <a href="#" class="master-mobile-nav-item group flex items-center px-3 py-3 text-sm font-medium rounded-lg" data-target="analyticsMasterContent">
+                <span class="mr-3 text-lg">📈</span>
+                Analytics
+              </a>
+              
+              <a href="#" class="master-mobile-nav-item group flex items-center px-3 py-3 text-sm font-medium rounded-lg" data-target="supportMasterContent">
+                <span class="mr-3 text-lg">🎧</span>
+                Support
+              </a>
+              
+              <a href="#" class="master-mobile-nav-item group flex items-center px-3 py-3 text-sm font-medium rounded-lg" data-target="systemMasterContent">
+                <span class="mr-3 text-lg">⚙️</span>
+                System
+              </a>
+            </nav>
+            
+            <!-- Mobile Sidebar Footer -->
+            <div class="flex-shrink-0 sidebar-footer border-t p-4">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <div class="h-8 w-8 rounded-full avatar-brand flex items-center justify-center text-white text-sm font-medium" id="masterMobileAdminAvatar">M</div>
+                </div>
+                <div class="ml-3 min-w-0 flex-1">
+                  <div class="text-sm font-medium text-white" id="masterMobileAdminUsername"></div>
+                  <div class="text-xs text-white/80">Master Admin</div>
+                </div>
+                <button id="masterMobileLogoutBtn" class="ml-3 p-1 rounded-full text-white/70 hover:text-white">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Main Content Area -->
       <div class="flex-1 flex flex-col overflow-hidden">
         <!-- Top Header -->
         <header class="w-full admin-header-divider">
           <div class="relative z-10 flex-shrink-0 h-16 admin-header flex">
+            <!-- Mobile menu button -->
+            <button class="lg:hidden px-4 border-r border-gray-200 text-gray-400 focus:outline-none focus:text-gray-600" id="masterMobileMenuBtn">
+              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+              </svg>
+            </button>
+            
             <div class="flex-1 flex justify-between px-4 sm:px-6 lg:px-8">
               <div class="flex-1 flex items-center">
                 <h1 class="text-3xl font-bold text-white" id="masterPageTitle">Dashboard</h1>

@@ -107,6 +107,35 @@ class MasterPortal {
       this.handleMasterLogout();
     });
 
+    // Mobile menu
+    document.getElementById('masterMobileMenuBtn').addEventListener('click', () => {
+      this.showMasterMobileMenu();
+    });
+    
+    document.getElementById('closeMasterMobileMenu').addEventListener('click', () => {
+      this.hideMasterMobileMenu();
+    });
+    
+    document.getElementById('masterMobileMenuBackdrop').addEventListener('click', () => {
+      this.hideMasterMobileMenu();
+    });
+
+    // Mobile navigation items
+    document.querySelectorAll('.master-mobile-nav-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const target = item.getAttribute('data-target');
+        const tabName = target.replace('MasterContent', '').replace('Master', '');
+        this.showMasterTab(tabName);
+        this.hideMasterMobileMenu();
+      });
+    });
+
+    // Mobile logout
+    document.getElementById('masterMobileLogoutBtn').addEventListener('click', () => {
+      this.handleMasterLogout();
+    });
+
     // Navigation
     document.getElementById('dashboardMasterNav').addEventListener('click', (e) => {
       e.preventDefault();
@@ -294,6 +323,19 @@ class MasterPortal {
     
     if (this.currentMasterAdmin) {
       document.getElementById('masterAdminUsername').textContent = this.currentMasterAdmin.username;
+      
+      // Update mobile master admin display
+      const mobileMasterAdminUsernameEl = document.getElementById('masterMobileAdminUsername');
+      if (mobileMasterAdminUsernameEl) {
+        mobileMasterAdminUsernameEl.textContent = this.currentMasterAdmin.username;
+      }
+      
+      // Update avatar initials
+      const initial = this.currentMasterAdmin.username.charAt(0).toUpperCase();
+      const masterMobileAvatarEl = document.getElementById('masterMobileAdminAvatar');
+      if (masterMobileAvatarEl) {
+        masterMobileAvatarEl.textContent = initial;
+      }
     }
     
     // Show default tab
@@ -332,6 +374,32 @@ class MasterPortal {
       this.loadOrganizations();
     } else if (tabName === 'analytics') {
       this.loadGlobalAnalytics();
+    }
+  }
+
+  showMasterMobileMenu() {
+    document.getElementById('masterMobileMenuOverlay').classList.remove('hidden');
+    // Update mobile nav active state
+    this.updateMasterMobileNavActiveState();
+  }
+
+  hideMasterMobileMenu() {
+    document.getElementById('masterMobileMenuOverlay').classList.add('hidden');
+  }
+
+  updateMasterMobileNavActiveState() {
+    // Remove active class from all mobile nav items
+    document.querySelectorAll('.master-mobile-nav-item').forEach(item => {
+      item.classList.remove('active');
+    });
+    
+    // Add active class to current tab's mobile nav item
+    const currentTab = document.querySelector('.tab-content:not(.hidden)');
+    if (currentTab) {
+      const mobileNavItem = document.querySelector(`.master-mobile-nav-item[data-target="${currentTab.id}"]`);
+      if (mobileNavItem) {
+        mobileNavItem.classList.add('active');
+      }
     }
   }
 

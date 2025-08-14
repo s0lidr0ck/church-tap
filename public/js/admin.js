@@ -27,6 +27,35 @@ class AdminDashboard {
       this.handleLogout();
     });
 
+    // Mobile menu
+    document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+      this.showMobileMenu();
+    });
+    
+    document.getElementById('closeMobileMenu').addEventListener('click', () => {
+      this.hideMobileMenu();
+    });
+    
+    document.getElementById('mobileMenuBackdrop').addEventListener('click', () => {
+      this.hideMobileMenu();
+    });
+
+    // Mobile navigation items
+    document.querySelectorAll('.mobile-nav-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const target = item.getAttribute('data-target');
+        const tabName = target.replace('Content', '');
+        this.showTab(tabName);
+        this.hideMobileMenu();
+      });
+    });
+
+    // Mobile logout in nav
+    document.getElementById('mobileLogoutBtnNav').addEventListener('click', () => {
+      this.handleLogout();
+    });
+
     // Sidebar navigation
     document.getElementById('dashboardNav').addEventListener('click', (e) => {
       e.preventDefault();
@@ -286,6 +315,23 @@ class AdminDashboard {
         adminUsernameEl.textContent = this.currentAdmin.username;
       }
       
+      // Update mobile admin display
+      const mobileAdminUsernameEl = document.getElementById('mobileAdminUsernameNav');
+      if (mobileAdminUsernameEl) {
+        mobileAdminUsernameEl.textContent = this.currentAdmin.username;
+      }
+      
+      // Update avatar initials
+      const initial = this.currentAdmin.username.charAt(0).toUpperCase();
+      const adminAvatarEl = document.getElementById('adminAvatar');
+      if (adminAvatarEl) {
+        adminAvatarEl.textContent = initial;
+      }
+      const mobileAvatarEl = document.getElementById('mobileAdminAvatar');
+      if (mobileAvatarEl) {
+        mobileAvatarEl.textContent = initial;
+      }
+      
       // Update organization context in header if element exists
       const orgContextEl = document.getElementById('organizationContext');
       if (orgContextEl) {
@@ -353,6 +399,23 @@ class AdminDashboard {
     
     if (this.currentAdmin) {
       document.getElementById('adminUsername').textContent = this.currentAdmin.username;
+      
+      // Update mobile admin display
+      const mobileAdminUsernameEl = document.getElementById('mobileAdminUsernameNav');
+      if (mobileAdminUsernameEl) {
+        mobileAdminUsernameEl.textContent = this.currentAdmin.username;
+      }
+      
+      // Update avatar initials
+      const initial = this.currentAdmin.username.charAt(0).toUpperCase();
+      const adminAvatarEl = document.getElementById('adminAvatar');
+      if (adminAvatarEl) {
+        adminAvatarEl.textContent = initial;
+      }
+      const mobileAvatarEl = document.getElementById('mobileAdminAvatar');
+      if (mobileAvatarEl) {
+        mobileAvatarEl.textContent = initial;
+      }
     }
     
     // Show default tab (verses)
@@ -389,6 +452,33 @@ class AdminDashboard {
       this.loadAnalytics();
     } else if (tabName === 'community') {
       this.loadCommunityData();
+    }
+  }
+
+  showMobileMenu() {
+    document.getElementById('mobileMenuOverlay').classList.remove('hidden');
+    // Update mobile nav active state
+    this.updateMobileNavActiveState();
+  }
+
+  hideMobileMenu() {
+    document.getElementById('mobileMenuOverlay').classList.add('hidden');
+  }
+
+  updateMobileNavActiveState() {
+    // Remove active class from all mobile nav items
+    document.querySelectorAll('.mobile-nav-item').forEach(item => {
+      item.classList.remove('active');
+    });
+    
+    // Add active class to current tab's mobile nav item
+    const currentTab = document.querySelector('.tab-content:not(.hidden)');
+    if (currentTab) {
+      const tabName = currentTab.id.replace('Content', '');
+      const mobileNavItem = document.querySelector(`.mobile-nav-item[data-target="${tabName}Content"]`);
+      if (mobileNavItem) {
+        mobileNavItem.classList.add('active');
+      }
     }
   }
 
