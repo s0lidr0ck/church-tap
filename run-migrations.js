@@ -1,23 +1,13 @@
-const MigrationSystem = require('./migrations/migration-system');
-const path = require('path');
+// Disabled legacy SQLite migrations
+// App Runner build previously invoked `node run-migrations.js` which required SQLite.
+// We now use Postgres only and initialize schema via `scripts/init-postgres.js` when needed.
+// Keep this file as a no-op so existing build pipelines succeed.
 
 async function runMigrations() {
-  const dbPath = path.join(__dirname, 'database.db');
-  const migrationSystem = new MigrationSystem(dbPath);
-
-  try {
-    console.log('🚀 Starting database migrations...');
-    await migrationSystem.migrate();
-    console.log('✅ All migrations completed successfully!');
-  } catch (error) {
-    console.error('❌ Migration failed:', error);
-    process.exit(1);
-  } finally {
-    migrationSystem.close();
-  }
+  console.log('⏭️  Skipping legacy SQLite migrations (Postgres-only deployment).');
+  return true;
 }
 
-// Run migrations if this script is executed directly
 if (require.main === module) {
   runMigrations();
 }
