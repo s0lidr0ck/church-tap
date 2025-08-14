@@ -485,6 +485,103 @@ app.get('/api/verses/search', optionalAuth, (req, res) => {
   });
 });
 
+// POST endpoint for verse search (for frontend compatibility)
+app.post('/api/verses/search', optionalAuth, (req, res) => {
+  const { query, limit = 20, offset = 0 } = req.body;
+  const orgId = req.organizationId || 1;
+  
+  if (!query || query.trim().length < 2) {
+    return res.status(400).json({ success: false, error: 'Search query must be at least 2 characters' });
+  }
+  
+  const searchTerm = `%${query.trim()}%`;
+  
+  // Search in verse text, bible reference, context, and tags
+  db.all(`
+    SELECT id, date, content_type, verse_text, image_path, bible_reference, context, tags, published
+    FROM verses 
+    WHERE published = TRUE 
+    AND organization_id = ?
+    AND (
+      verse_text LIKE ? OR 
+      bible_reference LIKE ? OR 
+      context LIKE ? OR 
+      tags LIKE ?
+    )
+    ORDER BY date DESC 
+    LIMIT ? OFFSET ?
+  `, [orgId, searchTerm, searchTerm, searchTerm, searchTerm, parseInt(limit), parseInt(offset)], (err, rows) => {
+    if (err) {
+      console.error('Search verses error:', err);
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    
+    // Get total count for pagination
+    db.get(`
+      SELECT COUNT(*) as total
+      FROM verses 
+      WHERE published = TRUE 
+      AND organization_id = ?
+      AND (
+        verse_text LIKE ? OR 
+        bible_reference LIKE ? OR 
+        context LIKE ? OR 
+        tags LIKE ?
+      )
+    `, [orgId, searchTerm, searchTerm, searchTerm, searchTerm], (err, countRow) => {
+      if (err) {
+        console.error('Search count error:', err);
+        return res.status(500).json({ success: false, error: 'Database error' });
+      }
+      
+      res.json({ 
+        success: true, 
+        verses: rows || [],
+        total: countRow ? countRow.total : 0,
+        query: query.trim(),
+        pagination: {
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          hasMore: (countRow?.total || 0) > (parseInt(offset) + parseInt(limit))
+        }
+      });
+    });
+  });
+});
+
+// Get verse history for the last N days
+app.get('/api/verses/history/:days', optionalAuth, (req, res) => {
+  const days = parseInt(req.params.days) || 30;
+  const orgId = req.organizationId || 1;
+  
+  // Calculate the date N days ago
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - days);
+  const cutoffDateStr = cutoffDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+  
+  db.all(`
+    SELECT id, date, content_type, verse_text, image_path, bible_reference, context, tags, published
+    FROM verses 
+    WHERE published = TRUE 
+    AND organization_id = ?
+    AND date >= ?
+    ORDER BY date DESC 
+    LIMIT 100
+  `, [orgId, cutoffDateStr], (err, rows) => {
+    if (err) {
+      console.error('History verses error:', err);
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    
+    res.json({ 
+      success: true, 
+      verses: rows || [],
+      days: days,
+      cutoff_date: cutoffDateStr
+    });
+  });
+});
+
 // Submit feedback
 app.post('/api/feedback', (req, res) => {
   const { feedback, user_token, url } = req.body;

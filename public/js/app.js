@@ -98,7 +98,8 @@ class ChurchTapApp {
     });
 
     document.getElementById('searchBtn').addEventListener('click', () => {
-      this.openSearch();
+      this.showVerseSearchModal();
+      this.toggleQuickMenu();
     });
 
     document.getElementById('feedbackBtn').addEventListener('click', () => {
@@ -120,6 +121,10 @@ class ChurchTapApp {
 
     document.getElementById('refreshBtn').addEventListener('click', () => {
       this.refreshVerse();
+    });
+
+    document.getElementById('historyBtn').addEventListener('click', () => {
+      this.showHistory();
     });
 
     // Community event listeners
@@ -340,6 +345,7 @@ class ChurchTapApp {
     if (verse.content_type === 'text') {
       document.getElementById('verseText').textContent = verse.verse_text;
       document.getElementById('verseReference').textContent = verse.bible_reference || '';
+      document.getElementById('verseReferenceDesktop').textContent = verse.bible_reference || '';
       
       const contextEl = document.getElementById('verseContext');
       if (verse.context) {
@@ -357,6 +363,7 @@ class ChurchTapApp {
       img.alt = verse.bible_reference || 'Church Tap image';
       
       document.getElementById('imageReference').textContent = verse.bible_reference || '';
+      document.getElementById('imageReferenceDesktop').textContent = verse.bible_reference || '';
       
       const contextEl = document.getElementById('imageContext');
       if (verse.context) {
@@ -942,14 +949,58 @@ class ChurchTapApp {
     return this.currentUser?.preferredTranslation || 'NASB';
   }
 
-  readFullChapter(reference) {
+  async readFullChapter(reference) {
     if (!reference) {
       this.showToast('No Bible reference available');
       return;
     }
 
     const translation = this.getUserPreferredTranslation();
-    
+    return this.readFullChapterInTranslation(reference, translation);
+  }
+
+  async readFullChapterInTranslation(reference, translation) {
+    if (!reference) {
+      this.showToast('No Bible reference available');
+      return;
+    }
+
+    // Parse the Bible reference to get book and chapter
+    const parsedRef = this.parseBibleReference(reference);
+    if (!parsedRef) {
+      console.log('Could not parse reference for chapter reading:', reference);
+      // Fallback to external Bible app/website
+      this.openExternalBibleApp(reference, translation);
+      return;
+    }
+
+    try {
+      this.showToast(`Loading full chapter in ${translation}...`);
+      
+      // Use bolls.life API to fetch the whole chapter
+      const bollsTranslation = this.getBollsTranslationId(translation);
+      const apiUrl = `https://bolls.life/get-text/${bollsTranslation}/${parsedRef.book}/${parsedRef.chapter}/`;
+      console.log('Fetching chapter from bolls.life:', apiUrl);
+      
+      const response = await fetch(apiUrl);
+      console.log('Chapter response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Chapter data:', data);
+        this.showChapterModal(data, reference, translation);
+      } else {
+        console.log('Chapter API failed, falling back to external app');
+        this.openExternalBibleApp(reference, translation);
+      }
+    } catch (error) {
+      console.error('Error fetching chapter:', error);
+      console.log('Network error, falling back to external app');
+      this.openExternalBibleApp(reference, translation);
+    }
+  }
+
+  openExternalBibleApp(reference, translation) {
     // Clean up the reference for URL encoding
     const cleanRef = reference.replace(/\s+/g, '%20');
     
@@ -996,41 +1047,237 @@ class ChurchTapApp {
     return translationIds[translation] || translationIds['NASB'];
   }
 
-  async viewInTranslation(reference) {
+  getBollsTranslationId(translation) {
+    // Map our translations to bolls.life API IDs
+    const bollsTranslationIds = {
+      'NASB': 'NASB',
+      'ESV': 'ESV',
+      'NIV': 'NIV',
+      'NLT': 'NLT',
+      'KJV': 'KJV',
+      'MSG': 'MSG',
+      'CSB': 'CSB',
+      'ASV': 'ASV',
+      'WEB': 'WEB'
+    };
+    return bollsTranslationIds[translation] || bollsTranslationIds['NASB'];
+  }
+
+  parseBibleReference(reference) {
+    // Parse references like "John 3:16", "1 Corinthians 13:4-8", "Genesis 1:1"
+    // Returns {book: number, chapter: number, verse: number} or null if parsing fails
+    
+    const bookNumbers = {
+      'genesis': 1, 'gen': 1,
+      'exodus': 2, 'exo': 2, 'exod': 2,
+      'leviticus': 3, 'lev': 3,
+      'numbers': 4, 'num': 4,
+      'deuteronomy': 5, 'deut': 5, 'deu': 5,
+      'joshua': 6, 'josh': 6, 'jos': 6,
+      'judges': 7, 'judg': 7, 'jdg': 7,
+      'ruth': 8, 'rut': 8,
+      '1 samuel': 9, '1samuel': 9, '1sam': 9, '1sa': 9,
+      '2 samuel': 10, '2samuel': 10, '2sam': 10, '2sa': 10,
+      '1 kings': 11, '1kings': 11, '1kgs': 11, '1ki': 11,
+      '2 kings': 12, '2kings': 12, '2kgs': 12, '2ki': 12,
+      '1 chronicles': 13, '1chronicles': 13, '1chron': 13, '1chr': 13, '1ch': 13,
+      '2 chronicles': 14, '2chronicles': 14, '2chron': 14, '2chr': 14, '2ch': 14,
+      'ezra': 15, 'ezr': 15,
+      'nehemiah': 16, 'neh': 16,
+      'esther': 17, 'est': 17,
+      'job': 18,
+      'psalm': 19, 'psalms': 19, 'psa': 19, 'ps': 19,
+      'proverbs': 20, 'prov': 20, 'pro': 20,
+      'ecclesiastes': 21, 'eccl': 21, 'ecc': 21,
+      'song of solomon': 22, 'song': 22, 'sos': 22,
+      'isaiah': 23, 'isa': 23,
+      'jeremiah': 24, 'jer': 24,
+      'lamentations': 25, 'lam': 25,
+      'ezekiel': 26, 'ezek': 26, 'eze': 26,
+      'daniel': 27, 'dan': 27,
+      'hosea': 28, 'hos': 28,
+      'joel': 29, 'joe': 29,
+      'amos': 30, 'amo': 30,
+      'obadiah': 31, 'obad': 31, 'oba': 31,
+      'jonah': 32, 'jon': 32,
+      'micah': 33, 'mic': 33,
+      'nahum': 34, 'nah': 34,
+      'habakkuk': 35, 'hab': 35,
+      'zephaniah': 36, 'zeph': 36, 'zep': 36,
+      'haggai': 37, 'hag': 37,
+      'zechariah': 38, 'zech': 38, 'zec': 38,
+      'malachi': 39, 'mal': 39,
+      'matthew': 40, 'matt': 40, 'mat': 40,
+      'mark': 41, 'mar': 41,
+      'luke': 42, 'luk': 42,
+      'john': 43, 'joh': 43,
+      'acts': 44, 'act': 44,
+      'romans': 45, 'rom': 45,
+      '1 corinthians': 46, '1corinthians': 46, '1cor': 46, '1co': 46,
+      '2 corinthians': 47, '2corinthians': 47, '2cor': 47, '2co': 47,
+      'galatians': 48, 'gal': 48,
+      'ephesians': 49, 'eph': 49,
+      'philippians': 50, 'phil': 50, 'php': 50,
+      'colossians': 51, 'col': 51,
+      '1 thessalonians': 52, '1thessalonians': 52, '1thess': 52, '1th': 52,
+      '2 thessalonians': 53, '2thessalonians': 53, '2thess': 53, '2th': 53,
+      '1 timothy': 54, '1timothy': 54, '1tim': 54, '1ti': 54,
+      '2 timothy': 55, '2timothy': 55, '2tim': 55, '2ti': 55,
+      'titus': 56, 'tit': 56,
+      'philemon': 57, 'phlm': 57, 'phm': 57,
+      'hebrews': 58, 'heb': 58,
+      'james': 59, 'jas': 59,
+      '1 peter': 60, '1peter': 60, '1pet': 60, '1pe': 60,
+      '2 peter': 61, '2peter': 61, '2pet': 61, '2pe': 61,
+      '1 john': 62, '1john': 62, '1joh': 62, '1jn': 62,
+      '2 john': 63, '2john': 63, '2joh': 63, '2jn': 63,
+      '3 john': 64, '3john': 64, '3joh': 64, '3jn': 64,
+      'jude': 65, 'jud': 65,
+      'revelation': 66, 'rev': 66
+    };
+
+    try {
+      // Clean up the reference
+      const cleanRef = reference.trim();
+      
+      // Match patterns like "John 3:16" or "1 Corinthians 13:4"
+      const match = cleanRef.match(/^(.+?)\s+(\d+):(\d+)(?:-\d+)?$/i);
+      if (!match) return null;
+      
+      const bookName = match[1].toLowerCase().replace(/\s+/g, ' ').trim();
+      const chapter = parseInt(match[2]);
+      const verse = parseInt(match[3]);
+      
+      const bookNum = bookNumbers[bookName];
+      if (!bookNum) return null;
+      
+      return {
+        book: bookNum,
+        chapter: chapter,
+        verse: verse
+      };
+    } catch (error) {
+      console.error('Error parsing Bible reference:', error);
+      return null;
+    }
+  }
+
+  viewInTranslation(reference) {
     if (!reference) {
       this.showToast('No Bible reference available');
       return;
     }
 
-    const translation = this.getUserPreferredTranslation();
+    // Show translation selection modal
+    this.showTranslationSelectionModal(reference);
+  }
+
+  showTranslationSelectionModal(reference) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
     
+    const availableTranslations = [
+      { code: 'NASB', name: 'New American Standard Bible' },
+      { code: 'ESV', name: 'English Standard Version' },
+      { code: 'NIV', name: 'New International Version' },
+      { code: 'NLT', name: 'New Living Translation' },
+      { code: 'KJV', name: 'King James Version' },
+      { code: 'MSG', name: 'The Message' },
+      { code: 'CSB', name: 'Christian Standard Bible' },
+      { code: 'ASV', name: 'American Standard Version' },
+      { code: 'WEB', name: 'World English Bible' }
+    ];
+
+    const translationOptions = availableTranslations.map(trans => `
+      <button onclick="app.fetchTranslation('${reference}', '${trans.code}'); this.closest('.fixed').remove();" 
+              class="w-full text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex justify-between items-center">
+        <span class="font-medium">${trans.code}</span>
+        <span class="text-sm text-gray-600 dark:text-gray-400">${trans.name}</span>
+      </button>
+    `).join('');
+    
+    modal.innerHTML = `
+      <div class="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6 max-h-96 overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">📚 Choose Translation</h3>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="space-y-1">
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">Select a Bible translation to view ${reference}:</p>
+          ${translationOptions}
+        </div>
+      </div>
+    `;
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+    
+    document.body.appendChild(modal);
+  }
+
+  async fetchTranslation(reference, selectedTranslation) {
+    // Parse the Bible reference first
+    const parsedRef = this.parseBibleReference(reference);
+    if (!parsedRef) {
+      console.log('Could not parse reference:', reference);
+      // Fallback to Bible Gateway if parsing fails
+      const bibleGatewayURL = `https://www.biblegateway.com/passage/?search=${encodeURIComponent(reference)}&version=${selectedTranslation}`;
+      window.open(bibleGatewayURL, '_blank');
+      this.showToast(`Opening ${reference} in ${selectedTranslation}...`);
+      return;
+    }
+
     try {
-      this.showToast('Loading verse translation...');
+      this.showToast(`Loading ${reference} in ${selectedTranslation}...`);
       
-      // Use a simple Bible API to fetch the verse
-      const response = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}?translation=${translation.toLowerCase()}`);
+      // Use bolls.life API with correct format: /get-verse/<translation>/<book>/<chapter>/<verse>/
+      const bollsTranslation = this.getBollsTranslationId(selectedTranslation);
+      const apiUrl = `https://bolls.life/get-verse/${bollsTranslation}/${parsedRef.book}/${parsedRef.chapter}/${parsedRef.verse}/`;
+      console.log('Fetching from bolls.life:', apiUrl);
+      console.log('Parsed reference:', parsedRef);
+      
+      const response = await fetch(apiUrl);
+      console.log('Bolls.life response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
-        this.showTranslationModal(data, translation);
+        console.log('Bolls.life data:', data);
+        // Add the original reference to the response
+        data.reference = reference;
+        this.showTranslationModal(data, selectedTranslation);
       } else {
+        console.log('Bolls.life API failed, falling back to Bible Gateway');
         // Fallback to Bible Gateway if API fails
-        const bibleGatewayURL = `https://www.biblegateway.com/passage/?search=${encodeURIComponent(reference)}&version=${translation}`;
+        const bibleGatewayURL = `https://www.biblegateway.com/passage/?search=${encodeURIComponent(reference)}&version=${selectedTranslation}`;
         window.open(bibleGatewayURL, '_blank');
-        this.showToast(`Opening ${reference} in ${translation}...`);
+        this.showToast(`Opening ${reference} in ${selectedTranslation}...`);
       }
     } catch (error) {
       console.error('Error fetching translation:', error);
+      console.log('Network error, falling back to Bible Gateway');
       // Fallback to external link
-      const bibleGatewayURL = `https://www.biblegateway.com/passage/?search=${encodeURIComponent(reference)}&version=${translation}`;
+      const bibleGatewayURL = `https://www.biblegateway.com/passage/?search=${encodeURIComponent(reference)}&version=${selectedTranslation}`;
       window.open(bibleGatewayURL, '_blank');
-      this.showToast(`Opening ${reference} in ${translation}...`);
+      this.showToast(`Opening ${reference} in ${selectedTranslation}...`);
     }
   }
 
   showTranslationModal(verseData, translation) {
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    
+    // Handle bolls.life API response format
+    const reference = verseData.reference || verseData.citation || 'Bible Verse';
+    const text = verseData.text || verseData.verse_text || verseData.content || 'Verse text not available';
+    const translationName = verseData.translation_name || translation;
+    
     modal.innerHTML = `
       <div class="bg-white dark:bg-gray-800 rounded-xl max-w-lg w-full p-6 max-h-96 overflow-y-auto">
         <div class="flex justify-between items-center mb-4">
@@ -1042,18 +1289,73 @@ class ChurchTapApp {
           </button>
         </div>
         <div class="space-y-4">
-          <div class="text-sm font-medium text-primary-600 dark:text-primary-400">${verseData.reference}</div>
+          <div class="text-sm font-medium text-primary-600 dark:text-primary-400">${reference}</div>
           <blockquote class="text-gray-800 dark:text-gray-200 leading-relaxed border-l-4 border-primary-500 pl-4 italic">
-            ${verseData.text}
+            ${text}
           </blockquote>
-          ${verseData.translation_name ? `<div class="text-xs text-gray-500 dark:text-gray-400">${verseData.translation_name}</div>` : ''}
+          <div class="text-xs text-gray-500 dark:text-gray-400">${translationName}</div>
         </div>
         <div class="mt-6 flex justify-end space-x-3">
           <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
             Close
           </button>
-          <button onclick="app.readFullChapter('${verseData.reference}')" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg">
-            📖 Read Full Chapter
+          <button onclick="app.readFullChapterInTranslation('${reference}', '${translation}')" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg">
+            📖 Read Full Chapter in ${translation}
+          </button>
+        </div>
+      </div>
+    `;
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+    
+    document.body.appendChild(modal);
+  }
+
+  showChapterModal(chapterData, reference, translation) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4';
+    modal.style.zIndex = '9999';
+    
+    // Parse reference to get book and chapter for title
+    const parsedRef = this.parseBibleReference(reference);
+    const chapterTitle = parsedRef ? `Chapter ${parsedRef.chapter}` : 'Bible Chapter';
+    
+    // Handle bolls.life chapter response - it returns an array of verse objects
+    let versesHtml = '';
+    if (Array.isArray(chapterData)) {
+      versesHtml = chapterData.map(verse => `
+        <div class="mb-3">
+          <span class="text-sm font-medium text-primary-600 dark:text-primary-400 mr-2">${verse.verse}</span>
+          <span class="text-gray-800 dark:text-gray-200">${verse.text}</span>
+        </div>
+      `).join('');
+    } else {
+      versesHtml = '<p class="text-gray-600 dark:text-gray-400">Chapter text not available</p>';
+    }
+    
+    modal.innerHTML = `
+      <div class="bg-white dark:bg-gray-800 rounded-xl w-full max-w-4xl h-full max-h-[85vh] overflow-hidden flex flex-col mx-auto my-4 shadow-2xl">
+        <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">📖 ${reference} - ${translation}</h3>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="p-4 overflow-y-auto flex-1 min-h-0">
+          <div class="space-y-3 leading-relaxed">
+            ${versesHtml}
+          </div>
+        </div>
+        <div class="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center flex-shrink-0">
+          <div class="text-xs text-gray-500 dark:text-gray-400">${translation} Translation</div>
+          <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+            Close
           </button>
         </div>
       </div>
@@ -1069,16 +1371,8 @@ class ChurchTapApp {
   }
 
   updateTranslationButtons() {
-    const translation = this.getUserPreferredTranslation();
-    const textTranslationName = document.getElementById('textTranslationName');
-    const imageTranslationName = document.getElementById('imageTranslationName');
-    
-    if (textTranslationName) {
-      textTranslationName.textContent = translation;
-    }
-    if (imageTranslationName) {
-      imageTranslationName.textContent = translation;
-    }
+    // Translation buttons now show "View in Translation" and open a selection modal
+    // No need to update translation names since users select their preferred translation
   }
 
   addToRecentlyViewed(verse) {
@@ -1090,16 +1384,677 @@ class ChurchTapApp {
     this.recentlyViewed.unshift({
       id: verse.id,
       date: verse.date,
+      bible_reference: verse.bible_reference,
       preview: verse.content_type === 'text' 
         ? verse.verse_text.substring(0, 50) + '...'
-        : verse.bible_reference
+        : verse.bible_reference,
+      content_type: verse.content_type,
+      verse_text: verse.verse_text,
+      image_path: verse.image_path,
+      context: verse.context,
+      tags: verse.tags
     });
     
-    if (this.recentlyViewed.length > 5) {
-      this.recentlyViewed = this.recentlyViewed.slice(0, 5);
+    if (this.recentlyViewed.length > 10) {
+      this.recentlyViewed = this.recentlyViewed.slice(0, 10);
     }
     
     localStorage.setItem('recentlyViewed', JSON.stringify(this.recentlyViewed));
+  }
+
+  async showHistory() {
+    try {
+      this.showToast('Loading verse history...');
+      
+      // Fetch last 60 days of verses from the server
+      const response = await fetch('/api/verses/history/60');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch verse history');
+      }
+      
+      const historyData = await response.json();
+      
+      if (!historyData.verses || historyData.verses.length === 0) {
+        this.showToast('No verse history available for the last 60 days');
+        return;
+      }
+      
+      this.displayHistoryModal(historyData.verses);
+    } catch (error) {
+      console.error('Error fetching verse history:', error);
+      this.showToast('Error loading verse history');
+    }
+  }
+
+  displayHistoryModal(verses) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    
+    const historyItems = verses.map((verse, index) => `
+      <div class="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+        <button onclick="app.loadHistoryVerse('${verse.date}'); this.closest('.fixed').remove();" 
+                class="w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+          <div class="flex justify-between items-start">
+            <div class="flex-1">
+              <div class="text-sm font-medium text-primary-600 dark:text-primary-400 mb-1">
+                ${verse.bible_reference || 'Bible Verse'}
+              </div>
+              <div class="text-sm text-gray-800 dark:text-gray-200 mb-2">
+                ${verse.content_type === 'text' 
+                  ? (verse.verse_text ? verse.verse_text.substring(0, 80) + '...' : 'Text verse')
+                  : verse.bible_reference || 'Image verse'
+                }
+              </div>
+              <div class="flex justify-between items-center">
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                  ${new Date(verse.date).toLocaleDateString()}
+                </div>
+                ${verse.tags ? `<div class="text-xs text-primary-500 dark:text-primary-400">${verse.tags.split(',')[0]}</div>` : ''}
+              </div>
+            </div>
+            <div class="ml-3 text-lg">
+              ${verse.content_type === 'image' ? '🖼️' : '📝'}
+            </div>
+          </div>
+        </button>
+      </div>
+    `).join('');
+    
+    modal.innerHTML = `
+      <div class="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col">
+        <div class="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">🕐 Verse History (60 days)</h3>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="overflow-y-auto flex-1">
+          ${historyItems}
+        </div>
+        <div class="p-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <div class="text-xs text-gray-500 dark:text-gray-400 text-center">
+            Showing ${verses.length} verses from the last 60 days
+          </div>
+        </div>
+      </div>
+    `;
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+    
+    document.body.appendChild(modal);
+  }
+
+  async loadHistoryVerse(date) {
+    // Navigate to the specific date to load the verse
+    this.currentDate = date;
+    this.updateDateDisplay(date);
+    await this.loadVerse(date);
+    this.showToast('Loading verse from history...');
+  }
+
+  showVerseSearchModal() {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    
+    modal.innerHTML = `
+      <div class="bg-white dark:bg-gray-800 rounded-xl max-w-lg w-full p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-xl font-semibold text-gray-900 dark:text-white">🔍 Search Verses</h3>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">What would you like to search?</label>
+            <div class="grid grid-cols-1 gap-3">
+              <!-- Church Tap Verses Search -->
+              <button onclick="app.showLocalSearchModal(); this.closest('.fixed').remove();" 
+                      class="p-4 border-2 border-primary-200 dark:border-primary-700 rounded-lg hover:border-primary-400 dark:hover:border-primary-500 transition-colors text-left">
+                <div class="flex items-start space-x-3">
+                  <div class="text-2xl">⛪</div>
+                  <div class="flex-1">
+                    <h4 class="font-medium text-gray-900 dark:text-white mb-1">Church Tap Verses</h4>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                      Search through your church's curated verses, tags, references, and commentary
+                    </p>
+                  </div>
+                </div>
+              </button>
+              
+              <!-- Bible Database Search -->
+              <button onclick="app.showBibleSearchModal(); this.closest('.fixed').remove();" 
+                      class="p-4 border-2 border-blue-200 dark:border-blue-700 rounded-lg hover:border-blue-400 dark:hover:border-blue-500 transition-colors text-left">
+                <div class="flex items-start space-x-3">
+                  <div class="text-2xl">📖</div>
+                  <div class="flex-1">
+                    <h4 class="font-medium text-gray-900 dark:text-white mb-1">Entire Bible Database</h4>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                      Search through all verses in multiple Bible translations
+                    </p>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+    
+    document.body.appendChild(modal);
+  }
+
+  showLocalSearchModal() {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    
+    modal.innerHTML = `
+      <div class="bg-white dark:bg-gray-800 rounded-xl max-w-lg w-full p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-xl font-semibold text-gray-900 dark:text-white">⛪ Search Church Tap Verses</h3>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <form id="localSearchForm" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search for:</label>
+            <input 
+              type="text" 
+              id="localSearchQuery" 
+              placeholder="Enter words, phrases, Bible references, or tags..."
+              class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+              required
+            >
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Searches verse text, Bible references, tags, and commentary from your church's curated content
+            </p>
+          </div>
+          
+          <div class="flex justify-end space-x-3 pt-4">
+            <button type="button" onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
+              Cancel
+            </button>
+            <button type="submit" class="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+              🔍 Search
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+    
+    // Add form submit handler
+    modal.querySelector('#localSearchForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const query = document.getElementById('localSearchQuery').value.trim();
+      
+      if (!query) {
+        this.showToast('Please enter a search term');
+        return;
+      }
+      
+      // Close search modal
+      document.body.removeChild(modal);
+      
+      // Perform local search
+      await this.searchLocalVerses(query);
+    });
+    
+    document.body.appendChild(modal);
+    
+    // Focus on search input
+    setTimeout(() => {
+      const searchInput = modal.querySelector('#localSearchQuery');
+      if (searchInput) searchInput.focus();
+    }, 100);
+  }
+
+  showBibleSearchModal() {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    
+    const availableTranslations = [
+      { code: 'NASB', name: 'New American Standard Bible' },
+      { code: 'ESV', name: 'English Standard Version' },
+      { code: 'NIV', name: 'New International Version' },
+      { code: 'NLT', name: 'New Living Translation' },
+      { code: 'KJV', name: 'King James Version' },
+      { code: 'MSG', name: 'The Message' },
+      { code: 'CSB', name: 'Christian Standard Bible' },
+      { code: 'ASV', name: 'American Standard Version' },
+      { code: 'WEB', name: 'World English Bible' }
+    ];
+
+    const translationOptions = availableTranslations.map(trans => 
+      `<option value="${trans.code}">${trans.code} - ${trans.name}</option>`
+    ).join('');
+
+    modal.innerHTML = `
+      <div class="bg-white dark:bg-gray-800 rounded-xl max-w-lg w-full p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-xl font-semibold text-gray-900 dark:text-white">📖 Search Bible Database</h3>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <form id="bibleSearchForm" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search for:</label>
+            <input 
+              type="text" 
+              id="bibleSearchQuery" 
+              placeholder="Enter words, phrases, or topics (e.g., 'love', 'peace', 'John 3:16')"
+              class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+              required
+            >
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Translation:</label>
+            <select 
+              id="bibleSearchTranslation" 
+              class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+              ${translationOptions}
+            </select>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <label class="flex items-center space-x-2">
+              <input type="checkbox" id="bibleMatchCase" class="rounded">
+              <span class="text-sm text-gray-700 dark:text-gray-300">Match case</span>
+            </label>
+            <label class="flex items-center space-x-2">
+              <input type="checkbox" id="bibleMatchWhole" class="rounded">
+              <span class="text-sm text-gray-700 dark:text-gray-300">Exact phrase</span>
+            </label>
+          </div>
+          
+          <div class="flex justify-end space-x-3 pt-4">
+            <button type="button" onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
+              Cancel
+            </button>
+            <button type="submit" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+              🔍 Search
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+    
+    // Add form submit handler
+    modal.querySelector('#bibleSearchForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const query = document.getElementById('bibleSearchQuery').value.trim();
+      const translation = document.getElementById('bibleSearchTranslation').value;
+      const matchCase = document.getElementById('bibleMatchCase').checked;
+      const matchWhole = document.getElementById('bibleMatchWhole').checked;
+      
+      if (!query) {
+        this.showToast('Please enter a search term');
+        return;
+      }
+      
+      // Close search modal
+      document.body.removeChild(modal);
+      
+      // Perform Bible search (existing functionality)
+      await this.searchVerses(query, translation, matchCase, matchWhole);
+    });
+    
+    // Set default translation to user's preferred one
+    const preferredTranslation = this.getUserPreferredTranslation();
+    const selectElement = modal.querySelector('#bibleSearchTranslation');
+    if (selectElement) {
+      selectElement.value = preferredTranslation;
+    }
+    
+    document.body.appendChild(modal);
+    
+    // Focus on search input
+    setTimeout(() => {
+      const searchInput = modal.querySelector('#bibleSearchQuery');
+      if (searchInput) searchInput.focus();
+    }, 100);
+  }
+
+  async searchLocalVerses(query) {
+    try {
+      this.showToast(`Searching Church Tap verses for "${query}"...`);
+      
+      // Search local verse database via server API (using GET endpoint)
+      const searchParams = new URLSearchParams({
+        q: query,
+        limit: '20',
+        offset: '0'
+      });
+      
+      const response = await fetch(`/api/verses/search?${searchParams}`);
+      
+      if (!response.ok) {
+        throw new Error(`Local search API error: ${response.status}`);
+      }
+      
+      const searchResults = await response.json();
+      console.log('Local search results:', searchResults);
+      
+      this.displayLocalSearchResults(searchResults, query);
+      
+    } catch (error) {
+      console.error('Error searching local verses:', error);
+      this.showToast('Error searching verses. Please try again.');
+    }
+  }
+
+  displayLocalSearchResults(results, query) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.style.zIndex = '9999';
+    
+    if (!results.verses || results.verses.length === 0) {
+      modal.innerHTML = `
+        <div class="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
+          <div class="text-center">
+            <div class="text-4xl mb-4">⛪</div>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Results Found</h3>
+            <p class="text-gray-600 dark:text-gray-400 mb-4">
+              No Church Tap verses found for "<strong>${query}</strong>"
+            </p>
+            <div class="flex justify-center space-x-3">
+              <button onclick="this.closest('.fixed').remove(); app.showLocalSearchModal();" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg">
+                Try Another Search
+              </button>
+              <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          document.body.removeChild(modal);
+        }
+      });
+      
+      document.body.appendChild(modal);
+      return;
+    }
+
+    const resultItems = results.verses.map(verse => `
+      <div class="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+        <button onclick="app.loadHistoryVerse('${verse.date}'); this.closest('.fixed').remove();" 
+                class="w-full text-left p-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+          <div class="mb-1">
+            <div class="text-sm font-medium text-primary-600 dark:text-primary-400">
+              ${verse.bible_reference || 'Bible Verse'} • ${new Date(verse.date).toLocaleDateString()}
+            </div>
+          </div>
+          <div class="text-sm text-gray-800 dark:text-gray-200 leading-relaxed mb-2">
+            ${verse.content_type === 'text' 
+              ? (verse.verse_text ? verse.verse_text.substring(0, 120) + '...' : 'Text verse')
+              : (verse.bible_reference || 'Image verse')
+            }
+          </div>
+          ${verse.context ? `
+            <div class="text-xs text-gray-600 dark:text-gray-400 mb-1">
+              ${verse.context.substring(0, 100)}...
+            </div>
+          ` : ''}
+          ${verse.tags ? `
+            <div class="flex flex-wrap gap-1 mt-1">
+              ${verse.tags.split(',').slice(0, 3).map(tag => 
+                `<span class="px-2 py-0.5 bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 text-xs rounded-full">${tag.trim()}</span>`
+              ).join('')}
+            </div>
+          ` : ''}
+        </button>
+      </div>
+    `).join('');
+    
+    modal.innerHTML = `
+      <div class="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full h-auto max-h-[70vh] shadow-xl">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+          <div class="flex justify-between items-center">
+            <div class="flex-1">
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">⛪ Church Results</h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400">
+                "${query}" • ${results.verses.length} verses found
+              </p>
+            </div>
+            <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="overflow-y-auto" style="max-height: calc(70vh - 140px);">
+          ${resultItems}
+        </div>
+        <div class="p-3 border-t border-gray-200 dark:border-gray-700">
+          <div class="text-xs text-gray-500 dark:text-gray-400 text-center">
+            Click any verse to view it
+          </div>
+        </div>
+      </div>
+    `;
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+    
+    document.body.appendChild(modal);
+  }
+
+  async searchVerses(query, translation, matchCase = false, matchWhole = false, page = 1) {
+    try {
+      this.showToast(`Searching for "${query}" in ${translation}...`);
+      
+      // Use bolls.life search API
+      const bollsTranslation = this.getBollsTranslationId(translation);
+      const searchParams = new URLSearchParams({
+        search: query,
+        match_case: matchCase.toString(),
+        match_whole: matchWhole.toString(),
+        page: page.toString(),
+        limit: '20'
+      });
+      
+      const apiUrl = `https://bolls.life/v2/find/${bollsTranslation}?${searchParams}`;
+      console.log('Searching verses:', apiUrl);
+      
+      const response = await fetch(apiUrl);
+      
+      if (!response.ok) {
+        throw new Error(`Search API error: ${response.status}`);
+      }
+      
+      const searchResults = await response.json();
+      console.log('Search results:', searchResults);
+      
+      this.displaySearchResults(searchResults, query, translation, matchCase, matchWhole, page);
+      
+    } catch (error) {
+      console.error('Error searching verses:', error);
+      this.showToast('Error searching verses. Please try again.');
+    }
+  }
+
+  displaySearchResults(results, query, translation, matchCase, matchWhole, currentPage) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.style.zIndex = '9999';
+    
+    if (!results.results || results.results.length === 0) {
+      modal.innerHTML = `
+        <div class="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
+          <div class="text-center">
+            <div class="text-4xl mb-4">🔍</div>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Results Found</h3>
+            <p class="text-gray-600 dark:text-gray-400 mb-4">
+              No verses found for "<strong>${query}</strong>" in ${translation}
+            </p>
+            <div class="flex justify-center space-x-3">
+              <button onclick="this.closest('.fixed').remove(); app.showVerseSearchModal();" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg">
+                Try Another Search
+              </button>
+              <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          document.body.removeChild(modal);
+        }
+      });
+      
+      document.body.appendChild(modal);
+      return;
+    }
+
+    const resultItems = results.results.map(verse => `
+      <div class="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+        <button onclick="app.viewSearchResult(${verse.book}, ${verse.chapter}, ${verse.verse}, '${translation}'); this.closest('.fixed').remove();" 
+                class="w-full text-left p-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+          <div class="mb-1">
+            <div class="text-sm font-medium text-primary-600 dark:text-primary-400">
+              ${this.getBookName(verse.book)} ${verse.chapter}:${verse.verse}
+            </div>
+          </div>
+          <div class="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">
+            ${verse.text.replace(/<[^>]*>/g, '').substring(0, 120)}...
+          </div>
+        </button>
+      </div>
+    `).join('');
+
+    const hasMorePages = results.total > (currentPage * 20);
+    const paginationControls = `
+      <div class="flex justify-between items-center text-sm">
+        ${currentPage > 1 ? 
+          `<button onclick="app.searchVerses('${query}', '${translation}', ${matchCase}, ${matchWhole}, ${currentPage - 1}); this.closest('.fixed').remove();" class="px-3 py-1 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded text-sm">← Prev</button>` 
+          : '<div></div>'
+        }
+        <span class="text-xs text-gray-500 dark:text-gray-400">
+          ${results.total} results
+        </span>
+        ${hasMorePages ? 
+          `<button onclick="app.searchVerses('${query}', '${translation}', ${matchCase}, ${matchWhole}, ${currentPage + 1}); this.closest('.fixed').remove();" class="px-3 py-1 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded text-sm">Next →</button>` 
+          : '<div></div>'
+        }
+      </div>
+    `;
+    
+    modal.innerHTML = `
+      <div class="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full h-auto max-h-[70vh] shadow-xl">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+          <div class="flex justify-between items-center">
+            <div class="flex-1">
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white">🔍 Results</h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400">
+                "${query}" in ${translation}
+              </p>
+            </div>
+            <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="overflow-y-auto" style="max-height: calc(70vh - 140px);">
+          ${resultItems}
+        </div>
+        <div class="p-3 border-t border-gray-200 dark:border-gray-700">
+          ${paginationControls}
+        </div>
+      </div>
+    `;
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+    
+    document.body.appendChild(modal);
+  }
+
+  async viewSearchResult(book, chapter, verse, translation) {
+    // Create a reference string and use existing translation modal
+    const reference = `${this.getBookName(book)} ${chapter}:${verse}`;
+    this.showToast(`Loading ${reference} in ${translation}...`);
+    
+    try {
+      // Use existing fetchTranslation method
+      await this.fetchTranslation(reference, translation);
+    } catch (error) {
+      console.error('Error loading search result:', error);
+      this.showToast('Error loading verse');
+    }
+  }
+
+  getBookName(bookNumber) {
+    const bookNames = {
+      1: 'Genesis', 2: 'Exodus', 3: 'Leviticus', 4: 'Numbers', 5: 'Deuteronomy',
+      6: 'Joshua', 7: 'Judges', 8: 'Ruth', 9: '1 Samuel', 10: '2 Samuel',
+      11: '1 Kings', 12: '2 Kings', 13: '1 Chronicles', 14: '2 Chronicles', 15: 'Ezra',
+      16: 'Nehemiah', 17: 'Esther', 18: 'Job', 19: 'Psalm', 20: 'Proverbs',
+      21: 'Ecclesiastes', 22: 'Song of Solomon', 23: 'Isaiah', 24: 'Jeremiah', 25: 'Lamentations',
+      26: 'Ezekiel', 27: 'Daniel', 28: 'Hosea', 29: 'Joel', 30: 'Amos',
+      31: 'Obadiah', 32: 'Jonah', 33: 'Micah', 34: 'Nahum', 35: 'Habakkuk',
+      36: 'Zephaniah', 37: 'Haggai', 38: 'Zechariah', 39: 'Malachi',
+      40: 'Matthew', 41: 'Mark', 42: 'Luke', 43: 'John', 44: 'Acts',
+      45: 'Romans', 46: '1 Corinthians', 47: '2 Corinthians', 48: 'Galatians', 49: 'Ephesians',
+      50: 'Philippians', 51: 'Colossians', 52: '1 Thessalonians', 53: '2 Thessalonians',
+      54: '1 Timothy', 55: '2 Timothy', 56: 'Titus', 57: 'Philemon', 58: 'Hebrews',
+      59: 'James', 60: '1 Peter', 61: '2 Peter', 62: '1 John', 63: '2 John',
+      64: '3 John', 65: 'Jude', 66: 'Revelation'
+    };
+    return bookNames[bookNumber] || `Book ${bookNumber}`;
   }
 
   async trackAnalytics(action, verseId = null) {
@@ -2150,3 +3105,5 @@ class ChurchTapApp {
 
 // Initialize the app
 window.churchTapApp = new ChurchTapApp();
+// Also make it available as 'app' for convenience in HTML onclick handlers
+window.app = window.churchTapApp;
