@@ -22,6 +22,7 @@ class ChurchTapApp {
       this.applyTheme();
       this.applyTextSize();
       this.checkAuthStatus();
+      this.updateTranslationButtons();
       this.hideSplashScreen();
       
       // Load content but don't let it block the UI
@@ -239,8 +240,13 @@ class ChurchTapApp {
       const diffX = startX - e.touches[0].clientX;
       const diffY = startY - e.touches[0].clientY;
       
+      // Only trigger swipes if movement is significant and deliberate
+      const minSwipeDistance = 80;
+      const maxScrollThreshold = 200; // Ignore if too much movement (likely scrolling)
+      
       if (Math.abs(diffX) > Math.abs(diffY)) {
-        if (Math.abs(diffX) > 50) {
+        // Horizontal swipe for navigation
+        if (Math.abs(diffX) > minSwipeDistance && Math.abs(diffY) < maxScrollThreshold) {
           if (diffX > 0) {
             // Swipe left - next day
             this.navigateDay(1);
@@ -252,17 +258,19 @@ class ChurchTapApp {
           startY = 0;
         }
       } else {
-        if (Math.abs(diffY) > 100) {
-          if (diffY > 0) {
-            // Swipe up - increase text size
-            this.cycleTextSize();
-          } else {
-            // Swipe down - decrease text size
-            this.cycleTextSize(true);
-          }
-          startX = 0;
-          startY = 0;
-        }
+        // Disable vertical swipe text resize to prevent conflict with scrolling
+        // Text size can still be changed with the button
+        // if (Math.abs(diffY) > minSwipeDistance && Math.abs(diffX) < 50) {
+        //   if (diffY > 0) {
+        //     // Swipe up - increase text size
+        //     this.cycleTextSize();
+        //   } else {
+        //     // Swipe down - decrease text size
+        //     this.cycleTextSize(true);
+        //   }
+        //   startX = 0;
+        //   startY = 0;
+        // }
       }
     });
 
@@ -374,6 +382,9 @@ class ChurchTapApp {
     
     // Display tags
     this.displayTags(verse.tags);
+    
+    // Update translation button labels
+    this.updateTranslationButtons();
     
     verseContent.classList.remove('hidden');
     engagementActions.classList.remove('hidden');
@@ -926,6 +937,150 @@ class ChurchTapApp {
     return token;
   }
 
+  getUserPreferredTranslation() {
+    // Default to NASB if no user preference or not logged in
+    return this.currentUser?.preferredTranslation || 'NASB';
+  }
+
+  readFullChapter(reference) {
+    if (!reference) {
+      this.showToast('No Bible reference available');
+      return;
+    }
+
+    const translation = this.getUserPreferredTranslation();
+    
+    // Clean up the reference for URL encoding
+    const cleanRef = reference.replace(/\s+/g, '%20');
+    
+    // Detect mobile device
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    try {
+      if (isMobile) {
+        // Try to open Bible app first (YouVersion)
+        const youVersionURL = `https://www.bible.com/bible/${this.getTranslationId(translation)}/${cleanRef}`;
+        const bibleAppURL = `bible://${cleanRef}`;
+        
+        // Try native Bible app first, fallback to YouVersion
+        window.open(bibleAppURL, '_blank');
+        
+        // Fallback to YouVersion web if app doesn't open
+        setTimeout(() => {
+          window.open(youVersionURL, '_blank');
+        }, 1000);
+      } else {
+        // Desktop: use Bible Gateway
+        const bibleGatewayURL = `https://www.biblegateway.com/passage/?search=${cleanRef}&version=${translation}`;
+        window.open(bibleGatewayURL, '_blank');
+      }
+      
+      this.showToast(`Opening ${reference} in ${translation}...`);
+    } catch (error) {
+      console.error('Error opening Bible reference:', error);
+      this.showToast('Error opening Bible reference');
+    }
+  }
+
+  getTranslationId(translation) {
+    // Map our translations to YouVersion Bible IDs
+    const translationIds = {
+      'NASB': '100', // NASB1995
+      'ESV': '59',   // ESV
+      'NIV': '111',  // NIV
+      'NLT': '116',  // NLT
+      'KJV': '1',    // KJV
+      'MSG': '97',   // MSG
+      'CSB': '1713'  // CSB
+    };
+    return translationIds[translation] || translationIds['NASB'];
+  }
+
+  async viewInTranslation(reference) {
+    if (!reference) {
+      this.showToast('No Bible reference available');
+      return;
+    }
+
+    const translation = this.getUserPreferredTranslation();
+    
+    try {
+      this.showToast('Loading verse translation...');
+      
+      // Use a simple Bible API to fetch the verse
+      const response = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}?translation=${translation.toLowerCase()}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        this.showTranslationModal(data, translation);
+      } else {
+        // Fallback to Bible Gateway if API fails
+        const bibleGatewayURL = `https://www.biblegateway.com/passage/?search=${encodeURIComponent(reference)}&version=${translation}`;
+        window.open(bibleGatewayURL, '_blank');
+        this.showToast(`Opening ${reference} in ${translation}...`);
+      }
+    } catch (error) {
+      console.error('Error fetching translation:', error);
+      // Fallback to external link
+      const bibleGatewayURL = `https://www.biblegateway.com/passage/?search=${encodeURIComponent(reference)}&version=${translation}`;
+      window.open(bibleGatewayURL, '_blank');
+      this.showToast(`Opening ${reference} in ${translation}...`);
+    }
+  }
+
+  showTranslationModal(verseData, translation) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.innerHTML = `
+      <div class="bg-white dark:bg-gray-800 rounded-xl max-w-lg w-full p-6 max-h-96 overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">📚 ${translation} Translation</h3>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="space-y-4">
+          <div class="text-sm font-medium text-primary-600 dark:text-primary-400">${verseData.reference}</div>
+          <blockquote class="text-gray-800 dark:text-gray-200 leading-relaxed border-l-4 border-primary-500 pl-4 italic">
+            ${verseData.text}
+          </blockquote>
+          ${verseData.translation_name ? `<div class="text-xs text-gray-500 dark:text-gray-400">${verseData.translation_name}</div>` : ''}
+        </div>
+        <div class="mt-6 flex justify-end space-x-3">
+          <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
+            Close
+          </button>
+          <button onclick="app.readFullChapter('${verseData.reference}')" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg">
+            📖 Read Full Chapter
+          </button>
+        </div>
+      </div>
+    `;
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+    
+    document.body.appendChild(modal);
+  }
+
+  updateTranslationButtons() {
+    const translation = this.getUserPreferredTranslation();
+    const textTranslationName = document.getElementById('textTranslationName');
+    const imageTranslationName = document.getElementById('imageTranslationName');
+    
+    if (textTranslationName) {
+      textTranslationName.textContent = translation;
+    }
+    if (imageTranslationName) {
+      imageTranslationName.textContent = translation;
+    }
+  }
+
   addToRecentlyViewed(verse) {
     const existing = this.recentlyViewed.findIndex(v => v.id === verse.id);
     if (existing !== -1) {
@@ -1389,6 +1544,9 @@ class ChurchTapApp {
       const initials = this.getUserInitials(this.currentUser);
       document.getElementById('userAvatar').textContent = initials;
     }
+    
+    // Update translation button labels with user preferences
+    this.updateTranslationButtons();
   }
 
   updateUIForLoggedOutUser() {
@@ -1741,11 +1899,10 @@ class ChurchTapApp {
         <div>
           <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Preferred Bible Translation</label>
           <select id="preferredTranslation" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-            <option value="">Select translation</option>
-            <option value="NIV">NIV - New International Version</option>
+            <option value="NASB" selected>NASB - New American Standard Bible (Recommended)</option>
             <option value="ESV">ESV - English Standard Version</option>
+            <option value="NIV">NIV - New International Version</option>
             <option value="NLT">NLT - New Living Translation</option>
-            <option value="NASB">NASB - New American Standard Bible</option>
             <option value="KJV">KJV - King James Version</option>
             <option value="MSG">MSG - The Message</option>
             <option value="CSB">CSB - Christian Standard Bible</option>
@@ -1878,11 +2035,13 @@ class ChurchTapApp {
             <div>
               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Preferred Bible Translation</label>
               <select id="profilePreferredTranslation" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                <option value="NIV" ${this.currentUser.preferredTranslation === 'NIV' ? 'selected' : ''}>NIV</option>
-                <option value="ESV" ${this.currentUser.preferredTranslation === 'ESV' ? 'selected' : ''}>ESV</option>
-                <option value="NLT" ${this.currentUser.preferredTranslation === 'NLT' ? 'selected' : ''}>NLT</option>
-                <option value="NASB" ${this.currentUser.preferredTranslation === 'NASB' ? 'selected' : ''}>NASB</option>
-                <option value="KJV" ${this.currentUser.preferredTranslation === 'KJV' ? 'selected' : ''}>KJV</option>
+                <option value="NASB" ${this.currentUser.preferredTranslation === 'NASB' ? 'selected' : ''}>NASB - New American Standard Bible</option>
+                <option value="ESV" ${this.currentUser.preferredTranslation === 'ESV' ? 'selected' : ''}>ESV - English Standard Version</option>
+                <option value="NIV" ${this.currentUser.preferredTranslation === 'NIV' ? 'selected' : ''}>NIV - New International Version</option>
+                <option value="NLT" ${this.currentUser.preferredTranslation === 'NLT' ? 'selected' : ''}>NLT - New Living Translation</option>
+                <option value="KJV" ${this.currentUser.preferredTranslation === 'KJV' ? 'selected' : ''}>KJV - King James Version</option>
+                <option value="MSG" ${this.currentUser.preferredTranslation === 'MSG' ? 'selected' : ''}>MSG - The Message</option>
+                <option value="CSB" ${this.currentUser.preferredTranslation === 'CSB' ? 'selected' : ''}>CSB - Christian Standard Bible</option>
               </select>
             </div>
             
