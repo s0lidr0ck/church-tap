@@ -17,16 +17,33 @@ class ChurchTapApp {
   }
 
   init() {
-    this.setupEventListeners();
-    this.applyTheme();
-    this.applyTextSize();
-    this.checkAuthStatus();
-    this.hideSplashScreen();
-    this.loadVerse(this.currentDate);
-    this.loadCommunity(this.currentDate);
-    this.setupSwipeGestures();
-    this.checkNotificationPermission();
-    this.detectNFCSupport();
+    try {
+      console.log('1. Starting init');
+      this.setupEventListeners();
+      console.log('2. Event listeners setup');
+      this.applyTheme();
+      console.log('3. Theme applied');
+      this.applyTextSize();
+      console.log('4. Text size applied');
+      this.checkAuthStatus();
+      console.log('5. Auth status checked');
+      this.hideSplashScreen();
+      console.log('6. Splash screen hidden');
+      this.loadVerse(this.currentDate);
+      console.log('7. Verse loading started');
+      this.loadCommunity(this.currentDate);
+      console.log('8. Community loading started');
+      this.setupSwipeGestures();
+      console.log('9. Swipe gestures setup');
+      this.checkNotificationPermission();
+      console.log('10. Notification permission checked');
+      this.detectNFCSupport();
+      console.log('11. NFC support detected');
+    } catch (error) {
+      console.error('Init error:', error);
+      // Still show the app even if there's an error
+      this.hideSplashScreen();
+    }
   }
 
   setupEventListeners() {
