@@ -7,8 +7,7 @@ const { Pool } = require('pg');
 
 const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL;
 if (!DATABASE_URL) {
-  // For local dev you can set DATABASE_URL in .env
-  console.warn('[db-adapter] DATABASE_URL not set. Set it to your Postgres connection string.');
+  throw new Error('[db-adapter] DATABASE_URL is required. Set it to your Postgres connection string (e.g., postgresql://user:pass@host:5432/dbname).');
 }
 
 const pool = new Pool({ connectionString: DATABASE_URL });

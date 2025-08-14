@@ -709,8 +709,85 @@ class ChurchTapApp {
   }
 
   openSearch() {
-    // TODO: Implement search functionality
-    this.showToast('🔍 Search coming soon!');
+    this.showModal('Search Verses', `
+      <form id="searchForm" class="space-y-4">
+        <div>
+          <label for="searchQuery" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Search for verses, references, or topics
+          </label>
+          <input 
+            type="text" 
+            id="searchQuery" 
+            placeholder="Enter search terms..."
+            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+            required
+          >
+        </div>
+        <div class="flex space-x-3">
+          <button type="submit" class="flex-1 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+            🔍 Search
+          </button>
+          <button type="button" onclick="app.closeModal()" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium transition-colors duration-200">
+            Cancel
+          </button>
+        </div>
+      </form>
+      <div id="searchResults" class="mt-6 hidden">
+        <h4 class="font-medium text-gray-800 dark:text-white mb-3">Search Results</h4>
+        <div id="searchResultsList" class="space-y-3 max-h-64 overflow-y-auto">
+          <!-- Results will be loaded here -->
+        </div>
+      </div>
+    `);
+
+    // Handle search form submission
+    document.getElementById('searchForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const query = document.getElementById('searchQuery').value.trim();
+      if (query.length >= 2) {
+        await this.performSearch(query);
+      }
+    });
+  }
+
+  async performSearch(query) {
+    try {
+      const response = await fetch(`/api/verses/search?q=${encodeURIComponent(query)}&limit=10`);
+      const data = await response.json();
+      
+      const searchResults = document.getElementById('searchResults');
+      const searchResultsList = document.getElementById('searchResultsList');
+      
+      if (data.success && data.verses.length > 0) {
+        searchResultsList.innerHTML = data.verses.map(verse => `
+          <div class="p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors" onclick="app.goToDate('${verse.date}')">
+            <div class="font-medium text-sm text-primary-600 dark:text-primary-400 mb-1">${verse.bible_reference}</div>
+            <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">${verse.date}</div>
+            ${verse.verse_text ? `<div class="text-sm text-gray-800 dark:text-gray-200 line-clamp-2">${verse.verse_text.substring(0, 100)}${verse.verse_text.length > 100 ? '...' : ''}</div>` : ''}
+            ${verse.tags ? `<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">${verse.tags}</div>` : ''}
+          </div>
+        `).join('');
+        
+        searchResults.classList.remove('hidden');
+      } else {
+        searchResultsList.innerHTML = `
+          <div class="text-center py-4 text-gray-500 dark:text-gray-400">
+            No verses found for "${query}"
+          </div>
+        `;
+        searchResults.classList.remove('hidden');
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      this.showToast('❌ Search failed. Please try again.');
+    }
+  }
+
+  goToDate(date) {
+    this.closeModal();
+    this.currentDate = date;
+    this.updateDateDisplay();
+    this.loadVerse();
   }
 
   openFeedback() {

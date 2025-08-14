@@ -33,6 +33,13 @@ CHURCH_DOMAIN=yourchurch.com
 MAX_FILE_SIZE=10485760  # 10MB in bytes
 UPLOAD_PATH=./public/uploads
 
+# AWS S3 Configuration (for file uploads)
+S3_BUCKET_NAME=churchtap
+S3_REGION=us-east-1
+S3_BASE_URL=https://churchtap.s3.us-east-1.amazonaws.com
+# AWS_ACCESS_KEY_ID=your-access-key-id
+# AWS_SECRET_ACCESS_KEY=your-secret-access-key
+
 # Analytics
 ENABLE_ANALYTICS=true
 ```

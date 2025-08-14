@@ -13,6 +13,7 @@ const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const compression = require('compression');
 const createRateLimiter = require('./middleware/rateLimit');
+const s3Service = require('./services/s3Service');
 
 // Trust reverse proxy (required for secure cookies behind App Runner/ELB)
 // Ensures req.secure reflects the original HTTPS and session cookies can be set with secure: true
@@ -104,23 +105,9 @@ const resolveOrganization = (req, res, next) => {
   );
 };
 
-// Configure multer for image uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = './public/uploads/';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'verse-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
+// Configure multer for image uploads (using memory storage for S3)
 const upload = multer({ 
-  storage: storage,
+  storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -134,7 +121,7 @@ const upload = multer({
 // Auto-publish verses at midnight Central Time
 cron.schedule('0 0 * * *', () => {
   const today = new Date().toISOString().split('T')[0];
-  db.run(`UPDATE verses SET published = 1 WHERE date = ? AND published = 0`, [today], (err) => {
+  db.run(`UPDATE verses SET published = TRUE WHERE date = ? AND published = FALSE`, [today], (err) => {
     if (err) {
       console.error('Error auto-publishing verse:', err);
     } else {
@@ -210,7 +197,7 @@ app.get('/api/verse/:date', trackAnalytics('api_verse'), optionalAuth, async (re
   
   try {
     // Check if there's a scheduled verse for this date first
-    db.get(`SELECT * FROM verses WHERE date = ? AND published = 1 AND organization_id = ?`, [date, orgId], async (err, scheduledVerse) => {
+    db.get(`SELECT * FROM verses WHERE date = ? AND published = TRUE AND organization_id = ?`, [date, orgId], async (err, scheduledVerse) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -261,11 +248,11 @@ app.get('/api/verse/:date', trackAnalytics('api_verse'), optionalAuth, async (re
               END
             ) as relevance_score
             FROM verses 
-            WHERE published = 1 
+            WHERE published = TRUE 
             AND date <= ? 
             AND (${conditions})
             AND organization_id = ?
-            ORDER BY relevance_score DESC, ABS(julianday(date) - julianday(?)) ASC
+            ORDER BY relevance_score DESC, ABS((date - ?::date)) ASC
             LIMIT 1
           `;
 
@@ -306,7 +293,7 @@ app.get('/api/verse/random', trackAnalytics('api_random'), (req, res) => {
   const today = new Date().toISOString().split('T')[0];
   const orgId = req.organizationId || 1;
   
-  db.get(`SELECT * FROM verses WHERE date BETWEEN ? AND ? AND published = 1 AND organization_id = ? ORDER BY RANDOM() LIMIT 1`, 
+  db.get(`SELECT * FROM verses WHERE date BETWEEN ? AND ? AND published = TRUE AND organization_id = ? ORDER BY RANDOM() LIMIT 1`, 
     [twoWeeksAgoStr, today, orgId], (err, row) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
@@ -419,6 +406,68 @@ app.post('/api/sync-analytics', (req, res) => {
   }
 });
 
+// Search verses
+app.get('/api/verses/search', optionalAuth, (req, res) => {
+  const { q: query, limit = 10, offset = 0 } = req.query;
+  const orgId = req.organizationId || 1;
+  
+  if (!query || query.trim().length < 2) {
+    return res.status(400).json({ success: false, error: 'Search query must be at least 2 characters' });
+  }
+  
+  const searchTerm = `%${query.trim()}%`;
+  
+  // Search in verse text, bible reference, context, and tags
+  db.all(`
+    SELECT id, date, content_type, verse_text, image_path, bible_reference, context, tags, published
+    FROM verses 
+    WHERE published = TRUE 
+    AND organization_id = ?
+    AND (
+      verse_text LIKE ? OR 
+      bible_reference LIKE ? OR 
+      context LIKE ? OR 
+      tags LIKE ?
+    )
+    ORDER BY date DESC 
+    LIMIT ? OFFSET ?
+  `, [orgId, searchTerm, searchTerm, searchTerm, searchTerm, parseInt(limit), parseInt(offset)], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    
+    // Get total count for pagination
+    db.get(`
+      SELECT COUNT(*) as total
+      FROM verses 
+      WHERE published = TRUE 
+      AND organization_id = ?
+      AND (
+        verse_text LIKE ? OR 
+        bible_reference LIKE ? OR 
+        context LIKE ? OR 
+        tags LIKE ?
+      )
+    `, [orgId, searchTerm, searchTerm, searchTerm, searchTerm], (err, countRow) => {
+      if (err) {
+        return res.status(500).json({ success: false, error: 'Database error' });
+      }
+      
+      res.json({ 
+        success: true, 
+        verses: rows || [],
+        total: countRow ? countRow.total : 0,
+        query: query.trim(),
+        pagination: {
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          hasMore: (countRow?.total || 0) > (parseInt(offset) + parseInt(limit))
+        }
+      });
+    });
+  });
+});
+
 // Submit feedback
 app.post('/api/feedback', (req, res) => {
   const { feedback, user_token, url } = req.body;
@@ -439,11 +488,79 @@ app.post('/api/feedback', (req, res) => {
   });
 });
 
-// Generate verse image (placeholder for now)
-app.post('/api/verse/generate-image', (req, res) => {
-  // This would generate an image from text verse
-  // For now, return a placeholder response
-  res.status(501).json({ success: false, error: 'Image generation not implemented yet' });
+// Generate verse image
+app.post('/api/verse/generate-image', async (req, res) => {
+  try {
+    const { verse_text, bible_reference, template = 'default' } = req.body;
+    
+    if (!verse_text || !bible_reference) {
+      return res.status(400).json({ success: false, error: 'Verse text and reference are required' });
+    }
+
+    // Create canvas-like image using Sharp
+    const width = 720;
+    const height = 1280;
+    
+    // Create a gradient background
+    const gradientSvg = `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#bg)" />
+        <foreignObject width="100%" height="100%">
+          <div xmlns="http://www.w3.org/1999/xhtml" style="
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            padding: 60px;
+            box-sizing: border-box;
+            color: white;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            text-align: center;
+          ">
+            <div style="
+              font-size: 32px;
+              line-height: 1.4;
+              margin-bottom: 40px;
+              font-weight: 400;
+              text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            ">${verse_text}</div>
+            <div style="
+              font-size: 20px;
+              font-weight: 600;
+              opacity: 0.9;
+              text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            ">${bible_reference}</div>
+          </div>
+        </foreignObject>
+      </svg>
+    `;
+
+    // Generate image using Sharp
+    const imageBuffer = await sharp(Buffer.from(gradientSvg))
+      .png()
+      .toBuffer();
+
+    // Upload to S3
+    const timestamp = Date.now();
+    const filename = `generated-verse-${timestamp}.png`;
+    const s3Result = await s3Service.uploadGeneratedImage(imageBuffer, filename);
+    
+    res.json({ 
+      success: true, 
+      image_path: s3Result.path,
+      image_url: s3Result.url
+    });
+  } catch (error) {
+    console.error('Image generation error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate image' });
+  }
 });
 
 // Admin Authentication Middleware
@@ -464,7 +581,7 @@ const requireOrgAuth = (req, res, next) => {
   db.get(`SELECT au.*, o.id as organization_id 
           FROM admin_users au 
           LEFT JOIN organizations o ON au.organization_id = o.id 
-          WHERE au.id = ? AND au.is_active = 1`, [req.session.adminId], (err, admin) => {
+          WHERE au.id = ? AND au.is_active = TRUE`, [req.session.adminId], (err, admin) => {
     if (err) {
       console.error('Error getting admin organization context:', err);
       return res.status(500).json({ success: false, error: 'Database error' });
@@ -500,7 +617,7 @@ app.post('/api/admin/login', async (req, res) => {
   db.get(`SELECT au.*, o.name as organization_name, o.subdomain as organization_subdomain 
            FROM admin_users au 
            LEFT JOIN organizations o ON au.organization_id = o.id 
-           WHERE au.username = ? AND au.is_active = 1`, [username], async (err, user) => {
+           WHERE au.username = ? AND au.is_active = TRUE`, [username], async (err, user) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -538,10 +655,10 @@ app.post('/api/admin/logout', (req, res) => {
 app.get('/api/admin/check-session', (req, res) => {
   if (req.session.adminId) {
     // Get admin details with organization context
-    db.get(`SELECT au.*, o.name as organization_name, o.subdomain as organization_subdomain 
+  db.get(`SELECT au.*, o.name as organization_name, o.subdomain as organization_subdomain 
             FROM admin_users au 
             LEFT JOIN organizations o ON au.organization_id = o.id 
-            WHERE au.id = ? AND au.is_active = 1`, [req.session.adminId], (err, admin) => {
+            WHERE au.id = ? AND au.is_active = TRUE`, [req.session.adminId], (err, admin) => {
       if (err) {
         console.error('Error checking admin session:', err);
         return res.json({ success: false, authenticated: false });
@@ -598,19 +715,18 @@ app.post('/api/admin/verses', requireOrgAuth, upload.single('image'), async (req
     }
     
     if (content_type === 'image' && req.file) {
-      // Resize image to 9:16 aspect ratio
-      const outputPath = `./public/uploads/verse-${date}-${Date.now()}.jpg`;
-      await sharp(req.file.path)
+      // Resize image to 9:16 aspect ratio and upload to S3
+      const processedImageBuffer = await sharp(req.file.buffer)
         .resize(720, 1280, { 
           fit: 'cover',
           position: 'center'
         })
         .jpeg({ quality: 85 })
-        .toFile(outputPath);
+        .toBuffer();
       
-      // Delete original
-      fs.unlinkSync(req.file.path);
-      image_path = outputPath.replace('./public', '');
+      // Upload to S3
+      const s3Result = await s3Service.uploadImage(processedImageBuffer, req.file.originalname);
+      image_path = s3Result.path;
     }
     
     db.run(`INSERT INTO verses (date, content_type, verse_text, image_path, bible_reference, context, tags, published, organization_id) 
@@ -637,19 +753,23 @@ app.put('/api/admin/verses/:id', requireOrgAuth, upload.single('image'), async (
     let image_path = req.body.image_path; // Keep existing image if no new one
     
     if (content_type === 'image' && req.file) {
-      // Resize image to 9:16 aspect ratio
-      const outputPath = `./public/uploads/verse-${date}-${Date.now()}.jpg`;
-      await sharp(req.file.path)
+      // Delete old image from S3 if it exists
+      if (req.body.image_path) {
+        await s3Service.deleteFile(req.body.image_path);
+      }
+      
+      // Resize image to 9:16 aspect ratio and upload to S3
+      const processedImageBuffer = await sharp(req.file.buffer)
         .resize(720, 1280, { 
           fit: 'cover',
           position: 'center'
         })
         .jpeg({ quality: 85 })
-        .toFile(outputPath);
+        .toBuffer();
       
-      // Delete original
-      fs.unlinkSync(req.file.path);
-      image_path = outputPath.replace('./public', '');
+      // Upload to S3
+      const s3Result = await s3Service.uploadImage(processedImageBuffer, req.file.originalname);
+      image_path = s3Result.path;
     }
     
     db.run(`UPDATE verses SET date = ?, content_type = ?, verse_text = ?, image_path = ?, 
@@ -683,12 +803,9 @@ app.delete('/api/admin/verses/:id', requireOrgAuth, (req, res) => {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
       
-      // Delete image file if exists
+      // Delete image file from S3 if exists
       if (verse && verse.image_path) {
-        const imagePath = './public' + verse.image_path;
-        if (fs.existsSync(imagePath)) {
-          fs.unlinkSync(imagePath);
-        }
+        s3Service.deleteFile(verse.image_path);
       }
       
       res.json({ success: true });
@@ -718,7 +835,7 @@ app.post('/api/admin/verses/bulk', requireOrgAuth, (req, res) => {
       break;
       
     case 'publish':
-      db.run(`UPDATE verses SET published = 1 WHERE id IN (${placeholders}) AND organization_id = ?`, params, function(err) {
+      db.run(`UPDATE verses SET published = TRUE WHERE id IN (${placeholders}) AND organization_id = ?`, params, function(err) {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
@@ -727,7 +844,7 @@ app.post('/api/admin/verses/bulk', requireOrgAuth, (req, res) => {
       break;
       
     case 'unpublish':
-      db.run(`UPDATE verses SET published = 0 WHERE id IN (${placeholders}) AND organization_id = ?`, params, function(err) {
+      db.run(`UPDATE verses SET published = FALSE WHERE id IN (${placeholders}) AND organization_id = ?`, params, function(err) {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
@@ -945,7 +1062,7 @@ app.get('/api/master/dashboard', requireMasterAuth, (req, res) => {
     db.all(`
       SELECT 
         COUNT(*) as total,
-        SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
+        SUM(CASE WHEN is_active THEN 1 ELSE 0 END) as active,
         SUM(CASE WHEN plan_type = 'basic' THEN 29 WHEN plan_type = 'premium' THEN 79 WHEN plan_type = 'enterprise' THEN 199 ELSE 0 END) as revenue
       FROM organizations
     `, (err, rows) => {
@@ -1179,7 +1296,7 @@ app.get('/api/master/overview', requireMasterAuth, (req, res) => {
         if (err) return reject(err);
         totals.totalOrganizations = row?.total || 0;
       });
-      db.get(`SELECT COUNT(*) AS active FROM organizations WHERE is_active = 1`, (err, row) => {
+      db.get(`SELECT COUNT(*) AS active FROM organizations WHERE is_active = TRUE`, (err, row) => {
         if (err) return reject(err);
         totals.activeOrganizations = row?.active || 0;
       });
@@ -1309,7 +1426,7 @@ app.get('/api/community/:date', trackAnalytics('community_view'), (req, res) => 
   
   // Get prayer requests for the date
   const getPrayerRequests = new Promise((resolve, reject) => {
-    db.all(`SELECT * FROM prayer_requests WHERE date = ? AND is_approved = 1 AND is_hidden = 0 AND organization_id = ? ORDER BY created_at ASC`, 
+  db.all(`SELECT * FROM prayer_requests WHERE date = ? AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = ? ORDER BY created_at ASC`, 
       [date, orgId], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
@@ -1318,7 +1435,7 @@ app.get('/api/community/:date', trackAnalytics('community_view'), (req, res) => 
   
   // Get praise reports for the date
   const getPraiseReports = new Promise((resolve, reject) => {
-    db.all(`SELECT * FROM praise_reports WHERE date = ? AND is_approved = 1 AND is_hidden = 0 AND organization_id = ? ORDER BY created_at ASC`, 
+  db.all(`SELECT * FROM praise_reports WHERE date = ? AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = ? ORDER BY created_at ASC`, 
       [date, orgId], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);

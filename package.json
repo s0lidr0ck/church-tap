@@ -7,7 +7,11 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "build": "npm run build:css",
-    "build:css": "tailwindcss -i ./public/src/input.css -o ./public/css/style.css --watch"
+    "build:css": "tailwindcss -i ./public/src/input.css -o ./public/css/style.css --watch",
+    "db:init": "node scripts/init-postgres.js",
+    "setup": "npm run db:init && node scripts/setup-initial-data.js",
+    "setup:full": "npm install && npm run build:css:once && npm run setup",
+    "build:css:once": "tailwindcss -i ./public/src/input.css -o ./public/css/style.css"
   },
   "keywords": [
     "nfc",
@@ -19,6 +23,8 @@
   "author": "Your Church",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.864.0",
+    "@aws-sdk/s3-request-presigner": "^3.864.0",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
     "cookie-parser": "^1.4.6",
