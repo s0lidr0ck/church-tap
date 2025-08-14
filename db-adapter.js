@@ -12,17 +12,26 @@ if (!DATABASE_URL) {
 const isPostgreSQL = DATABASE_URL.startsWith('postgresql://') || DATABASE_URL.startsWith('postgres://');
 const isSQLite = DATABASE_URL.startsWith('sqlite:');
 
-let pool, sqlite3, db;
+let pool, db;
 
-if (isPostgreSQL) {
-  const { Pool } = require('pg');
-  pool = new Pool({ connectionString: DATABASE_URL });
-} else if (isSQLite) {
-  sqlite3 = require('sqlite3').verbose();
-  const dbPath = DATABASE_URL.replace('sqlite:', '');
-  db = new sqlite3.Database(dbPath);
-} else {
-  throw new Error('[db-adapter] Unsupported database URL format. Use postgresql:// or sqlite: prefix.');
+try {
+  if (isPostgreSQL) {
+    const { Pool } = require('pg');
+    pool = new Pool({ 
+      connectionString: DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
+  } else if (isSQLite) {
+    // Only require sqlite3 when actually using SQLite
+    const sqlite3 = require('sqlite3').verbose();
+    const dbPath = DATABASE_URL.replace('sqlite:', '');
+    db = new sqlite3.Database(dbPath);
+  } else {
+    throw new Error('[db-adapter] Unsupported database URL format. Use postgresql:// or sqlite: prefix.');
+  }
+} catch (error) {
+  console.error('[db-adapter] Database initialization error:', error);
+  throw error;
 }
 
 const tableMap = new Map([
