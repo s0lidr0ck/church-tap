@@ -18,27 +18,31 @@ class ChurchTapApp {
 
   init() {
     try {
-      console.log('1. Starting init');
       this.setupEventListeners();
-      console.log('2. Event listeners setup');
       this.applyTheme();
-      console.log('3. Theme applied');
       this.applyTextSize();
-      console.log('4. Text size applied');
       this.checkAuthStatus();
-      console.log('5. Auth status checked');
       this.hideSplashScreen();
-      console.log('6. Splash screen hidden');
-      this.loadVerse(this.currentDate);
-      console.log('7. Verse loading started');
-      this.loadCommunity(this.currentDate);
-      console.log('8. Community loading started');
+      
+      // Load content but don't let it block the UI
+      Promise.race([
+        this.loadVerse(this.currentDate),
+        new Promise(resolve => setTimeout(resolve, 5000)) // 5 second fallback
+      ]).catch(err => {
+        console.error('Verse loading failed:', err);
+        this.showOfflineMessage();
+      });
+      
+      Promise.race([
+        this.loadCommunity(this.currentDate),
+        new Promise(resolve => setTimeout(resolve, 5000)) // 5 second fallback
+      ]).catch(err => {
+        console.error('Community loading failed:', err);
+      });
+      
       this.setupSwipeGestures();
-      console.log('9. Swipe gestures setup');
       this.checkNotificationPermission();
-      console.log('10. Notification permission checked');
       this.detectNFCSupport();
-      console.log('11. NFC support detected');
     } catch (error) {
       console.error('Init error:', error);
       // Still show the app even if there's an error
@@ -289,8 +293,16 @@ class ChurchTapApp {
     try {
       this.showLoading();
       
+      // Set a timeout to ensure loading state is cleared
+      const timeoutId = setTimeout(() => {
+        console.warn('Verse loading timeout - showing offline message');
+        this.showOfflineMessage();
+      }, 10000); // 10 second timeout
+      
       const response = await fetch(`/api/verse/${date}`);
       const data = await response.json();
+      
+      clearTimeout(timeoutId); // Clear timeout if request succeeds
       
       if (data.success && data.verse) {
         this.currentVerse = data.verse;
