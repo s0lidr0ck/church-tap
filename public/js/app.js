@@ -88,7 +88,7 @@ class ChurchTapApp {
       this.toggleQuickMenu();
     });
 
-    // Quick menu actions
+    // Main action buttons
     document.getElementById('randomVerseBtn').addEventListener('click', () => {
       this.showRandomVerse();
     });
@@ -518,22 +518,97 @@ class ChurchTapApp {
 
   async showRandomVerse() {
     try {
-      const response = await fetch('/api/verse/random');
+      const response = await fetch(this.buildApiUrl('/api/verse/random'));
       const data = await response.json();
       
       if (data.success && data.verse) {
-        this.currentDate = data.verse.date;
-        this.currentVerse = data.verse;
-        this.displayVerse(data.verse);
-        this.updateDateDisplay(data.verse.date);
-        this.updateEngagementState();
-        this.trackAnalytics('random_verse', data.verse.id);
-        this.showToast('🎲 Random verse loaded!');
+        const verse = data.verse;
+        
+        // Create modal content for the random verse
+        const verseContent = `
+          <div class="relative">
+            <button class="absolute -top-2 -right-2 w-8 h-8 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 transition-colors" onclick="app.closeModal()">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+            
+            <div class="text-center space-y-4">
+              <div class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 mb-4">
+                🎲 Random Verse${verse.source === 'bolls.life' ? ` • ${verse.translation}` : ''}
+              </div>
+            
+            <div class="verse-text text-lg leading-relaxed text-gray-800 dark:text-gray-200 mb-6">
+              ${verse.verse_text}
+            </div>
+            
+            <div class="verse-reference text-base font-semibold text-primary-600 dark:text-primary-400 mb-4">
+              ${verse.bible_reference}
+            </div>
+            
+            ${verse.context ? `<div class="text-sm text-gray-600 dark:text-gray-400 italic">${verse.context}</div>` : ''}
+            
+              <div class="flex justify-center space-x-4 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button id="shareRandomVerse" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+                  📤 Share
+                </button>
+                <button id="getAnotherRandom" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors">
+                  🎲 Another
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        this.showModal('Random Verse', verseContent);
+        
+        // Add event listeners for modal buttons
+        document.getElementById('shareRandomVerse').addEventListener('click', () => {
+          this.shareRandomVerse(verse);
+        });
+        
+        document.getElementById('getAnotherRandom').addEventListener('click', () => {
+          this.closeModal();
+          this.showRandomVerse(); // Recursively get another random verse
+        });
+        
+        // Track analytics for random verse
+        this.trackAnalytics('random_verse', verse.id);
       }
     } catch (error) {
       console.error('Error loading random verse:', error);
       this.showToast('Failed to load random verse');
     }
+  }
+
+  shareRandomVerse(verse) {
+    const shareData = {
+      title: 'Random Bible Verse',
+      text: `${verse.verse_text}\n\n— ${verse.bible_reference}`,
+      url: window.location.origin
+    };
+
+    if (navigator.share) {
+      navigator.share(shareData).catch(error => {
+        if (error.name !== 'AbortError') {
+          this.fallbackShareRandomVerse(shareData);
+        }
+      });
+    } else {
+      this.fallbackShareRandomVerse(shareData);
+    }
+  }
+
+  fallbackShareRandomVerse(shareData) {
+    // Copy to clipboard as fallback
+    const textToCopy = `${shareData.text}\n\n${shareData.url}`;
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      this.showToast('📋 Random verse copied to clipboard!');
+    }).catch(() => {
+      this.showToast('Unable to copy to clipboard');
+    });
+    
+    this.trackAnalytics('share_random_verse');
   }
 
   toggleTheme() {
@@ -589,8 +664,14 @@ class ChurchTapApp {
   async toggleHeart() {
     if (!this.currentVerse) return;
     
+    // Check if this is an external verse that can't be hearted
+    if (this.currentVerse.source === 'bolls.life') {
+      this.showToast('💝 External verses from bolls.life can\'t be hearted, but glad you love it!');
+      return;
+    }
+    
     try {
-      const response = await fetch('/api/verse/heart', {
+      const response = await fetch(this.buildApiUrl('/api/verse/heart'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -960,11 +1041,16 @@ class ChurchTapApp {
 
   // Helper method to add org parameter to API URLs
   buildApiUrl(path) {
-    if (this.orgParam) {
-      const separator = path.includes('?') ? '&' : '?';
-      return `${path}${separator}org=${this.orgParam}`;
+    try {
+      if (this.orgParam) {
+        const separator = path.includes('?') ? '&' : '?';
+        return `${path}${separator}org=${this.orgParam}`;
+      }
+      return path;
+    } catch (error) {
+      console.error('Error in buildApiUrl:', error);
+      return path;
     }
-    return path;
   }
 
   getUserPreferredTranslation() {
@@ -1448,7 +1534,7 @@ class ChurchTapApp {
       this.showToast('Loading verse history...');
       
       // Fetch last 60 days of verses from the server
-      const response = await fetch('/api/verses/history/60');
+      const response = await fetch(this.buildApiUrl('/api/verses/history/60'));
       
       if (!response.ok) {
         throw new Error('Failed to fetch verse history');
@@ -2458,7 +2544,7 @@ class ChurchTapApp {
 
   async submitPrayerRequest(content) {
     try {
-      const response = await fetch('/api/prayer-request', {
+      const response = await fetch(this.buildApiUrl('/api/prayer-request'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2488,7 +2574,7 @@ class ChurchTapApp {
 
   async submitVerseInsight(content, verseReference) {
     try {
-      const response = await fetch('/api/verse-community', {
+      const response = await fetch(this.buildApiUrl('/api/verse-community'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2519,7 +2605,7 @@ class ChurchTapApp {
 
   async submitPraiseReport(content) {
     try {
-      const response = await fetch('/api/praise-report', {
+      const response = await fetch(this.buildApiUrl('/api/praise-report'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2549,7 +2635,7 @@ class ChurchTapApp {
 
   async prayForRequest(prayerRequestId) {
     try {
-      const response = await fetch('/api/prayer-request/pray', {
+      const response = await fetch(this.buildApiUrl('/api/prayer-request/pray'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2584,7 +2670,7 @@ class ChurchTapApp {
 
   async heartInsight(insightId, buttonElement) {
     try {
-      const response = await fetch('/api/verse-community/heart', {
+      const response = await fetch(this.buildApiUrl('/api/verse-community/heart'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2623,7 +2709,7 @@ class ChurchTapApp {
 
   async celebrateReport(praiseReportId) {
     try {
-      const response = await fetch('/api/praise-report/celebrate', {
+      const response = await fetch(this.buildApiUrl('/api/praise-report/celebrate'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

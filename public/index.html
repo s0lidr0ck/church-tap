@@ -107,9 +107,6 @@
     <!-- Quick Menu -->
     <div id="quickMenu" class="hidden fixed top-16 right-4 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 min-w-48">
       <div class="p-4 space-y-3">
-        <button id="randomVerseBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-          🎲 Random Verse
-        </button>
         <button id="favoritesBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
           ❤️ My Favorites
         </button>
@@ -308,9 +305,16 @@
           <!-- QR Code Button -->
           <button id="qrBtn" class="flex flex-col items-center space-y-1 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation">
             <svg class="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1-1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
             </svg>
             <span class="text-xs text-gray-600 dark:text-gray-400">QR</span>
+          </button>
+          <!-- Random Verse Button -->
+          <button id="randomVerseBtn" class="flex flex-col items-center space-y-1 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation">
+            <svg class="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h16v16H4V4zM8 8h.01M16 8h.01M8 16h.01M16 16h.01M12 12h.01"></path>
+            </svg>
+            <span class="text-xs text-gray-600 dark:text-gray-400">Random</span>
           </button>
         </div>
       </div>

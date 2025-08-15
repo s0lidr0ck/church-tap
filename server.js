@@ -115,21 +115,10 @@ const dbQuery = {
 
 // Resolve organization context for each request based on host, custom domain, or override hints
 const resolveOrganization = (req, res, next) => {
-  // Skip logging for favicon and static assets to reduce noise
-  if (!req.url.includes('favicon') && !req.url.includes('.png') && !req.url.includes('.json') && !req.url.includes('appspecific')) {
-    console.log(`🔍 resolveOrganization: ${req.method} ${req.url}`);
-    console.log(`🔍 originalUrl: ${req.originalUrl}`);
-    console.log(`🔍 query:`, req.query);
-  }
-  
   // Prefer explicit hint via query/header for local/dev use
   const orgHint = req.query.org || req.headers['x-org-subdomain'];
   const hostHeader = (req.headers['x-forwarded-host'] || req.headers.host || '').toString();
   const host = hostHeader.split(':')[0].toLowerCase();
-  
-  if (!req.url.includes('favicon') && !req.url.includes('.png') && !req.url.includes('.json') && !req.url.includes('appspecific')) {
-    console.log(`🔍 orgHint: "${orgHint}", host: "${host}"`);
-  }
 
   // Attempt to extract subdomain from host (e.g., subdomain.example.com)
   let subdomainCandidate = null;
@@ -161,14 +150,8 @@ const resolveOrganization = (req, res, next) => {
       }
       if (org && org.id) {
         req.organizationId = org.id;
-        if (!req.url.includes('favicon') && !req.url.includes('.png') && !req.url.includes('.json') && !req.url.includes('appspecific')) {
-          console.log(`✅ Organization resolved: "${subdomainCandidate}" -> ID ${org.id}`);
-        }
       } else {
         req.organizationId = 1;
-        if (!req.url.includes('favicon') && !req.url.includes('.png') && !req.url.includes('.json') && !req.url.includes('appspecific')) {
-          console.log(`❌ Organization defaulted: "${subdomainCandidate}" -> ID 1 (not found)`);
-        }
       }
       next();
     }
@@ -261,11 +244,81 @@ app.get('/master', (req, res) => {
 
 // API Routes
 
+// Get random verse from bolls.life API (must come BEFORE /api/verse/:date)
+app.get('/api/verse/random', async (req, res) => {
+  console.log('🎲 Random verse endpoint called - URL:', req.url);
+  console.log('🎲 Query params:', req.query);
+  try {
+    // Use NASB translation by default, could be made configurable per user/org
+    const translation = 'NASB';
+    console.log('🌐 Fetching from bolls.life API...');
+    const bollsResponse = await fetch(`https://bolls.life/get-random-verse/${translation}/`);
+    
+    if (!bollsResponse.ok) {
+      throw new Error(`Bolls.life API error: ${bollsResponse.status}`);
+    }
+    
+    const bollsData = await bollsResponse.json();
+    console.log('📖 Received data from bolls.life:', bollsData);
+    
+    // Convert bolls.life format to our app's format
+    const bookName = getBookName(bollsData.book);
+    const reference = `${bookName} ${bollsData.chapter}:${bollsData.verse}`;
+    
+    const verse = {
+      id: `bolls_${bollsData.pk}`, // Unique ID for this external verse
+      date: new Date().toISOString().split('T')[0], // Today's date
+      content_type: 'text',
+      verse_text: bollsData.text,
+      bible_reference: reference,
+      context: `Random verse from ${translation} translation via bolls.life`,
+      tags: 'random,external',
+      published: true,
+      hearts: 0,
+      source: 'bolls.life',
+      translation: bollsData.translation,
+      external_id: bollsData.pk
+    };
+    
+    console.log('✅ Sending verse response');
+    res.json({ success: true, verse });
+    
+  } catch (error) {
+    console.error('Error fetching random verse from bolls.life:', error);
+    console.error('Error details:', error.message);
+    
+    // Fallback to local database if bolls.life is unavailable
+    console.log('🔄 Falling back to local database...');
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+    const twoWeeksAgoStr = twoWeeksAgo.toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
+    const orgId = req.organizationId || 1;
+    
+    console.log(`📅 Looking for verses between ${twoWeeksAgoStr} and ${today} for org ${orgId}`);
+    
+    dbQuery.get(`SELECT * FROM ct_verses WHERE date BETWEEN ? AND ? AND published = TRUE AND organization_id = ? ORDER BY RANDOM() LIMIT 1`, 
+      [twoWeeksAgoStr, today, orgId], (err, row) => {
+      console.log('📊 Database query result - err:', err, 'row:', row);
+      if (err) {
+        console.error('Database error in fallback:', err);
+        return res.status(500).json({ success: false, error: 'Database error in fallback' });
+      }
+      if (!row) {
+        console.log('No verses found in fallback');
+        return res.status(404).json({ success: false, error: 'No verses found for this organization' });
+      }
+      
+      console.log('✅ Sending fallback verse');
+      res.json({ success: true, verse: row });
+    });
+  }
+});
+
 // Get verse by date (with personalization support)
 app.get('/api/verse/:date', trackAnalytics('api_verse'), optionalAuth, async (req, res) => {
   const { date } = req.params;
   const orgId = req.organizationId || 1;
-  console.log(`📖 Getting verse for date ${date}, organization ID: ${orgId}`);
   
   try {
     // Check if there's a scheduled verse for this date first
@@ -357,27 +410,22 @@ app.get('/api/verse/:date', trackAnalytics('api_verse'), optionalAuth, async (re
   }
 });
 
-// Get random verse
-app.get('/api/verse/random', trackAnalytics('api_random'), (req, res) => {
-  const twoWeeksAgo = new Date();
-  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-  const twoWeeksAgoStr = twoWeeksAgo.toISOString().split('T')[0];
-  const today = new Date().toISOString().split('T')[0];
-  const orgId = req.organizationId || 1;
-  
-  dbQuery.get(`SELECT * FROM ct_verses WHERE date BETWEEN ? AND ? AND published = TRUE AND organization_id = ? ORDER BY RANDOM() LIMIT 1`, 
-    [twoWeeksAgoStr, today, orgId], (err, row) => {
-    if (err) {
-      return res.status(500).json({ success: false, error: 'Database error' });
-    }
-    
-    if (!row) {
-      return res.json({ success: false, message: 'No verses found' });
-    }
-    
-    res.json({ success: true, verse: row });
-  });
-});
+// Helper function to map book numbers to book names (bolls.life uses numbers)
+const getBookName = (bookNumber) => {
+  const books = [
+    '', // 0 - not used
+    'Genesis', 'Exodus', 'Leviticus', 'Numbers', 'Deuteronomy', 'Joshua', 'Judges', 'Ruth',
+    '1 Samuel', '2 Samuel', '1 Kings', '2 Kings', '1 Chronicles', '2 Chronicles', 'Ezra', 'Nehemiah',
+    'Esther', 'Job', 'Psalms', 'Proverbs', 'Ecclesiastes', 'Song of Solomon', 'Isaiah', 'Jeremiah',
+    'Lamentations', 'Ezekiel', 'Daniel', 'Hosea', 'Joel', 'Amos', 'Obadiah', 'Jonah', 'Micah',
+    'Nahum', 'Habakkuk', 'Zephaniah', 'Haggai', 'Zechariah', 'Malachi',
+    'Matthew', 'Mark', 'Luke', 'John', 'Acts', 'Romans', '1 Corinthians', '2 Corinthians',
+    'Galatians', 'Ephesians', 'Philippians', 'Colossians', '1 Thessalonians', '2 Thessalonians',
+    '1 Timothy', '2 Timothy', 'Titus', 'Philemon', 'Hebrews', 'James', '1 Peter', '2 Peter',
+    '1 John', '2 John', '3 John', 'Jude', 'Revelation'
+  ];
+  return books[bookNumber] || `Book ${bookNumber}`;
+};
 
 // Heart a verse
 app.post('/api/verse/heart', (req, res) => {
@@ -1652,7 +1700,6 @@ app.delete('/api/master/organizations/:id', requireMasterAuth, (req, res) => {
 app.get('/api/community/:date', trackAnalytics('community_view'), (req, res) => {
   const { date } = req.params;
   const orgId = req.organizationId || 1;
-  console.log(`👥 Getting community for date ${date}, organization ID: ${orgId}`);
   
   // Get prayer requests for the date
   const getPrayerRequests = new Promise((resolve, reject) => {
@@ -1704,6 +1751,8 @@ app.post('/api/prayer-request', (req, res) => {
   const ip = req.ip || req.connection.remoteAddress;
   const today = date || new Date().toISOString().split('T')[0];
   const orgId = req.organizationId || 1;
+  
+  console.log(`Prayer request - org parameter: ${req.query.org}, detected orgId: ${orgId}, host: ${req.get('host')}`);
   
   if (!content || content.trim().length === 0) {
     return res.status(400).json({ success: false, error: 'Prayer request content is required' });
