@@ -9,8 +9,35 @@
       "Bash(taskkill:*)",
       "WebFetch(domain:localhost)",
       "Bash(cmd //c:*)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(npm run build:css:once:*)",
+      "Bash(timeout 10 npm start)",
+      "Bash(curl:*)",
+      "Bash(npm install:*)",
+      "Bash(git add:*)",
+      "Bash(git reset:*)",
+      "Bash(git push:*)",
+      "Bash(cmd /c:*)",
+      "Bash(tasklist:*)",
+      "Bash(kill:*)",
+      "Bash(git commit:*)",
+      "Bash(ping:*)",
+      "Bash(telnet:*)",
+      "Bash(psql:*)",
+      "Bash(grep:*)",
+      "Bash(npm run build:css:*)",
+      "WebFetch(domain:bolls.life)",
+      "Bash(npx kill-port:*)",
+      "Bash(del run-verse-community-migration.js)",
+      "Bash(rm:*)",
+      "Bash(move:*)",
+      "Bash(mv:*)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "C:\\d C:\\Users\\pursu\\Documents\\GitHub",
+      "C:\\c\\Users\\pursu\\Documents\\GitHub"
+    ]
   }
 }

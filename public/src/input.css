@@ -49,6 +49,10 @@
     @apply text-base md:text-lg;
   }
   
+  .verse-text.size-medium {
+    @apply text-lg md:text-xl;
+  }
+  
   .verse-text.size-large {
     @apply text-xl md:text-2xl;
   }

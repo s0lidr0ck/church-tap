@@ -109,6 +109,22 @@ class AdminDashboard {
       this.toggleContentFields(e.target.value);
     });
 
+    // Community refresh button
+    const refreshCommunityBtn = document.getElementById('refreshCommunity');
+    if (refreshCommunityBtn) {
+      refreshCommunityBtn.addEventListener('click', () => {
+        this.loadCommunityData();
+      });
+    }
+
+    // Community filter
+    const communityFilter = document.getElementById('communityDaysFilter');
+    if (communityFilter) {
+      communityFilter.addEventListener('change', () => {
+        this.loadCommunityData();
+      });
+    }
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
@@ -898,17 +914,21 @@ class AdminDashboard {
   }
 
   renderCommunityData(community) {
-    const { prayer_requests, praise_reports } = community;
+    const { prayer_requests, praise_reports, verse_insights } = community;
     
     // Update stats
     document.getElementById('totalPrayerRequests').textContent = prayer_requests.length;
     document.getElementById('totalPraiseReports').textContent = praise_reports.length;
+    document.getElementById('totalVerseInsights').textContent = (verse_insights || []).length;
 
     // Render prayer requests
     this.renderAdminPrayerRequests(prayer_requests);
     
     // Render praise reports
     this.renderAdminPraiseReports(praise_reports);
+    
+    // Render verse insights
+    this.renderAdminVerseInsights(verse_insights || []);
   }
 
   renderAdminPrayerRequests(prayerRequests) {
@@ -926,9 +946,9 @@ class AdminDashboard {
 
     container.innerHTML = prayerRequests.map(request => `
       <div class="px-4 py-4">
-        <div class="flex items-start justify-between">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
           <div class="flex-1">
-            <div class="flex items-center space-x-2 mb-2">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
               <span class="text-sm font-medium text-gray-900">${request.date}</span>
               <span class="text-xs text-gray-500">${this.formatDateTime(request.created_at)}</span>
               ${request.is_approved ? 
@@ -941,21 +961,21 @@ class AdminDashboard {
               }
             </div>
             <p class="text-sm text-gray-700 mb-2">${this.escapeHtml(request.content)}</p>
-            <div class="flex items-center space-x-4 text-xs text-gray-500">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
               <span>🙏 ${request.prayer_count || 0} prayers</span>
               <span>IP: ${request.ip_address}</span>
             </div>
           </div>
-          <div class="flex items-center space-x-2 ml-4">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-2 lg:ml-4">
             ${!request.is_approved ? 
-              `<button onclick="adminDashboard.moderatePrayerRequest(${request.id}, true, false)" class="text-green-600 hover:text-green-900 text-sm">Approve</button>` :
-              `<button onclick="adminDashboard.moderatePrayerRequest(${request.id}, false, false)" class="text-yellow-600 hover:text-yellow-900 text-sm">Unapprove</button>`
+              `<button onclick="adminDashboard.moderatePrayerRequest(${request.id}, true, false)" class="text-green-600 hover:text-green-900 text-sm font-medium">Approve</button>` :
+              `<button onclick="adminDashboard.moderatePrayerRequest(${request.id}, false, false)" class="text-yellow-600 hover:text-yellow-900 text-sm font-medium">Unapprove</button>`
             }
             ${!request.is_hidden ? 
-              `<button onclick="adminDashboard.moderatePrayerRequest(${request.id}, ${request.is_approved}, true)" class="text-orange-600 hover:text-orange-900 text-sm">Hide</button>` :
-              `<button onclick="adminDashboard.moderatePrayerRequest(${request.id}, ${request.is_approved}, false)" class="text-blue-600 hover:text-blue-900 text-sm">Show</button>`
+              `<button onclick="adminDashboard.moderatePrayerRequest(${request.id}, ${request.is_approved}, true)" class="text-orange-600 hover:text-orange-900 text-sm font-medium">Hide</button>` :
+              `<button onclick="adminDashboard.moderatePrayerRequest(${request.id}, ${request.is_approved}, false)" class="text-blue-600 hover:text-blue-900 text-sm font-medium">Show</button>`
             }
-            <button onclick="adminDashboard.deletePrayerRequest(${request.id})" class="text-red-600 hover:text-red-900 text-sm">Delete</button>
+            <button onclick="adminDashboard.deletePrayerRequest(${request.id})" class="text-red-600 hover:text-red-900 text-sm font-medium">Delete</button>
           </div>
         </div>
       </div>
@@ -977,9 +997,9 @@ class AdminDashboard {
 
     container.innerHTML = praiseReports.map(report => `
       <div class="px-4 py-4">
-        <div class="flex items-start justify-between">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
           <div class="flex-1">
-            <div class="flex items-center space-x-2 mb-2">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
               <span class="text-sm font-medium text-gray-900">${report.date}</span>
               <span class="text-xs text-gray-500">${this.formatDateTime(report.created_at)}</span>
               ${report.is_approved ? 
@@ -992,21 +1012,21 @@ class AdminDashboard {
               }
             </div>
             <p class="text-sm text-gray-700 mb-2">${this.escapeHtml(report.content)}</p>
-            <div class="flex items-center space-x-4 text-xs text-gray-500">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
               <span>🎉 ${report.celebration_count || 0} celebrations</span>
               <span>IP: ${report.ip_address}</span>
             </div>
           </div>
-          <div class="flex items-center space-x-2 ml-4">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-2 lg:ml-4">
             ${!report.is_approved ? 
-              `<button onclick="adminDashboard.moderatePraiseReport(${report.id}, true, false)" class="text-green-600 hover:text-green-900 text-sm">Approve</button>` :
-              `<button onclick="adminDashboard.moderatePraiseReport(${report.id}, false, false)" class="text-yellow-600 hover:text-yellow-900 text-sm">Unapprove</button>`
+              `<button onclick="adminDashboard.moderatePraiseReport(${report.id}, true, false)" class="text-green-600 hover:text-green-900 text-sm font-medium">Approve</button>` :
+              `<button onclick="adminDashboard.moderatePraiseReport(${report.id}, false, false)" class="text-yellow-600 hover:text-yellow-900 text-sm font-medium">Unapprove</button>`
             }
             ${!report.is_hidden ? 
-              `<button onclick="adminDashboard.moderatePraiseReport(${report.id}, ${report.is_approved}, true)" class="text-orange-600 hover:text-orange-900 text-sm">Hide</button>` :
-              `<button onclick="adminDashboard.moderatePraiseReport(${report.id}, ${report.is_approved}, false)" class="text-blue-600 hover:text-blue-900 text-sm">Show</button>`
+              `<button onclick="adminDashboard.moderatePraiseReport(${report.id}, ${report.is_approved}, true)" class="text-orange-600 hover:text-orange-900 text-sm font-medium">Hide</button>` :
+              `<button onclick="adminDashboard.moderatePraiseReport(${report.id}, ${report.is_approved}, false)" class="text-blue-600 hover:text-blue-900 text-sm font-medium">Show</button>`
             }
-            <button onclick="adminDashboard.deletePraiseReport(${report.id})" class="text-red-600 hover:text-red-900 text-sm">Delete</button>
+            <button onclick="adminDashboard.deletePraiseReport(${report.id})" class="text-red-600 hover:text-red-900 text-sm font-medium">Delete</button>
           </div>
         </div>
       </div>
@@ -1123,6 +1143,108 @@ class AdminDashboard {
 
   formatDateTime(timestamp) {
     return new Date(timestamp).toLocaleString();
+  }
+
+  renderAdminVerseInsights(verseInsights) {
+    const container = document.getElementById('verseInsightsAdminList');
+    
+    if (verseInsights.length === 0) {
+      container.innerHTML = `
+        <div class="p-8 text-center text-gray-500">
+          <span class="text-2xl">💭</span>
+          <p class="mt-2">No verse insights found</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = verseInsights.map(insight => `
+      <div class="px-4 py-4">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+          <div class="flex-1">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
+              <span class="text-sm font-medium text-gray-900">${insight.date}</span>
+              <span class="text-xs text-gray-500">${this.formatDateTime(insight.created_at)}</span>
+              ${insight.is_approved ? 
+                '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Approved</span>' :
+                '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>'
+              }
+              ${insight.is_hidden ? 
+                '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Hidden</span>' :
+                ''
+              }
+            </div>
+            <p class="text-sm text-gray-700 mb-2">${this.escapeHtml(insight.content)}</p>
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+              <span>💭 Verse Insight</span>
+              <span>IP: ${insight.ip_address}</span>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-2 lg:ml-4">
+            ${!insight.is_approved ? 
+              `<button onclick="adminDashboard.moderateVerseInsight(${insight.id}, true, false)" class="text-green-600 hover:text-green-900 text-sm font-medium">Approve</button>` :
+              `<button onclick="adminDashboard.moderateVerseInsight(${insight.id}, false, false)" class="text-yellow-600 hover:text-yellow-900 text-sm font-medium">Unapprove</button>`
+            }
+            ${!insight.is_hidden ? 
+              `<button onclick="adminDashboard.moderateVerseInsight(${insight.id}, ${insight.is_approved}, true)" class="text-orange-600 hover:text-orange-900 text-sm font-medium">Hide</button>` :
+              `<button onclick="adminDashboard.moderateVerseInsight(${insight.id}, ${insight.is_approved}, false)" class="text-blue-600 hover:text-blue-900 text-sm font-medium">Show</button>`
+            }
+            <button onclick="adminDashboard.deleteVerseInsight(${insight.id})" class="text-red-600 hover:text-red-900 text-sm font-medium">Delete</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async moderateVerseInsight(id, isApproved, isHidden) {
+    try {
+      const response = await fetch(`/api/admin/verse-insight/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          is_approved: isApproved,
+          is_hidden: isHidden
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.loadCommunityData();
+        this.showToast('Verse insight updated successfully!');
+      } else {
+        this.showToast(data.error || 'Failed to update verse insight', 'error');
+      }
+    } catch (error) {
+      console.error('Error moderating verse insight:', error);
+      this.showToast('Connection error', 'error');
+    }
+  }
+
+  async deleteVerseInsight(id) {
+    if (!confirm('Are you sure you want to delete this verse insight?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/verse-insight/${id}`, {
+        method: 'DELETE'
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.loadCommunityData();
+        this.showToast('Verse insight deleted successfully!');
+      } else {
+        this.showToast(data.error || 'Failed to delete verse insight', 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting verse insight:', error);
+      this.showToast('Connection error', 'error');
+    }
   }
 }
 

@@ -56,7 +56,54 @@ app.use(session({
 }));
 
 // Database setup (Postgres via adapter)
-const db = require('./db-adapter');
+// Direct PostgreSQL connection
+const { Pool } = require('pg');
+
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  throw new Error('DATABASE_URL is required. Set it to your PostgreSQL connection string.');
+}
+
+const db = new Pool({ 
+  connectionString: DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+
+// Helper function to convert ? placeholders to $1, $2, etc. and handle queries
+function convertQueryParams(sql, params) {
+  let paramIndex = 1;
+  const convertedSql = sql.replace(/\?/g, () => `$${paramIndex++}`);
+  return { sql: convertedSql, params };
+}
+
+const dbQuery = {
+  get: (sql, params, callback) => {
+    const { sql: convertedSql, params: convertedParams } = convertQueryParams(sql, params);
+    db.query(convertedSql, convertedParams, (err, result) => {
+      if (err) return callback(err);
+      callback(null, result.rows[0] || null);
+    });
+  },
+  all: (sql, params, callback) => {
+    const { sql: convertedSql, params: convertedParams } = convertQueryParams(sql, params);
+    db.query(convertedSql, convertedParams, (err, result) => {
+      if (err) return callback(err);
+      callback(null, result.rows || []);
+    });
+  },
+  run: (sql, params, callback) => {
+    const { sql: convertedSql, params: convertedParams } = convertQueryParams(sql, params);
+    db.query(convertedSql, convertedParams, (err, result) => {
+      if (err) return callback(err);
+      // Simulate SQLite's this.lastID and this.changes
+      const context = { 
+        lastID: result.rows[0]?.id || result.insertId,
+        changes: result.rowCount || 0
+      };
+      callback.call(context, null);
+    });
+  }
+};
 
 // Note: Postgres schema (CT_* tables) should be created separately.
 
@@ -86,8 +133,8 @@ const resolveOrganization = (req, res, next) => {
   }
 
   // Try to match by custom_domain or subdomain
-  db.get(
-    `SELECT id, subdomain FROM organizations WHERE custom_domain = ? OR subdomain = ?`,
+  dbQuery.get(
+    `SELECT id, subdomain FROM ct_organizations WHERE custom_domain = ? OR subdomain = ?`,
     [host, subdomainCandidate],
     (err, org) => {
       if (err) {
@@ -121,7 +168,7 @@ const upload = multer({
 // Auto-publish verses at midnight Central Time
 cron.schedule('0 0 * * *', () => {
   const today = new Date().toISOString().split('T')[0];
-  db.run(`UPDATE verses SET published = TRUE WHERE date = ? AND published = FALSE`, [today], (err) => {
+  dbQuery.run(`UPDATE ct_verses SET published = TRUE WHERE date = ? AND published = FALSE`, [today], (err) => {
     if (err) {
       console.error('Error auto-publishing verse:', err);
     } else {
@@ -140,9 +187,10 @@ const trackAnalytics = (action) => {
     const verseId = req.params.id || req.body.verse_id;
     const orgId = req.organizationId || 1;
 
-    db.run(
-      `INSERT INTO analytics (verse_id, action, ip_address, user_agent, organization_id) VALUES (?, ?, ?, ?, ?)`,
-      [verseId, action, ip, userAgent, orgId]
+    dbQuery.run(
+      `INSERT INTO ct_analytics (verse_id, action, ip_address, user_agent, organization_id) VALUES (?, ?, ?, ?, ?)`,
+      [verseId, action, ip, userAgent, orgId],
+      () => {} // Empty callback
     );
     
     next();
@@ -197,7 +245,7 @@ app.get('/api/verse/:date', trackAnalytics('api_verse'), optionalAuth, async (re
   
   try {
     // Check if there's a scheduled verse for this date first
-    db.get(`SELECT * FROM verses WHERE date = ? AND published = TRUE AND organization_id = ?`, [date, orgId], async (err, scheduledVerse) => {
+    dbQuery.get(`SELECT * FROM ct_verses WHERE date = ? AND published = TRUE AND organization_id = ?`, [date, orgId], async (err, scheduledVerse) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -214,7 +262,7 @@ app.get('/api/verse/:date', trackAnalytics('api_verse'), optionalAuth, async (re
       // For logged-in users, try to find a personalized verse
       try {
         // Get user preferences
-        db.get(`SELECT * FROM user_preferences WHERE user_id = ?`, [req.user.userId], (err, prefs) => {
+        dbQuery.get(`SELECT * FROM ct_user_preferences WHERE user_id = ?`, [req.user.userId], (err, prefs) => {
           if (err || !prefs) {
             // If no preferences, return the scheduled verse
             return res.json({ success: true, verse: scheduledVerse });
@@ -247,7 +295,7 @@ app.get('/api/verse/:date', trackAnalytics('api_verse'), optionalAuth, async (re
                 ELSE 1
               END
             ) as relevance_score
-            FROM verses 
+            FROM ct_verses 
             WHERE published = TRUE 
             AND date <= ? 
             AND (${conditions})
@@ -256,7 +304,7 @@ app.get('/api/verse/:date', trackAnalytics('api_verse'), optionalAuth, async (re
             LIMIT 1
           `;
 
-          db.get(personalizedQuery, [...searchParams, date, orgId, date], (err, personalizedVerse) => {
+          dbQuery.get(personalizedQuery, [...searchParams, date, orgId, date], (err, personalizedVerse) => {
             if (err) {
               console.error('Personalization query error:', err);
               return res.json({ success: true, verse: scheduledVerse });
@@ -293,7 +341,7 @@ app.get('/api/verse/random', trackAnalytics('api_random'), (req, res) => {
   const today = new Date().toISOString().split('T')[0];
   const orgId = req.organizationId || 1;
   
-  db.get(`SELECT * FROM verses WHERE date BETWEEN ? AND ? AND published = TRUE AND organization_id = ? ORDER BY RANDOM() LIMIT 1`, 
+  dbQuery.get(`SELECT * FROM ct_verses WHERE date BETWEEN ? AND ? AND published = TRUE AND organization_id = ? ORDER BY RANDOM() LIMIT 1`, 
     [twoWeeksAgoStr, today, orgId], (err, row) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
@@ -315,13 +363,13 @@ app.post('/api/verse/heart', (req, res) => {
     return res.status(400).json({ success: false, error: 'Missing required fields' });
   }
   
-  db.run(`UPDATE verses SET hearts = hearts + 1 WHERE id = ?`, [verse_id], function(err) {
+  dbQuery.run(`UPDATE ct_verses SET hearts = hearts + 1 WHERE id = ?`, [verse_id], function(err) {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
     
     // Get updated heart count
-    db.get(`SELECT hearts FROM verses WHERE id = ?`, [verse_id], (err, row) => {
+    dbQuery.get(`SELECT hearts FROM ct_verses WHERE id = ?`, [verse_id], (err, row) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -359,7 +407,7 @@ app.post('/api/analytics', (req, res) => {
   const userAgent = req.get('User-Agent');
   const orgId = req.organizationId || 1;
   
-  db.run(`INSERT INTO analytics (verse_id, action, ip_address, user_agent, organization_id) VALUES (?, ?, ?, ?, ?)`,
+  dbQuery.run(`INSERT INTO ct_analytics (verse_id, action, ip_address, user_agent, organization_id) VALUES (?, ?, ?, ?, ?)`,
     [verse_id, action, ip, userAgent, orgId], (err) => {
     if (err) {
       console.error('Analytics error:', err);
@@ -394,7 +442,7 @@ app.post('/api/sync-analytics', (req, res) => {
       }
       
       const ev = events[index];
-      db.run(`INSERT INTO analytics (verse_id, action, ip_address, user_agent, organization_id) VALUES (?, ?, ?, ?, ?)`,
+      dbQuery.run(`INSERT INTO ct_analytics (verse_id, action, ip_address, user_agent, organization_id) VALUES (?, ?, ?, ?, ?)`,
         [ev.verse_id || null, ev.action || 'bg_event', ip, userAgent, orgId],
         (err) => {
           if (err) {
@@ -409,8 +457,8 @@ app.post('/api/sync-analytics', (req, res) => {
     
     processEvent(0);
   } else {
-    db.run(
-      `INSERT INTO analytics (verse_id, action, ip_address, user_agent, organization_id) VALUES (?, ?, ?, ?, ?)`,
+    dbQuery.run(
+      `INSERT INTO ct_analytics (verse_id, action, ip_address, user_agent, organization_id) VALUES (?, ?, ?, ?, ?)`,
       [null, 'background-sync', ip, userAgent, orgId],
       (err) => {
         if (err) {
@@ -435,9 +483,9 @@ app.get('/api/verses/search', optionalAuth, (req, res) => {
   const searchTerm = `%${query.trim()}%`;
   
   // Search in verse text, bible reference, context, and tags
-  db.all(`
+  dbQuery.all(`
     SELECT id, date, content_type, verse_text, image_path, bible_reference, context, tags, published
-    FROM verses 
+    FROM ct_verses 
     WHERE published = TRUE 
     AND organization_id = ?
     AND (
@@ -454,9 +502,9 @@ app.get('/api/verses/search', optionalAuth, (req, res) => {
     }
     
     // Get total count for pagination
-    db.get(`
+    dbQuery.get(`
       SELECT COUNT(*) as total
-      FROM verses 
+      FROM ct_verses 
       WHERE published = TRUE 
       AND organization_id = ?
       AND (
@@ -497,9 +545,9 @@ app.post('/api/verses/search', optionalAuth, (req, res) => {
   const searchTerm = `%${query.trim()}%`;
   
   // Search in verse text, bible reference, context, and tags
-  db.all(`
+  dbQuery.all(`
     SELECT id, date, content_type, verse_text, image_path, bible_reference, context, tags, published
-    FROM verses 
+    FROM ct_verses 
     WHERE published = TRUE 
     AND organization_id = ?
     AND (
@@ -517,9 +565,9 @@ app.post('/api/verses/search', optionalAuth, (req, res) => {
     }
     
     // Get total count for pagination
-    db.get(`
+    dbQuery.get(`
       SELECT COUNT(*) as total
-      FROM verses 
+      FROM ct_verses 
       WHERE published = TRUE 
       AND organization_id = ?
       AND (
@@ -559,9 +607,9 @@ app.get('/api/verses/history/:days', optionalAuth, (req, res) => {
   cutoffDate.setDate(cutoffDate.getDate() - days);
   const cutoffDateStr = cutoffDate.toISOString().split('T')[0]; // YYYY-MM-DD format
   
-  db.all(`
+  dbQuery.all(`
     SELECT id, date, content_type, verse_text, image_path, bible_reference, context, tags, published
-    FROM verses 
+    FROM ct_verses 
     WHERE published = TRUE 
     AND organization_id = ?
     AND date >= ?
@@ -591,7 +639,7 @@ app.post('/api/feedback', (req, res) => {
   }
   
   // Store feedback in a simple way (you might want a separate table)
-  db.run(`INSERT INTO analytics (action, ip_address, user_agent) VALUES (?, ?, ?)`,
+  dbQuery.run(`INSERT INTO ct_analytics (action, ip_address, user_agent) VALUES (?, ?, ?)`,
     [`feedback: ${feedback}`, req.ip, req.get('User-Agent')], (err) => {
     if (err) {
       console.error('Feedback error:', err);
@@ -692,9 +740,9 @@ const requireOrgAuth = (req, res, next) => {
   }
   
   // Get admin with organization context
-  db.get(`SELECT au.*, o.id as organization_id 
-          FROM admin_users au 
-          LEFT JOIN organizations o ON au.organization_id = o.id 
+  dbQuery.get(`SELECT au.*, o.id as organization_id 
+          FROM ct_admin_users au 
+          LEFT JOIN ct_organizations o ON au.organization_id = o.id 
           WHERE au.id = ? AND au.is_active = TRUE`, [req.session.adminId], (err, admin) => {
     if (err) {
       console.error('Error getting admin organization context:', err);
@@ -729,9 +777,9 @@ app.post('/api/admin/login', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Username and password required' });
   }
   
-  db.get(`SELECT au.*, o.name as organization_name, o.subdomain as organization_subdomain 
-           FROM admin_users au 
-           LEFT JOIN organizations o ON au.organization_id = o.id 
+  dbQuery.get(`SELECT au.*, o.name as organization_name, o.subdomain as organization_subdomain 
+           FROM ct_admin_users au 
+           LEFT JOIN ct_organizations o ON au.organization_id = o.id 
            WHERE au.username = ? AND au.is_active = TRUE`, [username], async (err, user) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
@@ -760,6 +808,39 @@ app.post('/api/admin/login', async (req, res) => {
   });
 });
 
+// Create default admin user (for setup)
+app.post('/api/setup/admin', async (req, res) => {
+  const { username = 'admin', password = 'admin123', email = 'admin@localhost' } = req.body;
+  
+  // Check if any admin users exist
+  dbQuery.get(`SELECT COUNT(*) as count FROM ct_admin_users`, [], async (err, result) => {
+    if (err) {
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    
+    if (result.count > 0) {
+      return res.status(400).json({ success: false, error: 'Admin users already exist' });
+    }
+    
+    try {
+      const passwordHash = await bcrypt.hash(password, 12);
+      dbQuery.run(
+        `INSERT INTO ct_admin_users (username, password_hash, email, role, organization_id, is_active) VALUES (?, ?, ?, ?, ?, ?)`,
+        [username, passwordHash, email, 'admin', 1, true],
+        function(insertErr) {
+          if (insertErr) {
+            console.error('Admin creation error:', insertErr);
+            return res.status(500).json({ success: false, error: 'Failed to create admin user' });
+          }
+          res.json({ success: true, message: 'Default admin user created', username, password });
+        }
+      );
+    } catch (hashErr) {
+      return res.status(500).json({ success: false, error: 'Failed to process password' });
+    }
+  });
+});
+
 // Admin logout
 app.post('/api/admin/logout', (req, res) => {
   req.session.destroy();
@@ -770,8 +851,8 @@ app.post('/api/admin/logout', (req, res) => {
 app.get('/api/admin/check-session', (req, res) => {
   if (req.session.adminId) {
     // Get admin details with organization context
-  db.get(`SELECT au.*, o.name as organization_name, o.subdomain as organization_subdomain 
-            FROM admin_users au 
+  dbQuery.get(`SELECT au.*, o.name as organization_name, o.subdomain as organization_subdomain 
+            FROM ct_admin_users au 
             LEFT JOIN organizations o ON au.organization_id = o.id 
             WHERE au.id = ? AND au.is_active = TRUE`, [req.session.adminId], (err, admin) => {
       if (err) {
@@ -806,7 +887,7 @@ app.get('/api/admin/check-session', (req, res) => {
 
 // Get all verses (admin)
 app.get('/api/admin/verses', requireOrgAuth, (req, res) => {
-  db.all(`SELECT * FROM verses WHERE organization_id = ? ORDER BY date DESC`, [req.organizationId], (err, rows) => {
+  dbQuery.all(`SELECT * FROM ct_verses WHERE organization_id = ? ORDER BY date DESC`, [req.organizationId], (err, rows) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -844,7 +925,7 @@ app.post('/api/admin/verses', requireOrgAuth, upload.single('image'), async (req
       image_path = s3Result.path;
     }
     
-    db.run(`INSERT INTO verses (date, content_type, verse_text, image_path, bible_reference, context, tags, published, organization_id) 
+    dbQuery.run(`INSERT INTO ct_verses (date, content_type, verse_text, image_path, bible_reference, context, tags, published, organization_id) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [date, content_type, verse_text, image_path, bible_reference, context, tags, published || 0, req.organizationId],
       function(err) {
@@ -887,7 +968,7 @@ app.put('/api/admin/verses/:id', requireOrgAuth, upload.single('image'), async (
       image_path = s3Result.path;
     }
     
-    db.run(`UPDATE verses SET date = ?, content_type = ?, verse_text = ?, image_path = ?, 
+    dbQuery.run(`UPDATE ct_verses SET date = ?, content_type = ?, verse_text = ?, image_path = ?, 
             bible_reference = ?, context = ?, tags = ?, published = ? WHERE id = ? AND organization_id = ?`,
       [date, content_type, verse_text, image_path, bible_reference, context, tags, published, id, req.organizationId],
       function(err) {
@@ -908,12 +989,12 @@ app.delete('/api/admin/verses/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   
   // Get verse to delete image file if exists (only from this organization)
-  db.get(`SELECT image_path FROM verses WHERE id = ? AND organization_id = ?`, [id, req.organizationId], (err, verse) => {
+  dbQuery.get(`SELECT image_path FROM ct_verses WHERE id = ? AND organization_id = ?`, [id, req.organizationId], (err, verse) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
     
-    db.run(`DELETE FROM verses WHERE id = ? AND organization_id = ?`, [id, req.organizationId], function(err) {
+    dbQuery.run(`DELETE FROM ct_verses WHERE id = ? AND organization_id = ?`, [id, req.organizationId], function(err) {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -941,7 +1022,7 @@ app.post('/api/admin/verses/bulk', requireOrgAuth, (req, res) => {
   
   switch (operation) {
     case 'delete':
-      db.run(`DELETE FROM verses WHERE id IN (${placeholders}) AND organization_id = ?`, params, function(err) {
+      dbQuery.run(`DELETE FROM ct_verses WHERE id IN (${placeholders}) AND organization_id = ?`, params, function(err) {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
@@ -950,7 +1031,7 @@ app.post('/api/admin/verses/bulk', requireOrgAuth, (req, res) => {
       break;
       
     case 'publish':
-      db.run(`UPDATE verses SET published = TRUE WHERE id IN (${placeholders}) AND organization_id = ?`, params, function(err) {
+      dbQuery.run(`UPDATE ct_verses SET published = TRUE WHERE id IN (${placeholders}) AND organization_id = ?`, params, function(err) {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
@@ -959,7 +1040,7 @@ app.post('/api/admin/verses/bulk', requireOrgAuth, (req, res) => {
       break;
       
     case 'unpublish':
-      db.run(`UPDATE verses SET published = FALSE WHERE id IN (${placeholders}) AND organization_id = ?`, params, function(err) {
+      dbQuery.run(`UPDATE ct_verses SET published = FALSE WHERE id IN (${placeholders}) AND organization_id = ?`, params, function(err) {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
@@ -971,7 +1052,7 @@ app.post('/api/admin/verses/bulk', requireOrgAuth, (req, res) => {
       if (!data.tags) {
         return res.status(400).json({ success: false, error: 'Tags required for tag update' });
       }
-      db.run(`UPDATE verses SET tags = ? WHERE id IN (${placeholders}) AND organization_id = ?`, [data.tags, ...verse_ids, req.organizationId], function(err) {
+      dbQuery.run(`UPDATE ct_verses SET tags = ? WHERE id IN (${placeholders}) AND organization_id = ?`, [data.tags, ...verse_ids, req.organizationId], function(err) {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
@@ -1054,7 +1135,7 @@ app.post('/api/admin/verses/import', requireOrgAuth, upload.single('csv'), (req,
           return;
         }
         
-        db.run(`INSERT INTO verses (date, content_type, verse_text, bible_reference, context, tags, published, organization_id) 
+        dbQuery.run(`INSERT INTO ct_verses (date, content_type, verse_text, bible_reference, context, tags, published, organization_id) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [date, content_type, verse_text || '', bible_reference || '', context || '', tags || '', published === 'true' ? 1 : 0, req.organizationId],
           function(err) {
@@ -1084,7 +1165,7 @@ app.post('/api/admin/verses/import', requireOrgAuth, upload.single('csv'), (req,
 });
 
 app.get('/api/admin/verses/export', requireOrgAuth, (req, res) => {
-  db.all(`SELECT date, content_type, verse_text, bible_reference, context, tags, published FROM verses WHERE organization_id = ? ORDER BY date DESC`, [req.organizationId], (err, rows) => {
+  dbQuery.all(`SELECT date, content_type, verse_text, bible_reference, context, tags, published FROM ct_verses WHERE organization_id = ? ORDER BY date DESC`, [req.organizationId], (err, rows) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -1121,7 +1202,7 @@ app.post('/api/master/login', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Username and password required' });
   }
   
-  db.get(`SELECT * FROM master_admins WHERE username = ?`, [username], async (err, user) => {
+  dbQuery.get(`SELECT * FROM ct_master_admins WHERE username = ?`, [username], async (err, user) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -1138,7 +1219,7 @@ app.post('/api/master/login', async (req, res) => {
     req.session.masterAdminUsername = user.username;
     
     // Update last login
-    db.run(`UPDATE master_admins SET last_login_at = CURRENT_TIMESTAMP, last_login_ip = ? WHERE id = ?`, 
+    dbQuery.run(`UPDATE ct_master_admins SET last_login_at = CURRENT_TIMESTAMP, last_login_ip = ? WHERE id = ?`, 
       [req.ip, user.id]);
     
     res.json({ success: true, admin: { id: user.id, username: user.username, role: user.role } });
@@ -1174,12 +1255,12 @@ app.get('/api/master/check-session', (req, res) => {
 app.get('/api/master/dashboard', requireMasterAuth, (req, res) => {
   // Get organization stats
   const getOrgStats = new Promise((resolve, reject) => {
-    db.all(`
+    dbQuery.all(`
       SELECT 
         COUNT(*) as total,
         SUM(CASE WHEN is_active THEN 1 ELSE 0 END) as active,
         SUM(CASE WHEN plan_type = 'basic' THEN 29 WHEN plan_type = 'premium' THEN 79 WHEN plan_type = 'enterprise' THEN 199 ELSE 0 END) as revenue
-      FROM organizations
+      FROM ct_organizations
     `, (err, rows) => {
       if (err) reject(err);
       else resolve(rows[0] || {});
@@ -1188,7 +1269,7 @@ app.get('/api/master/dashboard', requireMasterAuth, (req, res) => {
   
   // Get total users across all orgs
   const getUserStats = new Promise((resolve, reject) => {
-    db.get(`SELECT COUNT(*) as total FROM users`, (err, row) => {
+    dbQuery.get(`SELECT COUNT(*) as total FROM ct_users`, (err, row) => {
       if (err) reject(err);
       else resolve(row || {});
     });
@@ -1196,7 +1277,7 @@ app.get('/api/master/dashboard', requireMasterAuth, (req, res) => {
   
   // Get recent organizations
   const getRecentOrgs = new Promise((resolve, reject) => {
-    db.all(`SELECT name, subdomain, created_at FROM organizations ORDER BY created_at DESC LIMIT 5`, (err, rows) => {
+    dbQuery.all(`SELECT name, subdomain, created_at FROM ct_organizations ORDER BY created_at DESC LIMIT 5`, (err, rows) => {
       if (err) reject(err);
       else resolve(rows || []);
     });
@@ -1226,7 +1307,7 @@ app.get('/api/master/dashboard', requireMasterAuth, (req, res) => {
 app.get('/api/master/organizations', requireMasterAuth, (req, res) => {
   try {
     console.log('📊 Querying organizations table...');
-    db.all(`SELECT * FROM organizations ORDER BY created_at DESC`, [], (err, rows) => {
+    dbQuery.all(`SELECT * FROM ct_organizations ORDER BY created_at DESC`, [], (err, rows) => {
       if (err) {
         console.error('Master organizations query error:', err);
         return res.status(500).json({ success: false, error: 'Database error' });
@@ -1244,9 +1325,9 @@ app.get('/api/master/organizations', requireMasterAuth, (req, res) => {
 // List admins for a specific organization (master scope)
 app.get('/api/master/organizations/:id/admins', requireMasterAuth, (req, res) => {
   const { id } = req.params;
-  db.all(
+  dbQuery.all(
     `SELECT id, username, email, role, is_active, created_at, last_login_at 
-     FROM admin_users 
+     FROM ct_admin_users 
      WHERE organization_id = ? 
      ORDER BY created_at DESC`,
     [id],
@@ -1265,7 +1346,7 @@ app.put('/api/master/organizations/:id/admins/:adminId', requireMasterAuth, (req
   const { is_active, role } = req.body;
 
   // Ensure admin belongs to the organization
-  db.get(`SELECT id, organization_id FROM admin_users WHERE id = ?`, [adminId], (err, admin) => {
+  dbQuery.get(`SELECT id, organization_id FROM ct_admin_users WHERE id = ?`, [adminId], (err, admin) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -1289,7 +1370,7 @@ app.put('/api/master/organizations/:id/admins/:adminId', requireMasterAuth, (req
     }
 
     params.push(adminId);
-    db.run(`UPDATE admin_users SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, params, function(updateErr) {
+    dbQuery.run(`UPDATE ct_admin_users SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, params, function(updateErr) {
       if (updateErr) {
         return res.status(500).json({ success: false, error: 'Failed to update admin' });
       }
@@ -1308,7 +1389,7 @@ app.post('/api/master/organizations', requireMasterAuth, (req, res) => {
     }
     
     // Check if subdomain is already taken
-    db.get(`SELECT id FROM organizations WHERE subdomain = ?`, [subdomain], (err, existing) => {
+    dbQuery.get(`SELECT id FROM ct_organizations WHERE subdomain = ?`, [subdomain], (err, existing) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -1324,8 +1405,8 @@ app.post('/api/master/organizations', requireMasterAuth, (req, res) => {
     
     const features = JSON.stringify(['verses', 'community', 'analytics', 'users']);
     
-    db.run(`
-      INSERT INTO organizations (
+    dbQuery.run(`
+      INSERT INTO ct_organizations (
         name, subdomain, contact_email, plan_type, custom_domain, settings, features
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `, [name, subdomain, contact_email, plan_type, custom_domain, settings, features], 
@@ -1335,7 +1416,7 @@ app.post('/api/master/organizations', requireMasterAuth, (req, res) => {
       }
       
       // Log activity
-      db.run(`
+      dbQuery.run(`
         INSERT INTO master_admin_activity (
           master_admin_id, action, resource_type, resource_id, details, ip_address
         ) VALUES (?, ?, ?, ?, ?, ?)
@@ -1367,7 +1448,7 @@ app.put('/api/master/organizations/:id', requireMasterAuth, (req, res) => {
   }
   
   // Check if subdomain is taken by another organization
-  db.get(`SELECT id FROM organizations WHERE subdomain = ? AND id != ?`, [subdomain, id], (err, existing) => {
+  dbQuery.get(`SELECT id FROM ct_organizations WHERE subdomain = ? AND id != ?`, [subdomain, id], (err, existing) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -1376,8 +1457,8 @@ app.put('/api/master/organizations/:id', requireMasterAuth, (req, res) => {
       return res.status(400).json({ success: false, error: 'Subdomain is already taken' });
     }
     
-    db.run(`
-      UPDATE organizations SET 
+    dbQuery.run(`
+      UPDATE ct_organizations SET 
         name = ?, subdomain = ?, contact_email = ?, plan_type = ?, 
         custom_domain = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
@@ -1392,7 +1473,7 @@ app.put('/api/master/organizations/:id', requireMasterAuth, (req, res) => {
       }
       
       // Log activity
-      db.run(`
+      dbQuery.run(`
         INSERT INTO master_admin_activity (
           master_admin_id, action, resource_type, resource_id, organization_id, details, ip_address
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -1419,14 +1500,14 @@ app.get('/api/master/overview', requireMasterAuth, (req, res) => {
 
   const getTotals = new Promise((resolve, reject) => {
     // Get all totals in a single query for PostgreSQL compatibility
-    db.get(`
+    dbQuery.get(`
       SELECT 
-        (SELECT COUNT(*) FROM organizations) AS total_orgs,
-        (SELECT COUNT(*) FROM organizations WHERE is_active = TRUE) AS active_orgs,
-        (SELECT COUNT(*) FROM users) AS total_users,
-        (SELECT COUNT(*) FROM verses) AS total_verses,
-        (SELECT COUNT(*) FROM analytics WHERE action = 'verse_view' AND timestamp >= ?) AS total_views_7d,
-        (SELECT COUNT(DISTINCT ip_address) FROM analytics WHERE action = 'verse_view' AND timestamp >= ?) AS unique_visitors_7d
+        (SELECT COUNT(*) FROM ct_organizations) AS total_orgs,
+        (SELECT COUNT(*) FROM ct_organizations WHERE is_active = TRUE) AS active_orgs,
+        (SELECT COUNT(*) FROM ct_users) AS total_users,
+        (SELECT COUNT(*) FROM ct_verses) AS total_verses,
+        (SELECT COUNT(*) FROM ct_analytics WHERE action = 'verse_view' AND timestamp >= ?) AS total_views_7d,
+        (SELECT COUNT(DISTINCT ip_address) FROM ct_analytics WHERE action = 'verse_view' AND timestamp >= ?) AS unique_visitors_7d
     `, [sevenDaysAgoISO, sevenDaysAgoISO], (err, row) => {
       if (err) return reject(err);
       const totals = {
@@ -1442,7 +1523,7 @@ app.get('/api/master/overview', requireMasterAuth, (req, res) => {
   });
 
   const getPerOrg = new Promise((resolve, reject) => {
-    db.all(
+    dbQuery.all(
       `SELECT 
          o.id,
          o.name,
@@ -1450,12 +1531,12 @@ app.get('/api/master/overview', requireMasterAuth, (req, res) => {
          o.plan_type,
          o.is_active,
          o.created_at,
-         (SELECT COUNT(*) FROM verses v WHERE v.organization_id = o.id) AS verse_count,
-         (SELECT COUNT(*) FROM admin_users au WHERE au.organization_id = o.id) AS admin_count,
-         (SELECT COUNT(*) FROM users u WHERE u.organization_id = o.id) AS user_count,
-         (SELECT MAX(timestamp) FROM analytics a WHERE a.organization_id = o.id) AS last_activity,
-         (SELECT COUNT(*) FROM analytics a WHERE a.organization_id = o.id AND a.timestamp >= ?) AS views_7d
-       FROM organizations o
+         (SELECT COUNT(*) FROM ct_verses v WHERE v.organization_id = o.id) AS verse_count,
+         (SELECT COUNT(*) FROM ct_admin_users au WHERE au.organization_id = o.id) AS admin_count,
+         (SELECT COUNT(*) FROM ct_users u WHERE u.organization_id = o.id) AS user_count,
+         (SELECT MAX(timestamp) FROM ct_analytics a WHERE a.organization_id = o.id) AS last_activity,
+         (SELECT COUNT(*) FROM ct_analytics a WHERE a.organization_id = o.id AND a.timestamp >= ?) AS views_7d
+       FROM ct_organizations o
        ORDER BY o.created_at DESC`,
       [sevenDaysAgoISO],
       (err, rows) => {
@@ -1468,9 +1549,9 @@ app.get('/api/master/overview', requireMasterAuth, (req, res) => {
   Promise.all([getTotals, getPerOrg])
     .then(([totals, perOrg]) => {
       // Global 7-day timeseries
-      db.all(
+      dbQuery.all(
         `SELECT DATE(timestamp) as date, COUNT(*) as views, COUNT(DISTINCT ip_address) as unique_visitors
-         FROM analytics 
+         FROM ct_analytics 
          WHERE action = 'verse_view' AND timestamp >= ?
          GROUP BY DATE(timestamp)
          ORDER BY DATE(timestamp) ASC`,
@@ -1509,7 +1590,7 @@ app.delete('/api/master/organizations/:id', requireMasterAuth, (req, res) => {
   }
   
   // Get organization info for logging
-  db.get(`SELECT name, subdomain FROM organizations WHERE id = ?`, [id], (err, org) => {
+  dbQuery.get(`SELECT name, subdomain FROM ct_organizations WHERE id = ?`, [id], (err, org) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -1519,13 +1600,13 @@ app.delete('/api/master/organizations/:id', requireMasterAuth, (req, res) => {
     }
     
     // Delete organization (this will cascade delete related data)
-    db.run(`DELETE FROM organizations WHERE id = ?`, [id], function(err) {
+    dbQuery.run(`DELETE FROM ct_organizations WHERE id = ?`, [id], function(err) {
       if (err) {
         return res.status(500).json({ success: false, error: 'Failed to delete organization' });
       }
       
       // Log activity
-      db.run(`
+      dbQuery.run(`
         INSERT INTO master_admin_activity (
           master_admin_id, action, resource_type, resource_id, details, ip_address
         ) VALUES (?, ?, ?, ?, ?, ?)
@@ -1550,7 +1631,7 @@ app.get('/api/community/:date', trackAnalytics('community_view'), (req, res) => 
   
   // Get prayer requests for the date
   const getPrayerRequests = new Promise((resolve, reject) => {
-  db.all(`SELECT * FROM prayer_requests WHERE date = ? AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = ? ORDER BY created_at ASC`, 
+  dbQuery.all(`SELECT * FROM ct_prayer_requests WHERE date = ? AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = ? ORDER BY created_at ASC`, 
       [date, orgId], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
@@ -1559,20 +1640,30 @@ app.get('/api/community/:date', trackAnalytics('community_view'), (req, res) => 
   
   // Get praise reports for the date
   const getPraiseReports = new Promise((resolve, reject) => {
-  db.all(`SELECT * FROM praise_reports WHERE date = ? AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = ? ORDER BY created_at ASC`, 
+  dbQuery.all(`SELECT * FROM ct_praise_reports WHERE date = ? AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = ? ORDER BY created_at ASC`, 
       [date, orgId], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
       });
   });
   
-  Promise.all([getPrayerRequests, getPraiseReports])
-    .then(([prayerRequests, praiseReports]) => {
+  // Get verse insights for the date
+  const getVerseInsights = new Promise((resolve, reject) => {
+  dbQuery.all(`SELECT * FROM ct_verse_community_posts WHERE date = ? AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = ? ORDER BY created_at ASC`, 
+      [date, orgId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+  });
+  
+  Promise.all([getPrayerRequests, getPraiseReports, getVerseInsights])
+    .then(([prayerRequests, praiseReports, verseInsights]) => {
       res.json({
         success: true,
         community: {
           prayer_requests: prayerRequests,
-          praise_reports: praiseReports
+          praise_reports: praiseReports,
+          verse_insights: verseInsights
         }
       });
     })
@@ -1597,7 +1688,7 @@ app.post('/api/prayer-request', (req, res) => {
     return res.status(400).json({ success: false, error: 'Prayer request too long (max 500 characters)' });
   }
   
-  db.run(`INSERT INTO prayer_requests (date, content, user_token, ip_address, organization_id) VALUES (?, ?, ?, ?, ?)`,
+  dbQuery.run(`INSERT INTO ct_prayer_requests (date, content, user_token, ip_address, organization_id, is_approved) VALUES (?, ?, ?, ?, ?, TRUE)`,
     [today, content.trim(), user_token, ip, orgId], function(err) {
       if (err) {
         console.error('Error submitting prayer request:', err);
@@ -1623,7 +1714,7 @@ app.post('/api/praise-report', (req, res) => {
     return res.status(400).json({ success: false, error: 'Praise report too long (max 500 characters)' });
   }
   
-  db.run(`INSERT INTO praise_reports (date, content, user_token, ip_address, organization_id) VALUES (?, ?, ?, ?, ?)`,
+  dbQuery.run(`INSERT INTO ct_praise_reports (date, content, user_token, ip_address, organization_id, is_approved) VALUES (?, ?, ?, ?, ?, TRUE)`,
     [today, content.trim(), user_token, ip, orgId], function(err) {
       if (err) {
         console.error('Error submitting praise report:', err);
@@ -1644,7 +1735,7 @@ app.post('/api/prayer-request/pray', (req, res) => {
   }
   
   // Check if user already prayed for this request
-  db.get(`SELECT id FROM prayer_interactions WHERE prayer_request_id = ? AND user_token = ?`,
+  dbQuery.get(`SELECT id FROM ct_prayer_interactions WHERE prayer_request_id = ? AND user_token = ?`,
     [prayer_request_id, user_token], (err, row) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
@@ -1655,21 +1746,21 @@ app.post('/api/prayer-request/pray', (req, res) => {
       }
       
       // Add prayer interaction
-      db.run(`INSERT INTO prayer_interactions (prayer_request_id, user_token, ip_address) VALUES (?, ?, ?)`,
+      dbQuery.run(`INSERT INTO ct_prayer_interactions (prayer_request_id, user_token, ip_address) VALUES (?, ?, ?)`,
         [prayer_request_id, user_token, ip], function(err) {
           if (err) {
             return res.status(500).json({ success: false, error: 'Database error' });
           }
           
           // Update prayer count
-          db.run(`UPDATE prayer_requests SET prayer_count = prayer_count + 1 WHERE id = ?`,
+          dbQuery.run(`UPDATE ct_prayer_requests SET prayer_count = prayer_count + 1 WHERE id = ?`,
             [prayer_request_id], (err) => {
               if (err) {
                 return res.status(500).json({ success: false, error: 'Database error' });
               }
               
               // Get updated count
-              db.get(`SELECT prayer_count FROM prayer_requests WHERE id = ?`, 
+              dbQuery.get(`SELECT prayer_count FROM ct_prayer_requests WHERE id = ?`, 
                 [prayer_request_id], (err, row) => {
                   if (err) {
                     return res.status(500).json({ success: false, error: 'Database error' });
@@ -1692,7 +1783,7 @@ app.post('/api/praise-report/celebrate', (req, res) => {
   }
   
   // Check if user already celebrated this report
-  db.get(`SELECT id FROM celebration_interactions WHERE praise_report_id = ? AND user_token = ?`,
+  dbQuery.get(`SELECT id FROM ct_celebration_interactions WHERE praise_report_id = ? AND user_token = ?`,
     [praise_report_id, user_token], (err, row) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
@@ -1703,21 +1794,21 @@ app.post('/api/praise-report/celebrate', (req, res) => {
       }
       
       // Add celebration interaction
-      db.run(`INSERT INTO celebration_interactions (praise_report_id, user_token, ip_address) VALUES (?, ?, ?)`,
+      dbQuery.run(`INSERT INTO ct_celebration_interactions (praise_report_id, user_token, ip_address) VALUES (?, ?, ?)`,
         [praise_report_id, user_token, ip], function(err) {
           if (err) {
             return res.status(500).json({ success: false, error: 'Database error' });
           }
           
           // Update celebration count
-          db.run(`UPDATE praise_reports SET celebration_count = celebration_count + 1 WHERE id = ?`,
+          dbQuery.run(`UPDATE ct_praise_reports SET celebration_count = celebration_count + 1 WHERE id = ?`,
             [praise_report_id], (err) => {
               if (err) {
                 return res.status(500).json({ success: false, error: 'Database error' });
               }
               
               // Get updated count
-              db.get(`SELECT celebration_count FROM praise_reports WHERE id = ?`, 
+              dbQuery.get(`SELECT celebration_count FROM ct_praise_reports WHERE id = ?`, 
                 [praise_report_id], (err, row) => {
                   if (err) {
                     return res.status(500).json({ success: false, error: 'Database error' });
@@ -1730,7 +1821,7 @@ app.post('/api/praise-report/celebrate', (req, res) => {
     });
 });
 
-// Admin: Get all prayer requests and praise reports
+// Admin: Get all prayer requests, praise reports, and verse insights
 app.get('/api/admin/community', requireOrgAuth, (req, res) => {
   const { days = 7 } = req.query;
   const startDate = new Date();
@@ -1738,7 +1829,7 @@ app.get('/api/admin/community', requireOrgAuth, (req, res) => {
   const startDateStr = startDate.toISOString().split('T')[0];
   
   const getPrayerRequests = new Promise((resolve, reject) => {
-    db.all(`SELECT * FROM prayer_requests WHERE date >= ? AND organization_id = ? ORDER BY date DESC, created_at DESC`, 
+    dbQuery.all(`SELECT * FROM ct_prayer_requests WHERE date >= ? AND organization_id = ? ORDER BY date DESC, created_at DESC`, 
       [startDateStr, req.organizationId], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
@@ -1746,20 +1837,29 @@ app.get('/api/admin/community', requireOrgAuth, (req, res) => {
   });
   
   const getPraiseReports = new Promise((resolve, reject) => {
-    db.all(`SELECT * FROM praise_reports WHERE date >= ? AND organization_id = ? ORDER BY date DESC, created_at DESC`, 
+    dbQuery.all(`SELECT * FROM ct_praise_reports WHERE date >= ? AND organization_id = ? ORDER BY date DESC, created_at DESC`, 
       [startDateStr, req.organizationId], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
       });
   });
   
-  Promise.all([getPrayerRequests, getPraiseReports])
-    .then(([prayerRequests, praiseReports]) => {
+  const getVerseInsights = new Promise((resolve, reject) => {
+    dbQuery.all(`SELECT * FROM ct_verse_community_posts WHERE date >= ? AND organization_id = ? ORDER BY date DESC, created_at DESC`, 
+      [startDateStr, req.organizationId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+  });
+  
+  Promise.all([getPrayerRequests, getPraiseReports, getVerseInsights])
+    .then(([prayerRequests, praiseReports, verseInsights]) => {
       res.json({
         success: true,
         community: {
           prayer_requests: prayerRequests,
-          praise_reports: praiseReports
+          praise_reports: praiseReports,
+          verse_insights: verseInsights
         }
       });
     })
@@ -1774,7 +1874,7 @@ app.put('/api/admin/prayer-request/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   const { is_approved, is_hidden } = req.body;
   
-  db.run(`UPDATE prayer_requests SET is_approved = ?, is_hidden = ? WHERE id = ? AND organization_id = ?`,
+  dbQuery.run(`UPDATE ct_prayer_requests SET is_approved = ?, is_hidden = ? WHERE id = ? AND organization_id = ?`,
     [is_approved ? 1 : 0, is_hidden ? 1 : 0, id, req.organizationId], function(err) {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
@@ -1789,7 +1889,7 @@ app.put('/api/admin/praise-report/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   const { is_approved, is_hidden } = req.body;
   
-  db.run(`UPDATE praise_reports SET is_approved = ?, is_hidden = ? WHERE id = ? AND organization_id = ?`,
+  dbQuery.run(`UPDATE ct_praise_reports SET is_approved = ?, is_hidden = ? WHERE id = ? AND organization_id = ?`,
     [is_approved ? 1 : 0, is_hidden ? 1 : 0, id, req.organizationId], function(err) {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
@@ -1804,13 +1904,13 @@ app.delete('/api/admin/prayer-request/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   
   // Delete interactions first
-  db.run(`DELETE FROM prayer_interactions WHERE prayer_request_id = ?`, [id], (err) => {
+  dbQuery.run(`DELETE FROM ct_prayer_interactions WHERE prayer_request_id = ?`, [id], (err) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
     
     // Delete prayer request (only from this organization)
-    db.run(`DELETE FROM prayer_requests WHERE id = ? AND organization_id = ?`, [id, req.organizationId], function(err) {
+    dbQuery.run(`DELETE FROM ct_prayer_requests WHERE id = ? AND organization_id = ?`, [id, req.organizationId], function(err) {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -1825,19 +1925,351 @@ app.delete('/api/admin/praise-report/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   
   // Delete interactions first
-  db.run(`DELETE FROM celebration_interactions WHERE praise_report_id = ?`, [id], (err) => {
+  dbQuery.run(`DELETE FROM ct_celebration_interactions WHERE praise_report_id = ?`, [id], (err) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
     
     // Delete praise report (only from this organization)
-    db.run(`DELETE FROM praise_reports WHERE id = ? AND organization_id = ?`, [id, req.organizationId], function(err) {
+    dbQuery.run(`DELETE FROM ct_praise_reports WHERE id = ? AND organization_id = ?`, [id, req.organizationId], function(err) {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
       
       res.json({ success: true });
     });
+  });
+});
+
+// Admin: Moderate verse insight
+app.put('/api/admin/verse-insight/:id', requireOrgAuth, (req, res) => {
+  const { id } = req.params;
+  const { is_approved, is_hidden } = req.body;
+  
+  dbQuery.run(`UPDATE ct_verse_community_posts SET is_approved = ?, is_hidden = ? WHERE id = ? AND organization_id = ?`,
+    [is_approved ? 1 : 0, is_hidden ? 1 : 0, id, req.organizationId], function(err) {
+      if (err) {
+        return res.status(500).json({ success: false, error: 'Database error' });
+      }
+      
+      res.json({ success: true });
+    });
+});
+
+// Admin: Delete verse insight
+app.delete('/api/admin/verse-insight/:id', requireOrgAuth, (req, res) => {
+  const { id } = req.params;
+  
+  // Delete verse insight (only from this organization)
+  dbQuery.run(`DELETE FROM ct_verse_community_posts WHERE id = ? AND organization_id = ?`, [id, req.organizationId], function(err) {
+    if (err) {
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    
+    res.json({ success: true });
+  });
+});
+
+// VERSE COMMUNITY WALL ENDPOINTS
+
+// Submit community post for today's verse
+app.post('/api/verse-community', (req, res) => {
+  const { content, verse_reference, user_token, date } = req.body;
+  const ip = req.ip || req.connection.remoteAddress;
+  const today = date || new Date().toISOString().split('T')[0];
+  const orgId = req.organizationId || 1;
+  
+  if (!content || content.trim().length === 0) {
+    return res.status(400).json({ success: false, error: 'Post content is required' });
+  }
+  
+  if (content.length > 500) {
+    return res.status(400).json({ success: false, error: 'Post too long (max 500 characters)' });
+  }
+  
+  if (!verse_reference) {
+    return res.status(400).json({ success: false, error: 'Verse reference is required' });
+  }
+  
+  dbQuery.run(`
+    INSERT INTO ct_verse_community_posts (verse_reference, date, content, author_name, user_token, ip_address, organization_id, is_approved) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)
+  `, [verse_reference, today, content.trim(), 'Anonymous', user_token, ip, orgId], function(err) {
+    if (err) {
+      console.error('Error submitting verse community post:', err);
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    
+    res.json({ success: true, post_id: this.lastID });
+  });
+});
+
+// Heart/like a community post
+app.post('/api/verse-community/heart', (req, res) => {
+  const { post_id, user_token } = req.body;
+  const ip = req.ip || req.connection.remoteAddress;
+  const orgId = req.organizationId || 1;
+  
+  if (!post_id || !user_token) {
+    return res.status(400).json({ success: false, error: 'Post ID and user token are required' });
+  }
+  
+  // Check if user already hearted this post
+  dbQuery.get(`
+    SELECT id FROM ct_verse_community_interactions 
+    WHERE post_id = ? AND user_token = ?
+  `, [post_id, user_token], (err, row) => {
+    if (err) {
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    
+    if (row) {
+      return res.status(400).json({ success: false, error: 'You have already hearted this post' });
+    }
+    
+    // Add interaction
+    dbQuery.run(`
+      INSERT INTO ct_verse_community_interactions (post_id, user_token, ip_address) 
+      VALUES (?, ?, ?)
+    `, [post_id, user_token, ip], function(err) {
+      if (err) {
+        return res.status(500).json({ success: false, error: 'Database error' });
+      }
+      
+      // Update heart count
+      dbQuery.run(`
+        UPDATE ct_verse_community_posts SET heart_count = heart_count + 1 WHERE id = ?
+      `, [post_id], (err) => {
+        if (err) {
+          return res.status(500).json({ success: false, error: 'Database error' });
+        }
+        
+        // Get updated count
+        dbQuery.get(`
+          SELECT heart_count FROM ct_verse_community_posts WHERE id = ?
+        `, [post_id], (err, row) => {
+          if (err) {
+            return res.status(500).json({ success: false, error: 'Database error' });
+          }
+          
+          res.json({ success: true, heart_count: row?.heart_count || 0 });
+        });
+      });
+    });
+  });
+});
+
+// Admin: Get verse community posts for moderation
+app.get('/api/admin/verse-community', requireOrgAuth, (req, res) => {
+  const { days = 7 } = req.query;
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  const startDateStr = startDate.toISOString().split('T')[0];
+  
+  dbQuery.all(`
+    SELECT * FROM ct_verse_community_posts 
+    WHERE date >= ? AND organization_id = ? 
+    ORDER BY date DESC, created_at DESC
+  `, [startDateStr, req.organizationId], (err, rows) => {
+    if (err) {
+      console.error('Error fetching admin verse community posts:', err);
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    
+    res.json({
+      success: true,
+      posts: rows || []
+    });
+  });
+});
+
+// Admin: Moderate verse community post
+app.put('/api/admin/verse-community/:id', requireOrgAuth, (req, res) => {
+  const { id } = req.params;
+  const { is_approved, is_hidden } = req.body;
+  
+  dbQuery.run(`
+    UPDATE ct_verse_community_posts SET is_approved = ?, is_hidden = ? 
+    WHERE id = ? AND organization_id = ?
+  `, [is_approved ? 1 : 0, is_hidden ? 1 : 0, id, req.organizationId], function(err) {
+    if (err) {
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    
+    res.json({ success: true });
+  });
+});
+
+// Admin: Delete verse community post
+app.delete('/api/admin/verse-community/:id', requireOrgAuth, (req, res) => {
+  const { id } = req.params;
+  
+  if (!id || isNaN(id)) {
+    return res.status(400).json({ success: false, error: 'Invalid post ID' });
+  }
+  
+  // Delete post (only from this organization)
+  dbQuery.run(`
+    DELETE FROM ct_verse_community_posts WHERE id = ? AND organization_id = ?
+  `, [id, req.organizationId], function(err) {
+    if (err) {
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    
+    res.json({ success: true });
+  });
+});
+
+// STRONG'S NUMBERS ENDPOINTS
+
+// Get verse with Strong's numbers (KJV only)
+app.get('/api/strongs/:book/:chapter/:verse', trackAnalytics('strongs_view'), async (req, res) => {
+  const { book, chapter, verse } = req.params;
+  
+  try {
+    // Use bolls.life KJV API which includes Strong's numbers
+    const apiUrl = `https://bolls.life/get-verse/KJV/${book}/${chapter}/${verse}/`;
+    console.log('Fetching Strong\'s verse from bolls.life:', apiUrl);
+    
+    const response = await fetch(apiUrl);
+    
+    if (response.ok) {
+      const data = await response.json();
+      res.json({
+        success: true,
+        verse: data.text || data.verse_text,
+        reference: `${data.book_name || ''} ${chapter}:${verse}`
+      });
+    } else {
+      res.status(404).json({ success: false, error: 'Verse not found' });
+    }
+  } catch (error) {
+    console.error('Error fetching Strong\'s verse:', error);
+    res.status(500).json({ success: false, error: 'API error' });
+  }
+});
+
+// Get Strong's number definition
+app.get('/api/strongs/definition/:number', trackAnalytics('strongs_definition'), async (req, res) => {
+  const { number } = req.params;
+  
+  // First check if we have it cached
+  dbQuery.get(`
+    SELECT * FROM ct_strongs_references WHERE strongs_number = ?
+  `, [number], async (err, row) => {
+    if (err) {
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    
+    if (row) {
+      // Return cached definition
+      return res.json({
+        success: true,
+        definition: {
+          number: row.strongs_number,
+          language: row.language,
+          transliteration: row.transliteration,
+          phonetics: row.phonetics,
+          definition: row.definition,
+          short_definition: row.short_definition,
+          outline: row.outline_of_biblical_usage,
+          kjv_occurrences: row.total_kjv_occurrences
+        }
+      });
+    }
+    
+    // If not cached, fetch from bolls.life dictionary API
+    try {
+      const dictApiUrl = `https://bolls.life/dictionary-definition/BDBT/${number}/`;
+      console.log('Fetching Strong\'s definition from bolls.life:', dictApiUrl);
+      
+      const response = await fetch(dictApiUrl);
+      
+      if (response.ok) {
+        const definitions = await response.json();
+        
+        if (definitions && definitions.length > 0) {
+          // Take the first definition (usually the most relevant)
+          const def = definitions[0];
+          
+          const definitionData = {
+            number: def.topic || number,
+            language: number.startsWith('H') ? 'Hebrew' : 'Greek',
+            transliteration: def.transliteration || '',
+            phonetics: def.pronunciation || '',
+            definition: def.definition ? def.definition.replace(/<[^>]*>/g, '') : 'No definition available', // Strip HTML
+            short_definition: def.short_definition || '',
+            outline: def.lexeme || '',
+            kjv_occurrences: 0
+          };
+          
+          // Cache the definition for future use
+          dbQuery.run(`
+            INSERT INTO ct_strongs_references 
+            (strongs_number, language, transliteration, phonetics, definition, short_definition, outline_of_biblical_usage, total_kjv_occurrences) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (strongs_number) DO UPDATE SET
+            language = EXCLUDED.language,
+            transliteration = EXCLUDED.transliteration,
+            phonetics = EXCLUDED.phonetics,
+            definition = EXCLUDED.definition,
+            short_definition = EXCLUDED.short_definition,
+            outline_of_biblical_usage = EXCLUDED.outline_of_biblical_usage,
+            total_kjv_occurrences = EXCLUDED.total_kjv_occurrences,
+            updated_at = NOW()
+          `, [
+            definitionData.number,
+            definitionData.language,
+            definitionData.transliteration,
+            definitionData.phonetics,
+            definitionData.definition,
+            definitionData.short_definition,
+            definitionData.outline,
+            definitionData.kjv_occurrences
+          ], (cacheErr) => {
+            if (cacheErr) {
+              console.log('Warning: Could not cache Strong\'s definition:', cacheErr);
+            }
+          });
+          
+          return res.json({
+            success: true,
+            definition: definitionData
+          });
+        }
+      }
+      
+      // Fallback if API fails or no definitions found
+      res.json({
+        success: true,
+        definition: {
+          number: number,
+          language: number.startsWith('H') ? 'Hebrew' : 'Greek',
+          transliteration: 'Not available',
+          definition: 'Definition not found in dictionary.',
+          short_definition: 'No definition available',
+          outline: '',
+          kjv_occurrences: 0
+        }
+      });
+      
+    } catch (error) {
+      console.error('Error fetching Strong\'s definition:', error);
+      
+      // Fallback response
+      res.json({
+        success: true,
+        definition: {
+          number: number,
+          language: number.startsWith('H') ? 'Hebrew' : 'Greek',
+          transliteration: 'Not available',
+          definition: 'Error fetching definition. Please try again.',
+          short_definition: 'Error loading definition',
+          outline: '',
+          kjv_occurrences: 0
+        }
+      });
+    }
   });
 });
 
@@ -1875,7 +2307,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     // Check if user already exists
-    db.get(`SELECT id FROM users WHERE email = ?`, [email.toLowerCase()], async (err, existingUser) => {
+    dbQuery.get(`SELECT id FROM ct_users WHERE email = ?`, [email.toLowerCase()], async (err, existingUser) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -1889,7 +2321,7 @@ app.post('/api/auth/register', async (req, res) => {
       const verificationToken = crypto.randomBytes(32).toString('hex');
 
       // Create user
-      db.run(`INSERT INTO users (email, password_hash, first_name, last_name, display_name, verification_token) 
+      dbQuery.run(`INSERT INTO ct_users (email, password_hash, first_name, last_name, display_name, verification_token) 
               VALUES (?, ?, ?, ?, ?, ?)`,
         [email.toLowerCase(), passwordHash, firstName, lastName, displayName, verificationToken],
         function(err) {
@@ -1900,7 +2332,7 @@ app.post('/api/auth/register', async (req, res) => {
           const userId = this.lastID;
 
           // Create default user preferences
-          db.run(`INSERT INTO user_preferences (user_id) VALUES (?)`, [userId], (err) => {
+          dbQuery.run(`INSERT INTO ct_user_preferences (user_id) VALUES (?)`, [userId], (err) => {
             if (err) {
               console.error('Error creating user preferences:', err);
             }
@@ -1951,7 +2383,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     // Find user
-    db.get(`SELECT * FROM users WHERE email = ?`, [email.toLowerCase()], async (err, user) => {
+    dbQuery.get(`SELECT * FROM ct_users WHERE email = ?`, [email.toLowerCase()], async (err, user) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -1967,7 +2399,7 @@ app.post('/api/auth/login', async (req, res) => {
       }
 
       // Update last login
-      db.run(`UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?`, [user.id]);
+      dbQuery.run(`UPDATE ct_users SET last_login = CURRENT_TIMESTAMP WHERE id = ?`, [user.id]);
 
       // Generate JWT token
       const token = jwt.sign(
@@ -1984,7 +2416,7 @@ app.post('/api/auth/login', async (req, res) => {
       });
 
       // Check if user has completed onboarding
-      db.get(`SELECT * FROM user_preferences WHERE user_id = ?`, [user.id], (err, prefs) => {
+      dbQuery.get(`SELECT * FROM ct_user_preferences WHERE user_id = ?`, [user.id], (err, prefs) => {
         const requiresOnboarding = !prefs || (!prefs.interests && !prefs.life_stage);
 
         res.json({
@@ -2016,7 +2448,7 @@ app.post('/api/auth/logout', (req, res) => {
 
 // Get current user
 app.get('/api/auth/me', authenticateUser, (req, res) => {
-  db.get(`SELECT u.*, p.* FROM users u 
+  dbQuery.get(`SELECT u.*, p.* FROM ct_users u 
           LEFT JOIN user_preferences p ON u.id = p.user_id 
           WHERE u.id = ?`, [req.user.userId], (err, user) => {
     if (err) {
@@ -2058,7 +2490,7 @@ app.post('/api/auth/onboarding', authenticateUser, (req, res) => {
   const interestsJson = JSON.stringify(interests || []);
   const strugglesJson = JSON.stringify(struggles || []);
 
-  db.run(`UPDATE user_preferences SET 
+  dbQuery.run(`UPDATE ct_user_preferences SET 
           life_stage = ?, interests = ?, struggles = ?, prayer_frequency = ?, preferred_translation = ?, updated_at = CURRENT_TIMESTAMP
           WHERE user_id = ?`,
     [lifeStage, interestsJson, strugglesJson, prayerFrequency, preferredTranslation, req.user.userId],
@@ -2075,7 +2507,7 @@ app.post('/api/auth/onboarding', authenticateUser, (req, res) => {
 app.put('/api/auth/profile', authenticateUser, (req, res) => {
   const { firstName, lastName, displayName, phone, dateOfBirth } = req.body;
 
-  db.run(`UPDATE users SET 
+  dbQuery.run(`UPDATE ct_users SET 
           first_name = ?, last_name = ?, display_name = ?, phone = ?, date_of_birth = ?, updated_at = CURRENT_TIMESTAMP
           WHERE id = ?`,
     [firstName, lastName, displayName, phone, dateOfBirth, req.user.userId],
@@ -2098,7 +2530,7 @@ app.put('/api/auth/preferences', authenticateUser, (req, res) => {
   const interestsJson = JSON.stringify(interests || []);
   const strugglesJson = JSON.stringify(struggles || []);
 
-  db.run(`UPDATE user_preferences SET 
+  dbQuery.run(`UPDATE ct_user_preferences SET 
           life_stage = ?, interests = ?, struggles = ?, prayer_frequency = ?, preferred_translation = ?,
           notification_enabled = ?, notification_time = ?, timezone = ?, updated_at = CURRENT_TIMESTAMP
           WHERE user_id = ?`,
@@ -2120,12 +2552,12 @@ app.get('/api/admin/analytics', requireOrgAuth, (req, res) => {
   startDate.setDate(startDate.getDate() - days);
   
   // Get daily view counts
-  db.all(`
+  dbQuery.all(`
     SELECT 
       DATE(timestamp) as date,
       COUNT(*) as views,
       COUNT(DISTINCT ip_address) as unique_visitors
-    FROM analytics 
+    FROM ct_analytics 
     WHERE action = 'verse_view' AND timestamp >= ? AND organization_id = ?
     GROUP BY DATE(timestamp)
     ORDER BY date DESC
@@ -2135,15 +2567,15 @@ app.get('/api/admin/analytics', requireOrgAuth, (req, res) => {
     }
     
     // Get most viewed verses
-    db.all(`
+    dbQuery.all(`
       SELECT 
         v.id,
         v.date,
         v.bible_reference,
         v.verse_text,
         COUNT(a.id) as views
-      FROM verses v
-      LEFT JOIN analytics a ON v.id = a.verse_id AND a.action = 'verse_view'
+      FROM ct_verses v
+      LEFT JOIN ct_analytics a ON v.id = a.verse_id AND a.action = 'verse_view'
       WHERE a.timestamp >= ? AND v.organization_id = ? AND a.organization_id = ?
       GROUP BY v.id
       ORDER BY views DESC
@@ -2174,7 +2606,7 @@ app.post('/api/master/organizations/:id/admins', requireMasterAuth, async (req, 
   }
 
   // Ensure organization exists
-  db.get(`SELECT id FROM organizations WHERE id = ?`, [id], async (err, org) => {
+  dbQuery.get(`SELECT id FROM ct_organizations WHERE id = ?`, [id], async (err, org) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -2183,7 +2615,7 @@ app.post('/api/master/organizations/:id/admins', requireMasterAuth, async (req, 
     }
 
     // Ensure username unique
-    db.get(`SELECT id FROM admin_users WHERE username = ?`, [username], async (err, existing) => {
+    dbQuery.get(`SELECT id FROM ct_admin_users WHERE username = ?`, [username], async (err, existing) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -2193,8 +2625,8 @@ app.post('/api/master/organizations/:id/admins', requireMasterAuth, async (req, 
 
       try {
         const passwordHash = await bcrypt.hash(password, 12);
-        db.run(
-          `INSERT INTO admin_users (username, password_hash, email, role, organization_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        dbQuery.run(
+          `INSERT INTO ct_admin_users (username, password_hash, email, role, organization_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
           [username, passwordHash, email || null, role, id, true],
           function(insertErr) {
             if (insertErr) {
@@ -2222,6 +2654,8 @@ app.post('/api/prayer-request', rateLimiter('prayer_submit'));
 app.post('/api/praise-report', rateLimiter('praise_submit'));
 app.post('/api/prayer-request/pray', rateLimiter('pray_action'));
 app.post('/api/praise-report/celebrate', rateLimiter('celebrate_action'));
+app.post('/api/verse-community', rateLimiter('verse_community_submit'));
+app.post('/api/verse-community/heart', rateLimiter('verse_community_heart'));
 
 app.listen(PORT, () => {
   console.log(`Church Tap app running on http://localhost:${PORT}`);

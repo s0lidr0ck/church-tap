@@ -136,6 +136,10 @@ class ChurchTapApp {
       this.showPraiseReportModal();
     });
 
+    document.getElementById('submitInsightBtn').addEventListener('click', () => {
+      this.showVerseInsightModal();
+    });
+
     // Authentication event listeners
     document.getElementById('loginBtn').addEventListener('click', () => {
       this.showLoginModal();
@@ -565,6 +569,12 @@ class ChurchTapApp {
     if (verseText) {
       verseText.className = verseText.className.replace(/size-\w+/, '') + ` size-${this.textSize}`;
     }
+    
+    // Apply text size to all verse-text elements in modals
+    const modalVerseTexts = document.querySelectorAll('.verse-text');
+    modalVerseTexts.forEach(element => {
+      element.className = element.className.replace(/size-\w+/, '') + ` size-${this.textSize}`;
+    });
   }
 
   toggleQuickMenu() {
@@ -1233,6 +1243,24 @@ class ChurchTapApp {
       this.showToast(`Opening ${reference} in ${selectedTranslation}...`);
       return;
     }
+    
+    // For KJV, fetch with Strong's numbers
+    if (selectedTranslation === 'KJV') {
+      try {
+        const response = await fetch(`/api/strongs/${parsedRef.book}/${parsedRef.chapter}/${parsedRef.verse}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            data.reference = reference;
+            data.translation_name = 'King James Version';
+            this.showStrongsModal(data, selectedTranslation);
+            return;
+          }
+        }
+      } catch (error) {
+        console.log('Strong\'s API failed, falling back to regular KJV');
+      }
+    }
 
     try {
       this.showToast(`Loading ${reference} in ${selectedTranslation}...`);
@@ -1290,7 +1318,7 @@ class ChurchTapApp {
         </div>
         <div class="space-y-4">
           <div class="text-sm font-medium text-primary-600 dark:text-primary-400">${reference}</div>
-          <blockquote class="text-gray-800 dark:text-gray-200 leading-relaxed border-l-4 border-primary-500 pl-4 italic">
+          <blockquote class="verse-text text-gray-800 dark:text-gray-200 leading-relaxed border-l-4 border-primary-500 pl-4 italic size-${this.textSize}">
             ${text}
           </blockquote>
           <div class="text-xs text-gray-500 dark:text-gray-400">${translationName}</div>
@@ -1330,7 +1358,7 @@ class ChurchTapApp {
       versesHtml = chapterData.map(verse => `
         <div class="mb-3">
           <span class="text-sm font-medium text-primary-600 dark:text-primary-400 mr-2">${verse.verse}</span>
-          <span class="text-gray-800 dark:text-gray-200">${verse.text}</span>
+          <span class="verse-text text-gray-800 dark:text-gray-200 size-${this.textSize}">${verse.text}</span>
         </div>
       `).join('');
     } else {
@@ -2121,6 +2149,7 @@ class ChurchTapApp {
       
       if (data.success) {
         this.currentCommunity = data.community;
+        this.updateCommunityHeader(date);
         this.displayCommunity(data.community);
       } else {
         this.showEmptyCommunity();
@@ -2131,8 +2160,25 @@ class ChurchTapApp {
     }
   }
 
+  updateCommunityHeader(date) {
+    const today = new Date().toISOString().split('T')[0];
+    const header = document.getElementById('communityDateHeader');
+    
+    if (date === today) {
+      header.textContent = "Today's Community";
+    } else {
+      const dateObj = new Date(date + 'T00:00:00');
+      const formattedDate = dateObj.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+      header.textContent = `${formattedDate}'s Community`;
+    }
+  }
+
   displayCommunity(community) {
-    const { prayer_requests, praise_reports } = community;
+    const { prayer_requests, praise_reports, verse_insights } = community;
     
     document.getElementById('loadingCommunity').classList.add('hidden');
     document.getElementById('communitySection').classList.remove('hidden');
@@ -2145,6 +2191,14 @@ class ChurchTapApp {
       document.getElementById('prayerRequestsSection').classList.add('hidden');
     }
     
+    // Display verse insights
+    if (verse_insights && verse_insights.length > 0) {
+      this.displayVerseInsights(verse_insights);
+      document.getElementById('verseInsightsSection').classList.remove('hidden');
+    } else {
+      document.getElementById('verseInsightsSection').classList.add('hidden');
+    }
+    
     // Display praise reports
     if (praise_reports && praise_reports.length > 0) {
       this.displayPraiseReports(praise_reports);
@@ -2155,7 +2209,8 @@ class ChurchTapApp {
     
     // Show empty state if no content
     if ((!prayer_requests || prayer_requests.length === 0) && 
-        (!praise_reports || praise_reports.length === 0)) {
+        (!praise_reports || praise_reports.length === 0) && 
+        (!verse_insights || verse_insights.length === 0)) {
       document.getElementById('emptyCommunity').classList.remove('hidden');
     } else {
       document.getElementById('emptyCommunity').classList.add('hidden');
@@ -2188,6 +2243,32 @@ class ChurchTapApp {
               <span>${hasUserPrayed ? 'Prayed' : 'Pray'}</span>
               <span class="bg-white/20 px-1 rounded">${request.prayer_count || 0}</span>
             </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  displayVerseInsights(verseInsights) {
+    const container = document.getElementById('verseInsightsList');
+    
+    container.innerHTML = verseInsights.map(insight => {
+      const hasUserHearted = this.userInteractions[`insight_${insight.id}`];
+      
+      return `
+        <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
+          <div class="flex items-start justify-between mb-2">
+            <span class="text-xs text-purple-600 dark:text-purple-400 font-medium">${insight.verse_reference || 'Today\'s Verse'}</span>
+            <div class="flex items-center space-x-1">
+              <button onclick="app.heartInsight(${insight.id}, this)" class="flex items-center space-x-1 text-xs px-2 py-1 rounded-full ${hasUserHearted ? 'bg-red-100 text-red-600 cursor-not-allowed' : 'bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600'} transition-colors" ${hasUserHearted ? 'disabled' : ''}>
+                <span>❤️</span>
+                <span class="heart-count">${insight.heart_count || 0}</span>
+              </button>
+            </div>
+          </div>
+          <p class="text-gray-800 dark:text-gray-200 text-sm mb-3 leading-relaxed">${this.escapeHtml(insight.content)}</p>
+          <div class="text-xs text-gray-500">
+            ${new Date(insight.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
           </div>
         </div>
       `;
@@ -2274,6 +2355,54 @@ class ChurchTapApp {
     });
   }
 
+  showVerseInsightModal() {
+    const verseReference = this.currentVerse?.bible_reference || 'Today\'s Verse';
+    
+    this.showModal('Share Verse Insight', `
+      <form id="verseInsightForm" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+            Your insight about: <strong>${verseReference}</strong>
+          </label>
+          <textarea 
+            id="verseInsightText" 
+            rows="4" 
+            maxlength="500"
+            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white resize-none"
+            placeholder="Share what this verse means to you, how it applies to your life, or an insight you'd like others to know..."
+            required
+          ></textarea>
+          <div class="text-right text-xs text-gray-500 mt-1">
+            <span id="insightCharCount">0</span>/500 characters
+          </div>
+        </div>
+        <div class="text-xs text-gray-500">
+          Insights are shared anonymously and will appear after moderation.
+        </div>
+        <div class="flex space-x-3">
+          <button type="submit" class="btn-primary flex-1">💭 Share Insight</button>
+          <button type="button" onclick="window.churchTapApp.closeModal()" class="btn-secondary">Cancel</button>
+        </div>
+      </form>
+    `);
+
+    // Add character counter
+    const textarea = document.getElementById('verseInsightText');
+    const charCount = document.getElementById('insightCharCount');
+    textarea.addEventListener('input', () => {
+      charCount.textContent = textarea.value.length;
+    });
+
+    // Handle form submission
+    document.getElementById('verseInsightForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const content = textarea.value.trim();
+      if (content) {
+        this.submitVerseInsight(content, verseReference);
+      }
+    });
+  }
+
   showPraiseReportModal() {
     this.showModal('Submit Praise Report', `
       <form id="praiseReportForm" class="space-y-4">
@@ -2344,6 +2473,37 @@ class ChurchTapApp {
     }
   }
 
+  async submitVerseInsight(content, verseReference) {
+    try {
+      const response = await fetch('/api/verse-community', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content,
+          verse_reference: verseReference,
+          user_token: this.userToken,
+          date: this.currentDate || new Date().toISOString().split('T')[0]
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.closeModal();
+        this.showToast('💭 Verse insight submitted!');
+        this.loadCommunity(this.currentDate); // Reload community
+        this.trackAnalytics('verse_insight_submitted');
+      } else {
+        this.showToast(data.error || 'Failed to submit insight', 'error');
+      }
+    } catch (error) {
+      console.error('Error submitting verse insight:', error);
+      this.showToast('Connection error', 'error');
+    }
+  }
+
   async submitPraiseReport(content) {
     try {
       const response = await fetch('/api/praise-report', {
@@ -2405,6 +2565,45 @@ class ChurchTapApp {
       }
     } catch (error) {
       console.error('Error praying for request:', error);
+      this.showToast('Connection error', 'error');
+    }
+  }
+
+  async heartInsight(insightId, buttonElement) {
+    try {
+      const response = await fetch('/api/verse-community/heart', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          post_id: insightId,
+          user_token: this.userToken
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        const heartCountEl = buttonElement.querySelector('.heart-count');
+        heartCountEl.textContent = data.heart_count;
+        
+        // Update button state
+        buttonElement.classList.remove('hover:bg-red-100', 'text-gray-600', 'hover:text-red-600');
+        buttonElement.classList.add('bg-red-100', 'text-red-600', 'cursor-not-allowed');
+        buttonElement.disabled = true;
+        
+        // Track interaction
+        this.userInteractions[`insight_${insightId}`] = true;
+        this.saveUserInteractions();
+        
+        this.showToast('❤️');
+        this.trackAnalytics('insight_hearted');
+      } else {
+        this.showToast(data.error || 'Already hearted!', 'info');
+      }
+    } catch (error) {
+      console.error('Error hearting insight:', error);
       this.showToast('Connection error', 'error');
     }
   }
@@ -3100,6 +3299,190 @@ class ChurchTapApp {
       errorEl.textContent = 'Connection error';
       errorEl.classList.remove('hidden');
     }
+  }
+
+  
+  escapeHtml(unsafe) {
+    return unsafe
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+  
+  // STRONG'S NUMBERS METHODS
+  
+  showStrongsModal(verseData, translation) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    
+    const reference = verseData.reference || 'Bible Verse';
+    const text = this.processStrongsNumbers(verseData.verse || verseData.text, reference);
+    const translationName = verseData.translation_name || translation;
+    
+    modal.innerHTML = `
+      <div class="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">📚 ${translation} with Strong's Numbers</h3>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="space-y-4">
+          <div class="text-sm font-medium text-primary-600 dark:text-primary-400">${reference}</div>
+          <blockquote class="verse-text text-gray-800 dark:text-gray-200 leading-relaxed border-l-4 border-primary-500 pl-4 size-${this.textSize}">
+            ${text}
+          </blockquote>
+          <div class="text-xs text-gray-500 dark:text-gray-400">
+            ${translationName} • Click on Strong's numbers (highlighted) to see definitions
+          </div>
+        </div>
+        <div class="mt-6 flex justify-end space-x-3">
+          <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
+            Close
+          </button>
+        </div>
+      </div>
+    `;
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+    
+    document.body.appendChild(modal);
+  }
+  
+  isNewTestamentBook(reference) {
+    if (!reference) return false;
+    
+    // Extract book name from reference (e.g., "Matthew 5:1" -> "Matthew")
+    const bookName = reference.split(' ')[0].toLowerCase();
+    
+    // New Testament books
+    const newTestamentBooks = [
+      'matthew', 'mark', 'luke', 'john', 'acts',
+      'romans', 'corinthians', '1corinthians', '2corinthians',
+      'galatians', 'ephesians', 'philippians', 'colossians',
+      'thessalonians', '1thessalonians', '2thessalonians',
+      'timothy', '1timothy', '2timothy', 'titus', 'philemon',
+      'hebrews', 'james', 'peter', '1peter', '2peter',
+      'john', '1john', '2john', '3john', 'jude', 'revelation'
+    ];
+    
+    return newTestamentBooks.some(ntBook => 
+      bookName.includes(ntBook) || ntBook.includes(bookName)
+    );
+  }
+  
+  processStrongsNumbers(text, reference = '') {
+    if (!text) return '';
+    
+    // Determine if this is Old Testament (Hebrew - H) or New Testament (Greek - G)
+    const isNewTestament = this.isNewTestamentBook(reference);
+    const prefix = isNewTestament ? 'G' : 'H';
+    
+    // Replace Strong's number tags with clickable elements
+    return text.replace(/<S>(\d+)<\/S>/g, (match, number) => {
+      const strongsNumber = number.startsWith('H') || number.startsWith('G') ? number : `${prefix}${number}`;
+      return `<span class="strongs-number" 
+                    style="display: inline-block; background: #fef3c7; color: #92400e; padding: 2px 4px; border-radius: 4px; font-size: 11px; font-family: monospace; cursor: pointer; margin-left: 2px; border: 1px solid #d97706;" 
+                    onclick="app.showStrongsDefinition('${strongsNumber}')" 
+                    title="Click to see Strong's #${strongsNumber} definition"
+                    onmouseover="this.style.background='#fde68a'" 
+                    onmouseout="this.style.background='#fef3c7'">
+                ${strongsNumber}
+              </span>`;
+    });
+  }
+  
+  async showStrongsDefinition(strongsNumber) {
+    try {
+      const response = await fetch(`/api/strongs/definition/${strongsNumber}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        this.displayStrongsDefinition(data.definition);
+      } else {
+        this.showToast('Definition not available');
+      }
+    } catch (error) {
+      console.error('Error fetching Strong\'s definition:', error);
+      this.showToast('Network error');
+    }
+  }
+  
+  displayStrongsDefinition(definition) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4';
+    modal.style.zIndex = '10000';
+    
+    const languageFlag = definition.language === 'Hebrew' ? '🇮🇱' : '🇬🇷';
+    const languageColor = definition.language === 'Hebrew' ? 'text-orange-600' : 'text-blue-600';
+    
+    modal.innerHTML = `
+      <div class="bg-white dark:bg-gray-800 rounded-xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+            ${languageFlag} Strong's #${definition.number}
+          </h3>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="space-y-3">
+          <div class="flex items-center space-x-2">
+            <span class="text-sm font-medium ${languageColor}">${definition.language}</span>
+            ${definition.transliteration ? `<span class="text-sm italic text-gray-600 dark:text-gray-400">[${definition.transliteration}]</span>` : ''}
+            ${definition.phonetics ? `<span class="text-xs text-gray-500 dark:text-gray-500">/${definition.phonetics}/</span>` : ''}
+          </div>
+          
+          ${definition.short_definition ? `
+            <div>
+              <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Short Definition:</h4>
+              <p class="text-sm text-gray-600 dark:text-gray-400">${definition.short_definition}</p>
+            </div>
+          ` : ''}
+          
+          <div>
+            <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Definition:</h4>
+            <p class="text-sm text-gray-600 dark:text-gray-400">${definition.definition}</p>
+          </div>
+          
+          ${definition.outline ? `
+            <div>
+              <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Lexeme:</h4>
+              <p class="text-sm text-gray-600 dark:text-gray-400 font-hebrew">${definition.outline}</p>
+            </div>
+          ` : ''}
+          
+          ${definition.kjv_occurrences ? `
+            <div class="pt-2 border-t border-gray-200 dark:border-gray-600">
+              <span class="text-xs text-gray-500">KJV occurrences: ${definition.kjv_occurrences}</span>
+            </div>
+          ` : ''}
+        </div>
+        <div class="mt-4 flex justify-end">
+          <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm">
+            Close
+          </button>
+        </div>
+      </div>
+    `;
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+    
+    document.body.appendChild(modal);
   }
 }
 

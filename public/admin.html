@@ -472,18 +472,21 @@
         
         <!-- Filter Controls -->
         <div class="mb-6 bg-white shadow sm:rounded-lg p-4">
-          <div class="flex items-center space-x-4">
-            <select id="communityDaysFilter" class="border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500">
-              <option value="1">Last 24 hours</option>
-              <option value="7" selected>Last 7 days</option>
-              <option value="30">Last 30 days</option>
-            </select>
-            <button id="refreshCommunity" class="btn-secondary">Refresh</button>
+          <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+            <div class="w-full sm:w-auto">
+              <label for="communityDaysFilter" class="block text-sm font-medium text-gray-700 mb-1 sm:sr-only">Time Range</label>
+              <select id="communityDaysFilter" class="w-full sm:w-auto border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500">
+                <option value="1">Last 24 hours</option>
+                <option value="7" selected>Last 7 days</option>
+                <option value="30">Last 30 days</option>
+              </select>
+            </div>
+            <button id="refreshCommunity" class="btn-secondary w-full sm:w-auto">Refresh</button>
           </div>
         </div>
 
         <!-- Community Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div class="bg-white overflow-hidden shadow rounded-lg">
             <div class="p-5">
               <div class="flex items-center">
@@ -515,6 +518,22 @@
               </div>
             </div>
           </div>
+
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <span class="text-2xl">💭</span>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Verse Insights</dt>
+                    <dd id="totalVerseInsights" class="text-lg font-medium text-gray-900">--</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Prayer Requests Management -->
@@ -529,13 +548,24 @@
         </div>
 
         <!-- Praise Reports Management -->
-        <div class="bg-white shadow overflow-hidden sm:rounded-md">
+        <div class="bg-white shadow overflow-hidden sm:rounded-md mb-8">
           <div class="px-4 py-5 sm:px-6">
             <h3 class="text-lg leading-6 font-medium text-gray-900">Praise Reports</h3>
             <p class="mt-1 max-w-2xl text-sm text-gray-500">Manage and moderate praise reports</p>
           </div>
           <div id="praiseReportsAdminList" class="divide-y divide-gray-200">
             <!-- Praise reports will be loaded here -->
+          </div>
+        </div>
+
+        <!-- Verse Insights Management -->
+        <div class="bg-white shadow overflow-hidden sm:rounded-md">
+          <div class="px-4 py-5 sm:px-6">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">Verse Insights</h3>
+            <p class="mt-1 max-w-2xl text-sm text-gray-500">Manage and moderate verse insights</p>
+          </div>
+          <div id="verseInsightsAdminList" class="divide-y divide-gray-200">
+            <!-- Verse insights will be loaded here -->
           </div>
         </div>
       </div>
