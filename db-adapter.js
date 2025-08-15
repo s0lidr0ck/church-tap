@@ -17,26 +17,26 @@ const pool = new Pool({
 });
 
 const tableMap = new Map([
-  ['organizations', 'CT_organizations'],
-  ['admin_users', 'CT_admin_users'],
-  ['master_admins', 'CT_master_admins'],
-  ['master_admin_activity', 'CT_master_admin_activity'],
-  ['verses', 'CT_verses'],
-  ['analytics', 'CT_analytics'],
-  ['favorites', 'CT_favorites'],
-  ['prayer_requests', 'CT_prayer_requests'],
-  ['praise_reports', 'CT_praise_reports'],
-  ['prayer_interactions', 'CT_prayer_interactions'],
-  ['celebration_interactions', 'CT_celebration_interactions'],
-  ['users', 'CT_users'],
-  ['user_preferences', 'CT_user_preferences'],
-  ['user_collections', 'CT_user_collections'],
-  ['collection_verses', 'CT_collection_verses'],
-  ['user_verse_history', 'CT_user_verse_history'],
-  ['prayer_partnerships', 'CT_prayer_partnerships'],
-  ['personal_prayer_requests', 'CT_personal_prayer_requests'],
-  ['prayer_request_shares', 'CT_prayer_request_shares'],
-  ['user_sessions', 'CT_user_sessions'],
+  ['organizations', 'ct_organizations'],
+  ['admin_users', 'ct_admin_users'],
+  ['master_admins', 'ct_master_admins'],
+  ['master_admin_activity', 'ct_master_admin_activity'],
+  ['verses', 'ct_verses'],
+  ['analytics', 'ct_analytics'],
+  ['favorites', 'ct_favorites'],
+  ['prayer_requests', 'ct_prayer_requests'],
+  ['praise_reports', 'ct_praise_reports'],
+  ['prayer_interactions', 'ct_prayer_interactions'],
+  ['celebration_interactions', 'ct_celebration_interactions'],
+  ['users', 'ct_users'],
+  ['user_preferences', 'ct_user_preferences'],
+  ['user_collections', 'ct_user_collections'],
+  ['collection_verses', 'ct_collection_verses'],
+  ['user_verse_history', 'ct_user_verse_history'],
+  ['prayer_partnerships', 'ct_prayer_partnerships'],
+  ['personal_prayer_requests', 'ct_personal_prayer_requests'],
+  ['prayer_request_shares', 'ct_prayer_request_shares'],
+  ['user_sessions', 'ct_user_sessions'],
 ]);
 
 function translateTables(sql) {
@@ -83,11 +83,13 @@ async function query(sql, params) {
 
 module.exports = {
   get(sql, params, cb) {
+    if (typeof cb !== 'function') return;
     query(sql, params)
       .then((res) => cb(null, res.rows[0]))
       .catch((err) => cb(err));
   },
   all(sql, params, cb) {
+    if (typeof cb !== 'function') return;
     query(sql, params)
       .then((res) => cb(null, res.rows))
       .catch((err) => cb(err));

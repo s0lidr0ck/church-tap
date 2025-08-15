@@ -1225,12 +1225,14 @@ app.get('/api/master/dashboard', requireMasterAuth, (req, res) => {
 // Get all organizations
 app.get('/api/master/organizations', requireMasterAuth, (req, res) => {
   try {
-    db.all(`SELECT * FROM organizations ORDER BY created_at DESC`, (err, rows) => {
+    console.log('📊 Querying organizations table...');
+    db.all(`SELECT * FROM organizations ORDER BY created_at DESC`, [], (err, rows) => {
       if (err) {
         console.error('Master organizations query error:', err);
         return res.status(500).json({ success: false, error: 'Database error' });
       }
       
+      console.log(`📋 Found ${rows.length} organizations:`, rows.map(r => `ID:${r.id} Name:${r.name}`));
       res.json({ success: true, organizations: rows });
     });
   } catch (error) {
@@ -2192,10 +2194,11 @@ app.post('/api/master/organizations/:id/admins', requireMasterAuth, async (req, 
       try {
         const passwordHash = await bcrypt.hash(password, 12);
         db.run(
-          `INSERT INTO admin_users (username, password_hash, email, role, organization_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)`,
-          [username, passwordHash, email || null, role, id],
+          `INSERT INTO admin_users (username, password_hash, email, role, organization_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+          [username, passwordHash, email || null, role, id, true],
           function(insertErr) {
             if (insertErr) {
+              console.error('Admin creation error:', insertErr);
               return res.status(500).json({ success: false, error: 'Failed to create admin user' });
             }
             res.json({ success: true, admin_id: this.lastID });
