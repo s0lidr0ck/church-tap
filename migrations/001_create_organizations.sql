@@ -1,7 +1,7 @@
 -- Migration: Create organizations table for multi-tenancy
 -- This enables white-label instances for different churches/organizations
 
-CREATE TABLE organizations (
+CREATE TABLE ct_organizations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   subdomain TEXT UNIQUE NOT NULL, -- e.g., 'firstbaptist'
@@ -26,12 +26,12 @@ CREATE TABLE organizations (
 );
 
 -- Create indexes for performance
-CREATE INDEX idx_organizations_subdomain ON organizations(subdomain);
-CREATE INDEX idx_organizations_custom_domain ON organizations(custom_domain);
-CREATE INDEX idx_organizations_is_active ON organizations(is_active);
+CREATE INDEX idx_organizations_subdomain ON ct_organizations(subdomain);
+CREATE INDEX idx_organizations_custom_domain ON ct_organizations(custom_domain);
+CREATE INDEX idx_organizations_is_active ON ct_organizations(is_active);
 
 -- Insert default organization (existing data)
-INSERT INTO organizations (
+INSERT INTO ct_organizations (
   id, name, subdomain, settings, plan_type, features
 ) VALUES (
   1, 

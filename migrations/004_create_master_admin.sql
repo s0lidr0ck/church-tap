@@ -1,7 +1,7 @@
 -- Migration: Create master admin system for managing organizations
 -- This creates a separate admin system for the SaaS platform management
 
-CREATE TABLE master_admins (
+CREATE TABLE ct_master_admins (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT UNIQUE NOT NULL,
   username TEXT UNIQUE NOT NULL,
@@ -19,16 +19,16 @@ CREATE TABLE master_admins (
 );
 
 -- Create master admin sessions table
-CREATE TABLE master_admin_sessions (
+CREATE TABLE ct_master_admin_sessions (
   id TEXT PRIMARY KEY,
   master_admin_id INTEGER NOT NULL,
   expires_at DATETIME NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (master_admin_id) REFERENCES master_admins(id) ON DELETE CASCADE
+  FOREIGN KEY (master_admin_id) REFERENCES ct_master_admins(id) ON DELETE CASCADE
 );
 
 -- Create master admin activity log
-CREATE TABLE master_admin_activity (
+CREATE TABLE ct_master_admin_activity (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   master_admin_id INTEGER NOT NULL,
   action TEXT NOT NULL,
@@ -39,12 +39,12 @@ CREATE TABLE master_admin_activity (
   ip_address TEXT,
   user_agent TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (master_admin_id) REFERENCES master_admins(id),
-  FOREIGN KEY (organization_id) REFERENCES organizations(id)
+  FOREIGN KEY (master_admin_id) REFERENCES ct_master_admins(id),
+  FOREIGN KEY (organization_id) REFERENCES ct_organizations(id)
 );
 
 -- Insert default master admin
-INSERT INTO master_admins (
+INSERT INTO ct_master_admins (
   email, username, password_hash, first_name, last_name, role, permissions
 ) VALUES (
   'master@dailyverse.saas',
@@ -57,8 +57,8 @@ INSERT INTO master_admins (
 );
 
 -- Create indexes
-CREATE INDEX idx_master_admins_email ON master_admins(email);
-CREATE INDEX idx_master_admins_username ON master_admins(username);
-CREATE INDEX idx_master_admin_sessions_admin_id ON master_admin_sessions(master_admin_id);
-CREATE INDEX idx_master_admin_activity_admin_id ON master_admin_activity(master_admin_id);
-CREATE INDEX idx_master_admin_activity_organization ON master_admin_activity(organization_id);
+CREATE INDEX idx_master_admins_email ON ct_master_admins(email);
+CREATE INDEX idx_master_admins_username ON ct_master_admins(username);
+CREATE INDEX idx_master_admin_sessions_admin_id ON ct_master_admin_sessions(master_admin_id);
+CREATE INDEX idx_master_admin_activity_admin_id ON ct_master_admin_activity(master_admin_id);
+CREATE INDEX idx_master_admin_activity_organization ON ct_master_admin_activity(organization_id);

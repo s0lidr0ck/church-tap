@@ -8,6 +8,10 @@ class ChurchTapApp {
     this.favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
     this.recentlyViewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
     
+    // Get organization parameter from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    this.orgParam = urlParams.get('org');
+    
     this.currentCommunity = null;
     this.userInteractions = JSON.parse(localStorage.getItem('userInteractions') || '{}');
     this.currentUser = null;
@@ -316,7 +320,7 @@ class ChurchTapApp {
         this.showOfflineMessage();
       }, 10000); // 10 second timeout
       
-      const response = await fetch(`/api/verse/${date}`);
+      const response = await fetch(this.buildApiUrl(`/api/verse/${date}`));
       const data = await response.json();
       
       clearTimeout(timeoutId); // Clear timeout if request succeeds
@@ -952,6 +956,15 @@ class ChurchTapApp {
       localStorage.setItem('userToken', token);
     }
     return token;
+  }
+
+  // Helper method to add org parameter to API URLs
+  buildApiUrl(path) {
+    if (this.orgParam) {
+      const separator = path.includes('?') ? '&' : '?';
+      return `${path}${separator}org=${this.orgParam}`;
+    }
+    return path;
   }
 
   getUserPreferredTranslation() {
@@ -2144,7 +2157,7 @@ class ChurchTapApp {
   // Community Functions
   async loadCommunity(date) {
     try {
-      const response = await fetch(`/api/community/${date}`);
+      const response = await fetch(this.buildApiUrl(`/api/community/${date}`));
       const data = await response.json();
       
       if (data.success) {
@@ -2380,7 +2393,7 @@ class ChurchTapApp {
           Insights are shared anonymously and will appear after moderation.
         </div>
         <div class="flex space-x-3">
-          <button type="submit" class="btn-primary flex-1">💭 Share Insight</button>
+          <button type="submit" class="flex-1 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center space-x-2" style="background-color: #2563eb !important;">💭 Share Insight</button>
           <button type="button" onclick="window.churchTapApp.closeModal()" class="btn-secondary">Cancel</button>
         </div>
       </form>
@@ -2665,7 +2678,7 @@ class ChurchTapApp {
   // Authentication Functions
   async checkAuthStatus() {
     try {
-      const response = await fetch('/api/auth/me', {
+      const response = await fetch(this.buildApiUrl('/api/auth/me'), {
         credentials: 'include'
       });
       

@@ -94,13 +94,19 @@ const dbQuery = {
   run: (sql, params, callback) => {
     const { sql: convertedSql, params: convertedParams } = convertQueryParams(sql, params);
     db.query(convertedSql, convertedParams, (err, result) => {
-      if (err) return callback(err);
+      if (err) {
+        if (callback) return callback(err);
+        console.error('Database error (no callback):', err);
+        return;
+      }
       // Simulate SQLite's this.lastID and this.changes
       const context = { 
         lastID: result.rows[0]?.id || result.insertId,
         changes: result.rowCount || 0
       };
-      callback.call(context, null);
+      if (callback) {
+        callback.call(context, null);
+      }
     });
   }
 };
@@ -109,10 +115,21 @@ const dbQuery = {
 
 // Resolve organization context for each request based on host, custom domain, or override hints
 const resolveOrganization = (req, res, next) => {
+  // Skip logging for favicon and static assets to reduce noise
+  if (!req.url.includes('favicon') && !req.url.includes('.png') && !req.url.includes('.json') && !req.url.includes('appspecific')) {
+    console.log(`🔍 resolveOrganization: ${req.method} ${req.url}`);
+    console.log(`🔍 originalUrl: ${req.originalUrl}`);
+    console.log(`🔍 query:`, req.query);
+  }
+  
   // Prefer explicit hint via query/header for local/dev use
   const orgHint = req.query.org || req.headers['x-org-subdomain'];
   const hostHeader = (req.headers['x-forwarded-host'] || req.headers.host || '').toString();
   const host = hostHeader.split(':')[0].toLowerCase();
+  
+  if (!req.url.includes('favicon') && !req.url.includes('.png') && !req.url.includes('.json') && !req.url.includes('appspecific')) {
+    console.log(`🔍 orgHint: "${orgHint}", host: "${host}"`);
+  }
 
   // Attempt to extract subdomain from host (e.g., subdomain.example.com)
   let subdomainCandidate = null;
@@ -144,8 +161,14 @@ const resolveOrganization = (req, res, next) => {
       }
       if (org && org.id) {
         req.organizationId = org.id;
+        if (!req.url.includes('favicon') && !req.url.includes('.png') && !req.url.includes('.json') && !req.url.includes('appspecific')) {
+          console.log(`✅ Organization resolved: "${subdomainCandidate}" -> ID ${org.id}`);
+        }
       } else {
         req.organizationId = 1;
+        if (!req.url.includes('favicon') && !req.url.includes('.png') && !req.url.includes('.json') && !req.url.includes('appspecific')) {
+          console.log(`❌ Organization defaulted: "${subdomainCandidate}" -> ID 1 (not found)`);
+        }
       }
       next();
     }
@@ -242,6 +265,7 @@ app.get('/master', (req, res) => {
 app.get('/api/verse/:date', trackAnalytics('api_verse'), optionalAuth, async (req, res) => {
   const { date } = req.params;
   const orgId = req.organizationId || 1;
+  console.log(`📖 Getting verse for date ${date}, organization ID: ${orgId}`);
   
   try {
     // Check if there's a scheduled verse for this date first
@@ -853,7 +877,7 @@ app.get('/api/admin/check-session', (req, res) => {
     // Get admin details with organization context
   dbQuery.get(`SELECT au.*, o.name as organization_name, o.subdomain as organization_subdomain 
             FROM ct_admin_users au 
-            LEFT JOIN organizations o ON au.organization_id = o.id 
+            LEFT JOIN ct_organizations o ON au.organization_id = o.id 
             WHERE au.id = ? AND au.is_active = TRUE`, [req.session.adminId], (err, admin) => {
       if (err) {
         console.error('Error checking admin session:', err);
@@ -1417,7 +1441,7 @@ app.post('/api/master/organizations', requireMasterAuth, (req, res) => {
       
       // Log activity
       dbQuery.run(`
-        INSERT INTO master_admin_activity (
+        INSERT INTO ct_master_admin_activity (
           master_admin_id, action, resource_type, resource_id, details, ip_address
         ) VALUES (?, ?, ?, ?, ?, ?)
       `, [
@@ -1474,7 +1498,7 @@ app.put('/api/master/organizations/:id', requireMasterAuth, (req, res) => {
       
       // Log activity
       dbQuery.run(`
-        INSERT INTO master_admin_activity (
+        INSERT INTO ct_master_admin_activity (
           master_admin_id, action, resource_type, resource_id, organization_id, details, ip_address
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `, [
@@ -1607,7 +1631,7 @@ app.delete('/api/master/organizations/:id', requireMasterAuth, (req, res) => {
       
       // Log activity
       dbQuery.run(`
-        INSERT INTO master_admin_activity (
+        INSERT INTO ct_master_admin_activity (
           master_admin_id, action, resource_type, resource_id, details, ip_address
         ) VALUES (?, ?, ?, ?, ?, ?)
       `, [
@@ -1628,6 +1652,7 @@ app.delete('/api/master/organizations/:id', requireMasterAuth, (req, res) => {
 app.get('/api/community/:date', trackAnalytics('community_view'), (req, res) => {
   const { date } = req.params;
   const orgId = req.organizationId || 1;
+  console.log(`👥 Getting community for date ${date}, organization ID: ${orgId}`);
   
   // Get prayer requests for the date
   const getPrayerRequests = new Promise((resolve, reject) => {
@@ -2449,7 +2474,7 @@ app.post('/api/auth/logout', (req, res) => {
 // Get current user
 app.get('/api/auth/me', authenticateUser, (req, res) => {
   dbQuery.get(`SELECT u.*, p.* FROM ct_users u 
-          LEFT JOIN user_preferences p ON u.id = p.user_id 
+          LEFT JOIN ct_user_preferences p ON u.id = p.user_id 
           WHERE u.id = ?`, [req.user.userId], (err, user) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });

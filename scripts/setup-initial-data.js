@@ -10,7 +10,7 @@ async function setupInitialData() {
   try {
     // Check if organizations exist
     const existingOrg = await new Promise((resolve, reject) => {
-      db.get('SELECT id FROM organizations LIMIT 1', [], (err, row) => {
+      db.get('SELECT id FROM ct_organizations LIMIT 1', [], (err, row) => {
         if (err) reject(err);
         else resolve(row);
       });
@@ -20,7 +20,7 @@ async function setupInitialData() {
       // Create default organization
       const orgId = await new Promise((resolve, reject) => {
         db.run(`
-          INSERT INTO organizations (
+          INSERT INTO ct_organizations (
             name, subdomain, contact_email, plan_type, is_active,
             settings, features, created_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -48,7 +48,7 @@ async function setupInitialData() {
 
     // Check if master admin exists
     const existingMaster = await new Promise((resolve, reject) => {
-      db.get('SELECT id FROM master_admins LIMIT 1', [], (err, row) => {
+      db.get('SELECT id FROM ct_master_admins LIMIT 1', [], (err, row) => {
         if (err) reject(err);
         else resolve(row);
       });
@@ -61,7 +61,7 @@ async function setupInitialData() {
       
       await new Promise((resolve, reject) => {
         db.run(`
-          INSERT INTO master_admins (
+          INSERT INTO ct_master_admins (
             username, password_hash, email, role, is_active, created_at
           ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         `, [
@@ -83,7 +83,7 @@ async function setupInitialData() {
 
     // Check if regular admin exists for the organization
     const existingAdmin = await new Promise((resolve, reject) => {
-      db.get('SELECT id FROM admin_users WHERE organization_id = 1 LIMIT 1', [], (err, row) => {
+      db.get('SELECT id FROM ct_admin_users WHERE organization_id = 1 LIMIT 1', [], (err, row) => {
         if (err) reject(err);
         else resolve(row);
       });
@@ -96,7 +96,7 @@ async function setupInitialData() {
       
       await new Promise((resolve, reject) => {
         db.run(`
-          INSERT INTO admin_users (
+          INSERT INTO ct_admin_users (
             username, password_hash, email, role, organization_id, is_active, created_at
           ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         `, [
@@ -119,7 +119,7 @@ async function setupInitialData() {
 
     // Create sample verse if none exist
     const existingVerse = await new Promise((resolve, reject) => {
-      db.get('SELECT id FROM verses WHERE organization_id = 1 LIMIT 1', [], (err, row) => {
+      db.get('SELECT id FROM ct_verses WHERE organization_id = 1 LIMIT 1', [], (err, row) => {
         if (err) reject(err);
         else resolve(row);
       });
@@ -130,7 +130,7 @@ async function setupInitialData() {
       
       await new Promise((resolve, reject) => {
         db.run(`
-          INSERT INTO verses (
+          INSERT INTO ct_verses (
             date, content_type, verse_text, bible_reference, context, tags, 
             published, organization_id, created_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)

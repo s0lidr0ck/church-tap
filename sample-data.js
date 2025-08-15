@@ -59,7 +59,7 @@ const sampleVerses = [
 console.log('Adding sample verses to database...');
 
 sampleVerses.forEach((verse, index) => {
-  db.run(`INSERT INTO verses (date, content_type, verse_text, bible_reference, context, tags, published, hearts) 
+  db.run(`INSERT INTO ct_verses (date, content_type, verse_text, bible_reference, context, tags, published, hearts) 
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [verse.date, verse.content_type, verse.verse_text, verse.bible_reference, verse.context, verse.tags, verse.published, verse.hearts],
     function(err) {

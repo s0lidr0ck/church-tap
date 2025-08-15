@@ -52,7 +52,7 @@ console.log('Adding sample community data...');
 
 // Add prayer requests
 samplePrayerRequests.forEach((request, index) => {
-  db.run(`INSERT INTO prayer_requests (date, content, user_token, ip_address, prayer_count) VALUES (?, ?, ?, ?, ?)`,
+  db.run(`INSERT INTO ct_prayer_requests (date, content, user_token, ip_address, prayer_count) VALUES (?, ?, ?, ?, ?)`,
     [request.date, request.content, request.user_token, request.ip_address, Math.floor(Math.random() * 10) + 1],
     function(err) {
       if (err) {
@@ -65,7 +65,7 @@ samplePrayerRequests.forEach((request, index) => {
 
 // Add praise reports
 samplePraiseReports.forEach((report, index) => {
-  db.run(`INSERT INTO praise_reports (date, content, user_token, ip_address, celebration_count) VALUES (?, ?, ?, ?, ?)`,
+  db.run(`INSERT INTO ct_praise_reports (date, content, user_token, ip_address, celebration_count) VALUES (?, ?, ?, ?, ?)`,
     [report.date, report.content, report.user_token, report.ip_address, Math.floor(Math.random() * 15) + 1],
     function(err) {
       if (err) {
@@ -95,7 +95,7 @@ function addSampleInteractions() {
   ];
   
   sampleInteractions.forEach((interaction, index) => {
-    db.run(`INSERT INTO prayer_interactions (prayer_request_id, user_token, ip_address) VALUES (?, ?, ?)`,
+    db.run(`INSERT INTO ct_prayer_interactions (prayer_request_id, user_token, ip_address) VALUES (?, ?, ?)`,
       [interaction.prayer_request_id, interaction.user_token, interaction.ip_address], (err) => {
         if (err) console.error('Error adding prayer interaction:', err);
       });
@@ -108,7 +108,7 @@ function addSampleInteractions() {
   ];
   
   celebrationInteractions.forEach((interaction, index) => {
-    db.run(`INSERT INTO celebration_interactions (praise_report_id, user_token, ip_address) VALUES (?, ?, ?)`,
+    db.run(`INSERT INTO ct_celebration_interactions (praise_report_id, user_token, ip_address) VALUES (?, ?, ?)`,
       [interaction.praise_report_id, interaction.user_token, interaction.ip_address], (err) => {
         if (err) console.error('Error adding celebration interaction:', err);
         

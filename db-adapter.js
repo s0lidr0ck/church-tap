@@ -1,5 +1,4 @@
-// PostgreSQL adapter with table name translation
-// - Maps legacy table names to CT_ prefixed equivalents for multi-tenant support
+// PostgreSQL adapter for Church Tap
 // - Converts '?' placeholders to $1, $2, ... for PostgreSQL compatibility
 // - Exposes get/all/run methods with sqlite-like callback interface
 
@@ -16,42 +15,6 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-const tableMap = new Map([
-  ['organizations', 'ct_organizations'],
-  ['admin_users', 'ct_admin_users'],
-  ['master_admins', 'ct_master_admins'],
-  ['master_admin_activity', 'ct_master_admin_activity'],
-  ['verses', 'ct_verses'],
-  ['analytics', 'ct_analytics'],
-  ['favorites', 'ct_favorites'],
-  ['prayer_requests', 'ct_prayer_requests'],
-  ['praise_reports', 'ct_praise_reports'],
-  ['prayer_interactions', 'ct_prayer_interactions'],
-  ['celebration_interactions', 'ct_celebration_interactions'],
-  ['verse_community_posts', 'ct_verse_community_posts'],
-  ['verse_community_interactions', 'ct_verse_community_interactions'],
-  ['strongs_references', 'ct_strongs_references'],
-  ['users', 'ct_users'],
-  ['user_preferences', 'ct_user_preferences'],
-  ['user_collections', 'ct_user_collections'],
-  ['collection_verses', 'ct_collection_verses'],
-  ['user_verse_history', 'ct_user_verse_history'],
-  ['prayer_partnerships', 'ct_prayer_partnerships'],
-  ['personal_prayer_requests', 'ct_personal_prayer_requests'],
-  ['prayer_request_shares', 'ct_prayer_request_shares'],
-  ['user_sessions', 'ct_user_sessions'],
-]);
-
-function translateTables(sql) {
-  // Replace occurrences of table names when used as standalone identifiers
-  // This is conservative: word boundary before and after and not part of quotes
-  let out = sql;
-  for (const [legacy, mapped] of tableMap.entries()) {
-    const re = new RegExp(`\\b${legacy}\\b`, 'gi');
-    out = out.replace(re, mapped);
-  }
-  return out;
-}
 
 function translatePlaceholders(sql) {
   // Replace each '?' with $1..$n, ignoring those inside single quotes
@@ -76,7 +39,7 @@ function translatePlaceholders(sql) {
 }
 
 function translate(sql) {
-  return translatePlaceholders(translateTables(sql));
+  return translatePlaceholders(sql);
 }
 
 async function query(sql, params) {
