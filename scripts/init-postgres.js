@@ -5,7 +5,7 @@ const path = require('path');
 const { Client } = require('pg');
 
 async function main() {
-  const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error('DATABASE_URL is required');
   }

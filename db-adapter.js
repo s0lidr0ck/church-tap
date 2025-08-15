@@ -5,7 +5,7 @@
 
 const { Pool } = require('pg');
 
-const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
   throw new Error('[db-adapter] DATABASE_URL is required. Set it to your PostgreSQL connection string.');
 }
