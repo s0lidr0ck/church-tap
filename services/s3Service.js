@@ -7,20 +7,27 @@ class S3Service {
     this.region = process.env.S3_REGION || 'us-east-1';
     this.baseUrl = process.env.S3_BASE_URL || `https://${this.bucketName}.s3.${this.region}.amazonaws.com`;
     
-    // Initialize S3 client
-    const clientConfig = {
-      region: this.region,
-    };
-
-    // Add credentials if provided (for local development)
-    if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
-      clientConfig.credentials = {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    // Initialize S3 client with error handling
+    try {
+      const clientConfig = {
+        region: this.region,
       };
+
+      // Add credentials if provided (for local development)
+      if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+        clientConfig.credentials = {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        };
+      }
+      
+      this.s3Client = new S3Client(clientConfig);
+      this.isAvailable = true;
+    } catch (error) {
+      console.warn('S3 service unavailable:', error.message);
+      this.isAvailable = false;
+      this.s3Client = null;
     }
-    
-    this.s3Client = new S3Client(clientConfig);
   }
 
   /**
@@ -32,6 +39,10 @@ class S3Service {
    * @returns {Promise<{key: string, url: string}>}
    */
   async uploadFile(buffer, originalName, mimeType, folder = 'uploads') {
+    if (!this.isAvailable) {
+      throw new Error('S3 service is not available. Please configure AWS credentials and S3 bucket.');
+    }
+    
     try {
       // Generate unique filename
       const timestamp = Date.now();
@@ -81,6 +92,10 @@ class S3Service {
    * @returns {Promise<{key: string, url: string}>}
    */
   async uploadGeneratedImage(buffer, filename) {
+    if (!this.isAvailable) {
+      throw new Error('S3 service is not available. Please configure AWS credentials and S3 bucket.');
+    }
+    
     try {
       const timestamp = Date.now();
       const key = `generated/${filename || `generated-verse-${timestamp}.png`}`;
@@ -115,6 +130,11 @@ class S3Service {
    * @returns {Promise<void>}
    */
   async deleteFile(key) {
+    if (!this.isAvailable) {
+      console.warn('S3 service not available - skipping file deletion');
+      return;
+    }
+    
     try {
       // Remove leading slash if present
       const cleanKey = key.startsWith('/') ? key.substring(1) : key;
