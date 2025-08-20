@@ -175,7 +175,7 @@ const upload = multer({
 // Auto-publish verses at midnight Central Time
 cron.schedule('0 0 * * *', () => {
   const today = new Date().toISOString().split('T')[0];
-  dbQuery.run(`UPDATE ct_verses SET published = TRUE WHERE date = ? AND published = FALSE`, [today], (err) => {
+  dbQuery.run(`UPDATE ct_verses SET published = TRUE WHERE date = $1 AND published = FALSE`, [today], (err) => {
     if (err) {
       console.error('Error auto-publishing verse:', err);
     } else {
@@ -311,7 +311,7 @@ app.get('/api/verse/random', async (req, res) => {
     
     console.log(`📅 Looking for verses between ${twoWeeksAgoStr} and ${today} for org ${orgId}`);
     
-    dbQuery.get(`SELECT * FROM ct_verses WHERE date BETWEEN ? AND ? AND published = TRUE AND organization_id = ? ORDER BY RANDOM() LIMIT 1`, 
+    dbQuery.get(`SELECT * FROM ct_verses WHERE date BETWEEN $1 AND $2 AND published = TRUE AND organization_id = $3 ORDER BY RANDOM() LIMIT 1`, 
       [twoWeeksAgoStr, today, orgId], (err, row) => {
       console.log('📊 Database query result - err:', err, 'row:', row);
       if (err) {
@@ -336,7 +336,7 @@ app.get('/api/verse/:date', trackAnalytics('api_verse'), optionalAuth, async (re
   
   try {
     // Check if there's a scheduled verse for this date first
-    dbQuery.get(`SELECT * FROM ct_verses WHERE date = ? AND published = TRUE AND organization_id = ?`, [date, orgId], async (err, scheduledVerse) => {
+    dbQuery.get(`SELECT * FROM ct_verses WHERE date = $1 AND published = TRUE AND organization_id = $2`, [date, orgId], async (err, scheduledVerse) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
