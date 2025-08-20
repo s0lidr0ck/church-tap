@@ -141,7 +141,7 @@ const resolveOrganization = (req, res, next) => {
 
   // Try to match by custom_domain or subdomain
   dbQuery.get(
-    `SELECT id, subdomain FROM ct_organizations WHERE custom_domain = ? OR subdomain = ?`,
+    `SELECT id, subdomain FROM ct_organizations WHERE custom_domain = $1 OR subdomain = $2`,
     [host, subdomainCandidate],
     (err, org) => {
       if (err) {
@@ -978,7 +978,7 @@ class VerseImportService {
       // Check if verse already exists for this date
       const existingVerse = await new Promise((resolve, reject) => {
         dbQuery.get(
-          `SELECT id FROM CT_verses WHERE organization_id = ? AND date = ?`,
+          `SELECT id FROM CT_verses WHERE organization_id = $1 AND date = $2`,
           [organizationId, date],
           (err, row) => {
             if (err) return reject(err);
@@ -996,7 +996,7 @@ class VerseImportService {
       if (!versionKey) {
         const settings = await new Promise((resolve, reject) => {
           dbQuery.get(
-            `SELECT bible_version, enabled FROM CT_verse_import_settings WHERE organization_id = ?`,
+            `SELECT bible_version, enabled FROM CT_verse_import_settings WHERE organization_id = $1`,
             [organizationId],
             (err, row) => {
               if (err) return reject(err);
@@ -1187,7 +1187,7 @@ app.get('/api/admin/check-session', (req, res) => {
 
 // Get all verses (admin)
 app.get('/api/admin/verses', requireOrgAuth, (req, res) => {
-  dbQuery.all(`SELECT * FROM ct_verses WHERE organization_id = ? ORDER BY date DESC`, [req.organizationId], (err, rows) => {
+  dbQuery.all(`SELECT * FROM ct_verses WHERE organization_id = $1 ORDER BY date DESC`, [req.organizationId], (err, rows) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -1473,7 +1473,7 @@ app.post('/api/admin/verses/import', requireOrgAuth, upload.single('csv'), (req,
 });
 
 app.get('/api/admin/verses/export', requireOrgAuth, (req, res) => {
-  dbQuery.all(`SELECT date, content_type, verse_text, bible_reference, context, tags, published FROM ct_verses WHERE organization_id = ? ORDER BY date DESC`, [req.organizationId], (err, rows) => {
+  dbQuery.all(`SELECT date, content_type, verse_text, bible_reference, context, tags, published FROM ct_verses WHERE organization_id = $1 ORDER BY date DESC`, [req.organizationId], (err, rows) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -1509,7 +1509,7 @@ app.get('/api/organization/links', (req, res) => {
   dbQuery.all(
     `SELECT id, title, url, icon, sort_order 
      FROM CT_organization_links 
-     WHERE organization_id = ? AND is_active = true 
+     WHERE organization_id = $1 AND is_active = true 
      ORDER BY sort_order ASC, title ASC`,
     [orgId],
     (err, rows) => {
@@ -1526,7 +1526,7 @@ app.get('/api/organization/links', (req, res) => {
 app.get('/api/admin/organization/links', requireOrgAuth, (req, res) => {
   dbQuery.all(
     `SELECT * FROM CT_organization_links 
-     WHERE organization_id = ? 
+     WHERE organization_id = $1 
      ORDER BY sort_order ASC, title ASC`,
     [req.organizationId],
     (err, rows) => {
@@ -1634,7 +1634,7 @@ app.get('/api/admin/verse-import/settings', requireOrgAuth, (req, res) => {
   dbQuery.get(
     `SELECT enabled, bible_version, import_time, fallback_versions 
      FROM CT_verse_import_settings 
-     WHERE organization_id = ?`,
+     WHERE organization_id = $1`,
     [organizationId],
     (err, row) => {
       if (err) {
@@ -1928,7 +1928,7 @@ app.get('/api/master/organizations/:id/admins', requireMasterAuth, (req, res) =>
   dbQuery.all(
     `SELECT id, username, email, role, is_active, created_at, last_login_at 
      FROM ct_admin_users 
-     WHERE organization_id = ? 
+     WHERE organization_id = $1 
      ORDER BY created_at DESC`,
     [id],
     (err, rows) => {
