@@ -224,7 +224,20 @@ const optionalAuth = (req, res, next) => {
 // Resolve organization for all requests before handling routes
 app.use(resolveOrganization);
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  const hostHeader = req.headers['x-forwarded-host'] || req.headers.host || '';
+  const host = hostHeader.split(':')[0].toLowerCase();
+  
+  console.log(`🏠 Homepage request - Host: ${host}`);
+  
+  // If it's the root domain (no subdomain), serve marketing homepage
+  if (host === 'churchtap.app' || host === 'www.churchtap.app') {
+    console.log(`📄 Serving marketing homepage for: ${host}`);
+    res.sendFile(path.join(__dirname, 'public', 'homepage.html'));
+  } else {
+    // Subdomain or localhost - serve church interface
+    console.log(`⛪ Serving church interface for: ${host}`);
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  }
 });
 
 app.get('/verse', trackAnalytics('view'), (req, res) => {
