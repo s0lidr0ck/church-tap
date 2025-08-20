@@ -48,6 +48,7 @@ class ChurchTapApp {
       this.setupSwipeGestures();
       this.checkNotificationPermission();
       this.detectNFCSupport();
+      this.loadOrganizationLinks();
     } catch (error) {
       console.error('Init error:', error);
       // Still show the app even if there's an error
@@ -3582,6 +3583,64 @@ class ChurchTapApp {
     });
     
     document.body.appendChild(modal);
+  }
+
+  // Load and display organization links
+  async loadOrganizationLinks() {
+    try {
+      const response = await fetch('/api/organization/links');
+      if (!response.ok) {
+        console.log('No organization links available');
+        return;
+      }
+      
+      const links = await response.json();
+      this.displayOrganizationLinks(links);
+    } catch (error) {
+      console.error('Error loading organization links:', error);
+    }
+  }
+
+  displayOrganizationLinks(links) {
+    const linksContainer = document.getElementById('organizationLinksList');
+    const linksMenu = document.getElementById('organizationLinksMenu');
+    
+    if (!linksContainer || !links || links.length === 0) {
+      if (linksMenu) {
+        linksMenu.style.display = 'none';
+      }
+      return;
+    }
+
+    // Icon mapping for organization links
+    const iconMap = {
+      website: '🌐',
+      calendar: '📅',
+      email: '✉️',
+      phone: '📞',
+      facebook: '📘',
+      youtube: '📺',
+      instagram: '📷',
+      twitter: '🐦',
+      church: '⛪',
+      bible: '📖',
+      pray: '🙏',
+      donate: '💝',
+      music: '🎵',
+      sermon: '🎤',
+      news: '📰',
+      event: '🎉'
+    };
+
+    linksContainer.innerHTML = links.map(link => `
+      <button onclick="window.open('${link.url}', '_blank')" 
+              class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center space-x-2">
+        <span>${iconMap[link.icon] || '🌐'}</span>
+        <span class="truncate">${link.title}</span>
+      </button>
+    `).join('');
+    
+    linksMenu.style.display = 'block';
   }
 }
 
