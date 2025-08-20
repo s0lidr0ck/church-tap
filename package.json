@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "build": "npm run build:css",
+    "build": "npm run build:css:once",
     "build:css": "tailwindcss -i ./public/src/input.css -o ./public/css/style.css --watch",
     "db:init": "node scripts/init-postgres.js",
     "setup": "npm run db:init && node scripts/setup-initial-data.js",
