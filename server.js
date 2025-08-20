@@ -2108,8 +2108,8 @@ app.get('/api/master/overview', requireMasterAuth, (req, res) => {
         (SELECT COUNT(*) FROM ct_organizations WHERE is_active = TRUE) AS active_orgs,
         (SELECT COUNT(*) FROM ct_users) AS total_users,
         (SELECT COUNT(*) FROM ct_verses) AS total_verses,
-        (SELECT COUNT(*) FROM ct_analytics WHERE action = 'verse_view' AND timestamp >= ?) AS total_views_7d,
-        (SELECT COUNT(DISTINCT ip_address) FROM ct_analytics WHERE action = 'verse_view' AND timestamp >= ?) AS unique_visitors_7d
+        (SELECT COUNT(*) FROM ct_analytics WHERE action = 'verse_view' AND timestamp >= $1) AS total_views_7d,
+        (SELECT COUNT(DISTINCT ip_address) FROM ct_analytics WHERE action = 'verse_view' AND timestamp >= $2) AS unique_visitors_7d
     `, [sevenDaysAgoISO, sevenDaysAgoISO], (err, row) => {
       if (err) return reject(err);
       const totals = {
@@ -2137,7 +2137,7 @@ app.get('/api/master/overview', requireMasterAuth, (req, res) => {
          (SELECT COUNT(*) FROM ct_admin_users au WHERE au.organization_id = o.id) AS admin_count,
          (SELECT COUNT(*) FROM ct_users u WHERE u.organization_id = o.id) AS user_count,
          (SELECT MAX(timestamp) FROM ct_analytics a WHERE a.organization_id = o.id) AS last_activity,
-         (SELECT COUNT(*) FROM ct_analytics a WHERE a.organization_id = o.id AND a.timestamp >= ?) AS views_7d
+         (SELECT COUNT(*) FROM ct_analytics a WHERE a.organization_id = o.id AND a.timestamp >= $1) AS views_7d
        FROM ct_organizations o
        ORDER BY o.created_at DESC`,
       [sevenDaysAgoISO],
@@ -2192,7 +2192,7 @@ app.delete('/api/master/organizations/:id', requireMasterAuth, (req, res) => {
   }
   
   // Get organization info for logging
-  dbQuery.get(`SELECT name, subdomain FROM ct_organizations WHERE id = ?`, [id], (err, org) => {
+  dbQuery.get(`SELECT name, subdomain FROM ct_organizations WHERE id = $1`, [id], (err, org) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -2202,7 +2202,7 @@ app.delete('/api/master/organizations/:id', requireMasterAuth, (req, res) => {
     }
     
     // Delete organization (this will cascade delete related data)
-    dbQuery.run(`DELETE FROM ct_organizations WHERE id = ?`, [id], function(err) {
+    dbQuery.run(`DELETE FROM ct_organizations WHERE id = $1`, [id], function(err) {
       if (err) {
         return res.status(500).json({ success: false, error: 'Failed to delete organization' });
       }
@@ -2233,7 +2233,7 @@ app.get('/api/community/:date', trackAnalytics('community_view'), (req, res) => 
   
   // Get prayer requests for the date
   const getPrayerRequests = new Promise((resolve, reject) => {
-  dbQuery.all(`SELECT * FROM ct_prayer_requests WHERE date = ? AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = ? ORDER BY created_at ASC`, 
+  dbQuery.all(`SELECT * FROM ct_prayer_requests WHERE date = $1 AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = $2 ORDER BY created_at ASC`, 
       [date, orgId], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
@@ -2242,7 +2242,7 @@ app.get('/api/community/:date', trackAnalytics('community_view'), (req, res) => 
   
   // Get praise reports for the date
   const getPraiseReports = new Promise((resolve, reject) => {
-  dbQuery.all(`SELECT * FROM ct_praise_reports WHERE date = ? AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = ? ORDER BY created_at ASC`, 
+  dbQuery.all(`SELECT * FROM ct_praise_reports WHERE date = $1 AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = $2 ORDER BY created_at ASC`, 
       [date, orgId], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
@@ -2251,7 +2251,7 @@ app.get('/api/community/:date', trackAnalytics('community_view'), (req, res) => 
   
   // Get verse insights for the date
   const getVerseInsights = new Promise((resolve, reject) => {
-  dbQuery.all(`SELECT * FROM ct_verse_community_posts WHERE date = ? AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = ? ORDER BY created_at ASC`, 
+  dbQuery.all(`SELECT * FROM ct_verse_community_posts WHERE date = $1 AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = $2 ORDER BY created_at ASC`, 
       [date, orgId], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
@@ -2339,7 +2339,7 @@ app.post('/api/prayer-request/pray', (req, res) => {
   }
   
   // Check if user already prayed for this request
-  dbQuery.get(`SELECT id FROM ct_prayer_interactions WHERE prayer_request_id = ? AND user_token = ?`,
+  dbQuery.get(`SELECT id FROM ct_prayer_interactions WHERE prayer_request_id = $1 AND user_token = $2`,
     [prayer_request_id, user_token], (err, row) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
@@ -2357,14 +2357,14 @@ app.post('/api/prayer-request/pray', (req, res) => {
           }
           
           // Update prayer count
-          dbQuery.run(`UPDATE ct_prayer_requests SET prayer_count = prayer_count + 1 WHERE id = ?`,
+          dbQuery.run(`UPDATE ct_prayer_requests SET prayer_count = prayer_count + 1 WHERE id = $1`,
             [prayer_request_id], (err) => {
               if (err) {
                 return res.status(500).json({ success: false, error: 'Database error' });
               }
               
               // Get updated count
-              dbQuery.get(`SELECT prayer_count FROM ct_prayer_requests WHERE id = ?`, 
+              dbQuery.get(`SELECT prayer_count FROM ct_prayer_requests WHERE id = $1`, 
                 [prayer_request_id], (err, row) => {
                   if (err) {
                     return res.status(500).json({ success: false, error: 'Database error' });
@@ -2387,7 +2387,7 @@ app.post('/api/praise-report/celebrate', (req, res) => {
   }
   
   // Check if user already celebrated this report
-  dbQuery.get(`SELECT id FROM ct_celebration_interactions WHERE praise_report_id = ? AND user_token = ?`,
+  dbQuery.get(`SELECT id FROM ct_celebration_interactions WHERE praise_report_id = $1 AND user_token = $2`,
     [praise_report_id, user_token], (err, row) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
@@ -2405,14 +2405,14 @@ app.post('/api/praise-report/celebrate', (req, res) => {
           }
           
           // Update celebration count
-          dbQuery.run(`UPDATE ct_praise_reports SET celebration_count = celebration_count + 1 WHERE id = ?`,
+          dbQuery.run(`UPDATE ct_praise_reports SET celebration_count = celebration_count + 1 WHERE id = $1`,
             [praise_report_id], (err) => {
               if (err) {
                 return res.status(500).json({ success: false, error: 'Database error' });
               }
               
               // Get updated count
-              dbQuery.get(`SELECT celebration_count FROM ct_praise_reports WHERE id = ?`, 
+              dbQuery.get(`SELECT celebration_count FROM ct_praise_reports WHERE id = $1`, 
                 [praise_report_id], (err, row) => {
                   if (err) {
                     return res.status(500).json({ success: false, error: 'Database error' });
@@ -2433,7 +2433,7 @@ app.get('/api/admin/community', requireOrgAuth, (req, res) => {
   const startDateStr = startDate.toISOString().split('T')[0];
   
   const getPrayerRequests = new Promise((resolve, reject) => {
-    dbQuery.all(`SELECT * FROM ct_prayer_requests WHERE date >= ? AND organization_id = ? ORDER BY date DESC, created_at DESC`, 
+    dbQuery.all(`SELECT * FROM ct_prayer_requests WHERE date >= $1 AND organization_id = $2 ORDER BY date DESC, created_at DESC`, 
       [startDateStr, req.organizationId], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
@@ -2441,7 +2441,7 @@ app.get('/api/admin/community', requireOrgAuth, (req, res) => {
   });
   
   const getPraiseReports = new Promise((resolve, reject) => {
-    dbQuery.all(`SELECT * FROM ct_praise_reports WHERE date >= ? AND organization_id = ? ORDER BY date DESC, created_at DESC`, 
+    dbQuery.all(`SELECT * FROM ct_praise_reports WHERE date >= $1 AND organization_id = $2 ORDER BY date DESC, created_at DESC`, 
       [startDateStr, req.organizationId], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
@@ -2449,7 +2449,7 @@ app.get('/api/admin/community', requireOrgAuth, (req, res) => {
   });
   
   const getVerseInsights = new Promise((resolve, reject) => {
-    dbQuery.all(`SELECT * FROM ct_verse_community_posts WHERE date >= ? AND organization_id = ? ORDER BY date DESC, created_at DESC`, 
+    dbQuery.all(`SELECT * FROM ct_verse_community_posts WHERE date >= $1 AND organization_id = $2 ORDER BY date DESC, created_at DESC`, 
       [startDateStr, req.organizationId], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
@@ -2478,7 +2478,7 @@ app.put('/api/admin/prayer-request/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   const { is_approved, is_hidden } = req.body;
   
-  dbQuery.run(`UPDATE ct_prayer_requests SET is_approved = ?, is_hidden = ? WHERE id = ? AND organization_id = ?`,
+  dbQuery.run(`UPDATE ct_prayer_requests SET is_approved = $1, is_hidden = $2 WHERE id = $3 AND organization_id = $4`,
     [is_approved ? 1 : 0, is_hidden ? 1 : 0, id, req.organizationId], function(err) {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
@@ -2493,7 +2493,7 @@ app.put('/api/admin/praise-report/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   const { is_approved, is_hidden } = req.body;
   
-  dbQuery.run(`UPDATE ct_praise_reports SET is_approved = ?, is_hidden = ? WHERE id = ? AND organization_id = ?`,
+  dbQuery.run(`UPDATE ct_praise_reports SET is_approved = $1, is_hidden = $2 WHERE id = $3 AND organization_id = $4`,
     [is_approved ? 1 : 0, is_hidden ? 1 : 0, id, req.organizationId], function(err) {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
@@ -2508,13 +2508,13 @@ app.delete('/api/admin/prayer-request/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   
   // Delete interactions first
-  dbQuery.run(`DELETE FROM ct_prayer_interactions WHERE prayer_request_id = ?`, [id], (err) => {
+  dbQuery.run(`DELETE FROM ct_prayer_interactions WHERE prayer_request_id = $1`, [id], (err) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
     
     // Delete prayer request (only from this organization)
-    dbQuery.run(`DELETE FROM ct_prayer_requests WHERE id = ? AND organization_id = ?`, [id, req.organizationId], function(err) {
+    dbQuery.run(`DELETE FROM ct_prayer_requests WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], function(err) {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -2529,13 +2529,13 @@ app.delete('/api/admin/praise-report/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   
   // Delete interactions first
-  dbQuery.run(`DELETE FROM ct_celebration_interactions WHERE praise_report_id = ?`, [id], (err) => {
+  dbQuery.run(`DELETE FROM ct_celebration_interactions WHERE praise_report_id = $1`, [id], (err) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
     
     // Delete praise report (only from this organization)
-    dbQuery.run(`DELETE FROM ct_praise_reports WHERE id = ? AND organization_id = ?`, [id, req.organizationId], function(err) {
+    dbQuery.run(`DELETE FROM ct_praise_reports WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], function(err) {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -2550,7 +2550,7 @@ app.put('/api/admin/verse-insight/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   const { is_approved, is_hidden } = req.body;
   
-  dbQuery.run(`UPDATE ct_verse_community_posts SET is_approved = ?, is_hidden = ? WHERE id = ? AND organization_id = ?`,
+  dbQuery.run(`UPDATE ct_verse_community_posts SET is_approved = $1, is_hidden = $2 WHERE id = $3 AND organization_id = $4`,
     [is_approved ? 1 : 0, is_hidden ? 1 : 0, id, req.organizationId], function(err) {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
@@ -2565,7 +2565,7 @@ app.delete('/api/admin/verse-insight/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   
   // Delete verse insight (only from this organization)
-  dbQuery.run(`DELETE FROM ct_verse_community_posts WHERE id = ? AND organization_id = ?`, [id, req.organizationId], function(err) {
+  dbQuery.run(`DELETE FROM ct_verse_community_posts WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], function(err) {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -2621,7 +2621,7 @@ app.post('/api/verse-community/heart', (req, res) => {
   // Check if user already hearted this post
   dbQuery.get(`
     SELECT id FROM ct_verse_community_interactions 
-    WHERE post_id = ? AND user_token = ?
+    WHERE post_id = $1 AND user_token = $2
   `, [post_id, user_token], (err, row) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
@@ -2672,7 +2672,7 @@ app.get('/api/admin/verse-community', requireOrgAuth, (req, res) => {
   
   dbQuery.all(`
     SELECT * FROM ct_verse_community_posts 
-    WHERE date >= ? AND organization_id = ? 
+    WHERE date >= $1 AND organization_id = $2 
     ORDER BY date DESC, created_at DESC
   `, [startDateStr, req.organizationId], (err, rows) => {
     if (err) {
@@ -2693,8 +2693,8 @@ app.put('/api/admin/verse-community/:id', requireOrgAuth, (req, res) => {
   const { is_approved, is_hidden } = req.body;
   
   dbQuery.run(`
-    UPDATE ct_verse_community_posts SET is_approved = ?, is_hidden = ? 
-    WHERE id = ? AND organization_id = ?
+    UPDATE ct_verse_community_posts SET is_approved = $1, is_hidden = $2 
+    WHERE id = $3 AND organization_id = $4
   `, [is_approved ? 1 : 0, is_hidden ? 1 : 0, id, req.organizationId], function(err) {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
@@ -2714,7 +2714,7 @@ app.delete('/api/admin/verse-community/:id', requireOrgAuth, (req, res) => {
   
   // Delete post (only from this organization)
   dbQuery.run(`
-    DELETE FROM ct_verse_community_posts WHERE id = ? AND organization_id = ?
+    DELETE FROM ct_verse_community_posts WHERE id = $1 AND organization_id = $2
   `, [id, req.organizationId], function(err) {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
@@ -2911,7 +2911,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     // Check if user already exists
-    dbQuery.get(`SELECT id FROM ct_users WHERE email = ?`, [email.toLowerCase()], async (err, existingUser) => {
+    dbQuery.get(`SELECT id FROM ct_users WHERE email = $1`, [email.toLowerCase()], async (err, existingUser) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -2987,7 +2987,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     // Find user
-    dbQuery.get(`SELECT * FROM ct_users WHERE email = ?`, [email.toLowerCase()], async (err, user) => {
+    dbQuery.get(`SELECT * FROM ct_users WHERE email = $1`, [email.toLowerCase()], async (err, user) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -3003,7 +3003,7 @@ app.post('/api/auth/login', async (req, res) => {
       }
 
       // Update last login
-      dbQuery.run(`UPDATE ct_users SET last_login = CURRENT_TIMESTAMP WHERE id = ?`, [user.id]);
+      dbQuery.run(`UPDATE ct_users SET last_login = CURRENT_TIMESTAMP WHERE id = $1`, [user.id]);
 
       // Generate JWT token
       const token = jwt.sign(
@@ -3020,7 +3020,7 @@ app.post('/api/auth/login', async (req, res) => {
       });
 
       // Check if user has completed onboarding
-      dbQuery.get(`SELECT * FROM ct_user_preferences WHERE user_id = ?`, [user.id], (err, prefs) => {
+      dbQuery.get(`SELECT * FROM ct_user_preferences WHERE user_id = $1`, [user.id], (err, prefs) => {
         const requiresOnboarding = !prefs || (!prefs.interests && !prefs.life_stage);
 
         res.json({
@@ -3054,7 +3054,7 @@ app.post('/api/auth/logout', (req, res) => {
 app.get('/api/auth/me', authenticateUser, (req, res) => {
   dbQuery.get(`SELECT u.*, p.* FROM ct_users u 
           LEFT JOIN ct_user_preferences p ON u.id = p.user_id 
-          WHERE u.id = ?`, [req.user.userId], (err, user) => {
+          WHERE u.id = $1`, [req.user.userId], (err, user) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -3095,8 +3095,8 @@ app.post('/api/auth/onboarding', authenticateUser, (req, res) => {
   const strugglesJson = JSON.stringify(struggles || []);
 
   dbQuery.run(`UPDATE ct_user_preferences SET 
-          life_stage = ?, interests = ?, struggles = ?, prayer_frequency = ?, preferred_translation = ?, updated_at = CURRENT_TIMESTAMP
-          WHERE user_id = ?`,
+          life_stage = $1, interests = $2, struggles = $3, prayer_frequency = $4, preferred_translation = $5, updated_at = CURRENT_TIMESTAMP
+          WHERE user_id = $6`,
     [lifeStage, interestsJson, strugglesJson, prayerFrequency, preferredTranslation, req.user.userId],
     function(err) {
       if (err) {
@@ -3112,8 +3112,8 @@ app.put('/api/auth/profile', authenticateUser, (req, res) => {
   const { firstName, lastName, displayName, phone, dateOfBirth } = req.body;
 
   dbQuery.run(`UPDATE ct_users SET 
-          first_name = ?, last_name = ?, display_name = ?, phone = ?, date_of_birth = ?, updated_at = CURRENT_TIMESTAMP
-          WHERE id = ?`,
+          first_name = $1, last_name = $2, display_name = $3, phone = $4, date_of_birth = $5, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $6`,
     [firstName, lastName, displayName, phone, dateOfBirth, req.user.userId],
     function(err) {
       if (err) {
@@ -3135,9 +3135,9 @@ app.put('/api/auth/preferences', authenticateUser, (req, res) => {
   const strugglesJson = JSON.stringify(struggles || []);
 
   dbQuery.run(`UPDATE ct_user_preferences SET 
-          life_stage = ?, interests = ?, struggles = ?, prayer_frequency = ?, preferred_translation = ?,
-          notification_enabled = ?, notification_time = ?, timezone = ?, updated_at = CURRENT_TIMESTAMP
-          WHERE user_id = ?`,
+          life_stage = $1, interests = $2, struggles = $3, prayer_frequency = $4, preferred_translation = $5,
+          notification_enabled = $6, notification_time = $7, timezone = $8, updated_at = CURRENT_TIMESTAMP
+          WHERE user_id = $9`,
     [lifeStage, interestsJson, strugglesJson, prayerFrequency, preferredTranslation,
      notificationEnabled, notificationTime, timezone, req.user.userId],
     function(err) {
@@ -3162,7 +3162,7 @@ app.get('/api/admin/analytics', requireOrgAuth, (req, res) => {
       COUNT(*) as views,
       COUNT(DISTINCT ip_address) as unique_visitors
     FROM ct_analytics 
-    WHERE action = 'verse_view' AND timestamp >= ? AND organization_id = ?
+    WHERE action = 'verse_view' AND timestamp >= $1 AND organization_id = $2
     GROUP BY DATE(timestamp)
     ORDER BY date DESC
   `, [startDate.toISOString(), req.organizationId], (err, dailyStats) => {
@@ -3180,7 +3180,7 @@ app.get('/api/admin/analytics', requireOrgAuth, (req, res) => {
         COUNT(a.id) as views
       FROM ct_verses v
       LEFT JOIN ct_analytics a ON v.id = a.verse_id AND a.action = 'verse_view'
-      WHERE a.timestamp >= ? AND v.organization_id = ? AND a.organization_id = ?
+      WHERE a.timestamp >= $1 AND v.organization_id = $2 AND a.organization_id = $3
       GROUP BY v.id
       ORDER BY views DESC
       LIMIT 10
@@ -3210,7 +3210,7 @@ app.post('/api/master/organizations/:id/admins', requireMasterAuth, async (req, 
   }
 
   // Ensure organization exists
-  dbQuery.get(`SELECT id FROM ct_organizations WHERE id = ?`, [id], async (err, org) => {
+  dbQuery.get(`SELECT id FROM ct_organizations WHERE id = $1`, [id], async (err, org) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -3219,7 +3219,7 @@ app.post('/api/master/organizations/:id/admins', requireMasterAuth, async (req, 
     }
 
     // Ensure username unique
-    dbQuery.get(`SELECT id FROM ct_admin_users WHERE username = ?`, [username], async (err, existing) => {
+    dbQuery.get(`SELECT id FROM ct_admin_users WHERE username = $1`, [username], async (err, existing) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
