@@ -2061,9 +2061,9 @@ app.put('/api/master/organizations/:id', requireMasterAuth, (req, res) => {
     
     dbQuery.run(`
       UPDATE ct_organizations SET 
-        name = ?, subdomain = ?, contact_email = ?, plan_type = ?, 
-        custom_domain = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+        name = $1, subdomain = $2, contact_email = $3, plan_type = $4, 
+        custom_domain = $5, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $6
     `, [name, subdomain, contact_email, plan_type, custom_domain, id], 
     function(err) {
       if (err) {
