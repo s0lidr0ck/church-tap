@@ -353,7 +353,7 @@ app.get('/api/verse/:date', trackAnalytics('api_verse'), optionalAuth, async (re
       // For logged-in users, try to find a personalized verse
       try {
         // Get user preferences
-        dbQuery.get(`SELECT * FROM ct_user_preferences WHERE user_id = ?`, [req.user.userId], (err, prefs) => {
+        dbQuery.get(`SELECT * FROM ct_user_preferences WHERE user_id = $1`, [req.user.userId], (err, prefs) => {
           if (err || !prefs) {
             // If no preferences, return the scheduled verse
             return res.json({ success: true, verse: scheduledVerse });
@@ -388,10 +388,10 @@ app.get('/api/verse/:date', trackAnalytics('api_verse'), optionalAuth, async (re
             ) as relevance_score
             FROM ct_verses 
             WHERE published = TRUE 
-            AND date <= ? 
+            AND date <= $1 
             AND (${conditions})
-            AND organization_id = ?
-            ORDER BY relevance_score DESC, ABS((date - ?::date)) ASC
+            AND organization_id = $2
+            ORDER BY relevance_score DESC, ABS((date - $3::date)) ASC
             LIMIT 1
           `;
 
@@ -449,13 +449,13 @@ app.post('/api/verse/heart', (req, res) => {
     return res.status(400).json({ success: false, error: 'Missing required fields' });
   }
   
-  dbQuery.run(`UPDATE ct_verses SET hearts = hearts + 1 WHERE id = ?`, [verse_id], function(err) {
+  dbQuery.run(`UPDATE ct_verses SET hearts = hearts + 1 WHERE id = $1`, [verse_id], function(err) {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
     
     // Get updated heart count
-    dbQuery.get(`SELECT hearts FROM ct_verses WHERE id = ?`, [verse_id], (err, row) => {
+    dbQuery.get(`SELECT hearts FROM ct_verses WHERE id = $1`, [verse_id], (err, row) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -1043,7 +1043,7 @@ const requireOrgAuth = (req, res, next) => {
   dbQuery.get(`SELECT au.*, o.id as organization_id 
           FROM ct_admin_users au 
           LEFT JOIN ct_organizations o ON au.organization_id = o.id 
-          WHERE au.id = ? AND au.is_active = TRUE`, [req.session.adminId], (err, admin) => {
+          WHERE au.id = $1 AND au.is_active = TRUE`, [req.session.adminId], (err, admin) => {
     if (err) {
       console.error('Error getting admin organization context:', err);
       return res.status(500).json({ success: false, error: 'Database error' });
@@ -1080,7 +1080,7 @@ app.post('/api/admin/login', async (req, res) => {
   dbQuery.get(`SELECT au.*, o.name as organization_name, o.subdomain as organization_subdomain 
            FROM ct_admin_users au 
            LEFT JOIN ct_organizations o ON au.organization_id = o.id 
-           WHERE au.username = ? AND au.is_active = TRUE`, [username], async (err, user) => {
+           WHERE au.username = $1 AND au.is_active = TRUE`, [username], async (err, user) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -1154,7 +1154,7 @@ app.get('/api/admin/check-session', (req, res) => {
   dbQuery.get(`SELECT au.*, o.name as organization_name, o.subdomain as organization_subdomain 
             FROM ct_admin_users au 
             LEFT JOIN ct_organizations o ON au.organization_id = o.id 
-            WHERE au.id = ? AND au.is_active = TRUE`, [req.session.adminId], (err, admin) => {
+            WHERE au.id = $1 AND au.is_active = TRUE`, [req.session.adminId], (err, admin) => {
       if (err) {
         console.error('Error checking admin session:', err);
         return res.json({ success: false, authenticated: false });
@@ -1276,8 +1276,8 @@ app.put('/api/admin/verses/:id', requireOrgAuth, upload.single('image'), async (
       image_path = s3Result.path;
     }
     
-    dbQuery.run(`UPDATE ct_verses SET date = ?, content_type = ?, verse_text = ?, image_path = ?, 
-            bible_reference = ?, context = ?, tags = ?, published = ? WHERE id = ? AND organization_id = ?`,
+    dbQuery.run(`UPDATE ct_verses SET date = $1, content_type = $2, verse_text = $3, image_path = $4, 
+            bible_reference = $5, context = $6, tags = $7, published = $8 WHERE id = $9 AND organization_id = $10`,
       [date, content_type, verse_text, image_path, bible_reference, context, tags, published, id, req.organizationId],
       function(err) {
         if (err) {
@@ -1297,12 +1297,12 @@ app.delete('/api/admin/verses/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   
   // Get verse to delete image file if exists (only from this organization)
-  dbQuery.get(`SELECT image_path FROM ct_verses WHERE id = ? AND organization_id = ?`, [id, req.organizationId], (err, verse) => {
+  dbQuery.get(`SELECT image_path FROM ct_verses WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], (err, verse) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
     
-    dbQuery.run(`DELETE FROM ct_verses WHERE id = ? AND organization_id = ?`, [id, req.organizationId], function(err) {
+    dbQuery.run(`DELETE FROM ct_verses WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], function(err) {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -1330,7 +1330,7 @@ app.post('/api/admin/verses/bulk', requireOrgAuth, (req, res) => {
   
   switch (operation) {
     case 'delete':
-      dbQuery.run(`DELETE FROM ct_verses WHERE id IN (${placeholders}) AND organization_id = ?`, params, function(err) {
+      dbQuery.run(`DELETE FROM ct_verses WHERE id IN (${placeholders}) AND organization_id = $${params.length}`, params, function(err) {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
@@ -1339,7 +1339,7 @@ app.post('/api/admin/verses/bulk', requireOrgAuth, (req, res) => {
       break;
       
     case 'publish':
-      dbQuery.run(`UPDATE ct_verses SET published = TRUE WHERE id IN (${placeholders}) AND organization_id = ?`, params, function(err) {
+      dbQuery.run(`UPDATE ct_verses SET published = TRUE WHERE id IN (${placeholders}) AND organization_id = $${params.length}`, params, function(err) {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
@@ -1348,7 +1348,7 @@ app.post('/api/admin/verses/bulk', requireOrgAuth, (req, res) => {
       break;
       
     case 'unpublish':
-      dbQuery.run(`UPDATE ct_verses SET published = FALSE WHERE id IN (${placeholders}) AND organization_id = ?`, params, function(err) {
+      dbQuery.run(`UPDATE ct_verses SET published = FALSE WHERE id IN (${placeholders}) AND organization_id = $${params.length}`, params, function(err) {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
@@ -1360,7 +1360,7 @@ app.post('/api/admin/verses/bulk', requireOrgAuth, (req, res) => {
       if (!data.tags) {
         return res.status(400).json({ success: false, error: 'Tags required for tag update' });
       }
-      dbQuery.run(`UPDATE ct_verses SET tags = ? WHERE id IN (${placeholders}) AND organization_id = ?`, [data.tags, ...verse_ids, req.organizationId], function(err) {
+      dbQuery.run(`UPDATE ct_verses SET tags = $1 WHERE id IN (${placeholders}) AND organization_id = $${verse_ids.length + 2}`, [data.tags, ...verse_ids, req.organizationId], function(err) {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
@@ -1584,8 +1584,8 @@ app.put('/api/admin/organization/links/:id', requireOrgAuth, (req, res) => {
   
   dbQuery.run(
     `UPDATE CT_organization_links 
-     SET title = ?, url = ?, icon = ?, sort_order = ?, is_active = ?
-     WHERE id = ? AND organization_id = ?`,
+     SET title = $1, url = $2, icon = $3, sort_order = $4, is_active = $5
+     WHERE id = $6 AND organization_id = $7`,
     [title, url, icon || 'website', sort_order || 0, is_active !== undefined ? is_active : true, id, req.organizationId],
     function(err) {
       if (err) {
@@ -1608,7 +1608,7 @@ app.delete('/api/admin/organization/links/:id', requireOrgAuth, (req, res) => {
   
   dbQuery.run(
     `DELETE FROM CT_organization_links 
-     WHERE id = ? AND organization_id = ?`,
+     WHERE id = $1 AND organization_id = $2`,
     [id, req.organizationId],
     function(err) {
       if (err) {
@@ -1802,7 +1802,7 @@ app.post('/api/master/login', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Username and password required' });
   }
   
-  dbQuery.get(`SELECT * FROM ct_master_admins WHERE username = ?`, [username], async (err, user) => {
+  dbQuery.get(`SELECT * FROM ct_master_admins WHERE username = $1`, [username], async (err, user) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -1819,7 +1819,7 @@ app.post('/api/master/login', async (req, res) => {
     req.session.masterAdminUsername = user.username;
     
     // Update last login
-    dbQuery.run(`UPDATE ct_master_admins SET last_login_at = CURRENT_TIMESTAMP, last_login_ip = ? WHERE id = ?`, 
+    dbQuery.run(`UPDATE ct_master_admins SET last_login_at = CURRENT_TIMESTAMP, last_login_ip = $1 WHERE id = $2`, 
       [req.ip, user.id]);
     
     res.json({ success: true, admin: { id: user.id, username: user.username, role: user.role } });
@@ -1946,7 +1946,7 @@ app.put('/api/master/organizations/:id/admins/:adminId', requireMasterAuth, (req
   const { is_active, role } = req.body;
 
   // Ensure admin belongs to the organization
-  dbQuery.get(`SELECT id, organization_id FROM ct_admin_users WHERE id = ?`, [adminId], (err, admin) => {
+  dbQuery.get(`SELECT id, organization_id FROM ct_admin_users WHERE id = $1`, [adminId], (err, admin) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -1956,12 +1956,14 @@ app.put('/api/master/organizations/:id/admins/:adminId', requireMasterAuth, (req
 
     const fields = [];
     const params = [];
+    let paramIndex = 1;
+    
     if (typeof is_active === 'boolean') {
-      fields.push('is_active = ?');
+      fields.push(`is_active = $${paramIndex++}`);
       params.push(is_active ? 1 : 0);
     }
     if (role) {
-      fields.push('role = ?');
+      fields.push(`role = $${paramIndex++}`);
       params.push(role);
     }
 
@@ -1970,7 +1972,7 @@ app.put('/api/master/organizations/:id/admins/:adminId', requireMasterAuth, (req
     }
 
     params.push(adminId);
-    dbQuery.run(`UPDATE ct_admin_users SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, params, function(updateErr) {
+    dbQuery.run(`UPDATE ct_admin_users SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramIndex}`, params, function(updateErr) {
       if (updateErr) {
         return res.status(500).json({ success: false, error: 'Failed to update admin' });
       }
@@ -1989,7 +1991,7 @@ app.post('/api/master/organizations', requireMasterAuth, (req, res) => {
     }
     
     // Check if subdomain is already taken
-    dbQuery.get(`SELECT id FROM ct_organizations WHERE subdomain = ?`, [subdomain], (err, existing) => {
+    dbQuery.get(`SELECT id FROM ct_organizations WHERE subdomain = $1`, [subdomain], (err, existing) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -2048,7 +2050,7 @@ app.put('/api/master/organizations/:id', requireMasterAuth, (req, res) => {
   }
   
   // Check if subdomain is taken by another organization
-  dbQuery.get(`SELECT id FROM ct_organizations WHERE subdomain = ? AND id != ?`, [subdomain, id], (err, existing) => {
+  dbQuery.get(`SELECT id FROM ct_organizations WHERE subdomain = $1 AND id != $2`, [subdomain, id], (err, existing) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
