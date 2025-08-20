@@ -261,6 +261,41 @@ CREATE TABLE IF NOT EXISTS CT_master_admin_activity (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Organization Links table
+CREATE TABLE IF NOT EXISTS CT_organization_links (
+  id SERIAL PRIMARY KEY,
+  organization_id INTEGER NOT NULL REFERENCES CT_organizations(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  url TEXT NOT NULL,
+  icon VARCHAR(50) DEFAULT 'website',
+  sort_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_ct_organization_links_org_id ON CT_organization_links(organization_id);
+CREATE INDEX IF NOT EXISTS idx_ct_organization_links_sort_order ON CT_organization_links(organization_id, sort_order, is_active);
+
+-- Verse Import Settings table
+CREATE TABLE IF NOT EXISTS CT_verse_import_settings (
+  id SERIAL PRIMARY KEY,
+  organization_id INTEGER NOT NULL REFERENCES CT_organizations(id) ON DELETE CASCADE,
+  enabled BOOLEAN DEFAULT true,
+  bible_version VARCHAR(20) DEFAULT 'NIV',
+  import_time VARCHAR(10) DEFAULT '00:00',
+  fallback_versions JSONB DEFAULT '["NIV", "NLT", "KJV"]'::jsonb,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(organization_id)
+);
+
+-- Create index for verse import settings
+CREATE INDEX IF NOT EXISTS idx_ct_verse_import_settings_org_id ON CT_verse_import_settings(organization_id);
+
+-- Note: Trigger for updated_at will be added later
+
 -- Seed default organization (id = 1) if none exists
 INSERT INTO CT_organizations (id, name, subdomain, settings, plan_type, features, is_active)
 SELECT 1, 'Default Organization', 'default', '{}'::jsonb, 'enterprise', '["verses","community","analytics","users","api"]'::jsonb, TRUE

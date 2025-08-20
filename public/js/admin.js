@@ -77,6 +77,14 @@ class AdminDashboard {
       e.preventDefault();
       this.showTab('users');
     });
+    document.getElementById('linksNav').addEventListener('click', (e) => {
+      e.preventDefault();
+      this.showTab('links');
+    });
+    document.getElementById('verseImportNav').addEventListener('click', (e) => {
+      e.preventDefault();
+      this.showTab('verseImport');
+    });
     document.getElementById('settingsNav').addEventListener('click', (e) => {
       e.preventDefault();
       this.showTab('settings');
@@ -253,6 +261,76 @@ class AdminDashboard {
           theme.menuText = next;
           localStorage.setItem('brandTheme', JSON.stringify(theme));
         } catch (e) {}
+      });
+    }
+
+    // Organization Links event listeners
+    const addLinkBtn = document.getElementById('addLinkBtn');
+    if (addLinkBtn) {
+      addLinkBtn.addEventListener('click', () => {
+        this.showLinkModal();
+      });
+    }
+
+    const addFirstLinkBtn = document.getElementById('addFirstLinkBtn');
+    if (addFirstLinkBtn) {
+      addFirstLinkBtn.addEventListener('click', () => {
+        this.showLinkModal();
+      });
+    }
+
+    // Link modal events
+    const cancelLinkModal = document.getElementById('cancelLinkModal');
+    if (cancelLinkModal) {
+      cancelLinkModal.addEventListener('click', () => {
+        this.hideLinkModal();
+      });
+    }
+
+    const linkModal = document.getElementById('linkModal');
+    if (linkModal) {
+      linkModal.addEventListener('click', (e) => {
+        if (e.target === linkModal) {
+          this.hideLinkModal();
+        }
+      });
+    }
+
+    // Link form
+    const linkForm = document.getElementById('linkForm');
+    if (linkForm) {
+      linkForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.saveLinkForm();
+      });
+    }
+
+    // Verse Import event listeners
+    const checkTodayBtn = document.getElementById('checkTodayBtn');
+    if (checkTodayBtn) {
+      checkTodayBtn.addEventListener('click', () => {
+        this.checkTodayVerse();
+      });
+    }
+
+    const importTodayBtn = document.getElementById('importTodayBtn');
+    if (importTodayBtn) {
+      importTodayBtn.addEventListener('click', () => {
+        this.importTodayVerse();
+      });
+    }
+
+    const manualImportBtn = document.getElementById('manualImportBtn');
+    if (manualImportBtn) {
+      manualImportBtn.addEventListener('click', () => {
+        this.manualImportVerse();
+      });
+    }
+
+    const saveImportSettings = document.getElementById('saveImportSettings');
+    if (saveImportSettings) {
+      saveImportSettings.addEventListener('click', () => {
+        this.saveImportSettings();
       });
     }
   }
@@ -459,6 +537,8 @@ class AdminDashboard {
       'analytics': 'Analytics Dashboard', 
       'community': 'Community Management',
       'users': 'User Management',
+      'links': 'Organization Links',
+      'verseImport': 'Verse Import',
       'settings': 'Settings'
     };
     document.getElementById('pageTitle').textContent = titleMap[tabName] || 'Dashboard';
@@ -468,6 +548,10 @@ class AdminDashboard {
       this.loadAnalytics();
     } else if (tabName === 'community') {
       this.loadCommunityData();
+    } else if (tabName === 'links') {
+      this.loadOrganizationLinks();
+    } else if (tabName === 'verseImport') {
+      this.loadVerseImportSettings();
     }
   }
 
@@ -1244,6 +1328,390 @@ class AdminDashboard {
     } catch (error) {
       console.error('Error deleting verse insight:', error);
       this.showToast('Connection error', 'error');
+    }
+  }
+
+  // Organization Links Methods
+  async loadOrganizationLinks() {
+    const loadingEl = document.getElementById('loadingLinksAdmin');
+    const tableContainer = document.getElementById('linksTableContainer');
+    const noLinksMessage = document.getElementById('noLinksMessage');
+
+    try {
+      loadingEl.classList.remove('hidden');
+      tableContainer.classList.add('hidden');
+      noLinksMessage.classList.add('hidden');
+
+      const response = await fetch('/api/admin/organization/links');
+      const links = await response.json();
+
+      if (response.ok && links.length > 0) {
+        this.renderLinksTable(links);
+        tableContainer.classList.remove('hidden');
+      } else {
+        noLinksMessage.classList.remove('hidden');
+      }
+    } catch (error) {
+      console.error('Error loading organization links:', error);
+      this.showToast('Failed to load links', 'error');
+      noLinksMessage.classList.remove('hidden');
+    } finally {
+      loadingEl.classList.add('hidden');
+    }
+  }
+
+  renderLinksTable(links) {
+    const tbody = document.getElementById('linksTableBody');
+    
+    tbody.innerHTML = links.map(link => {
+      const icon = this.getLinkIcon(link.icon);
+      const statusBadge = link.is_active ? 
+        '<span class="status-badge status-published">Active</span>' : 
+        '<span class="status-badge status-draft">Inactive</span>';
+
+      return `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+            ${link.title}
+          </td>
+          <td class="px-6 py-4 text-sm text-gray-900">
+            <div class="max-w-xs truncate">
+              <a href="${link.url}" target="_blank" class="text-primary-600 hover:text-primary-900">
+                ${link.url}
+              </a>
+            </div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            <span class="text-lg mr-2">${icon}</span>
+            ${link.icon}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            ${statusBadge}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            ${link.sort_order}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <div class="flex items-center space-x-2">
+              <button onclick="adminDashboard.editLink(${link.id})" 
+                      class="text-primary-600 hover:text-primary-900 font-medium">Edit</button>
+              <button onclick="adminDashboard.deleteLink(${link.id})" 
+                      class="text-red-600 hover:text-red-900 font-medium">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  getLinkIcon(iconName) {
+    const icons = {
+      'website': '🌐',
+      'facebook': '📘',
+      'instagram': '📷',
+      'youtube': '📺',
+      'twitter': '🐦',
+      'email': '📧',
+      'phone': '📞',
+      'location': '📍',
+      'calendar': '📅',
+      'donate': '💝',
+      'prayer': '🙏',
+      'music': '🎵',
+      'sermon': '🎙️',
+      'bible': '📖',
+      'heart': '❤️',
+      'star': '⭐',
+      'home': '🏠',
+      'info': 'ℹ️',
+      'contact': '📞',
+      'about': '👥'
+    };
+    return icons[iconName] || '🔗';
+  }
+
+  showLinkModal(linkData = null) {
+    const modal = document.getElementById('linkModal');
+    const modalTitle = document.getElementById('linkModalTitle');
+    const form = document.getElementById('linkForm');
+
+    if (linkData) {
+      modalTitle.textContent = 'Edit Organization Link';
+      document.getElementById('linkTitle').value = linkData.title;
+      document.getElementById('linkUrl').value = linkData.url;
+      document.getElementById('linkIcon').value = linkData.icon;
+      document.getElementById('linkSortOrder').value = linkData.sort_order;
+      document.getElementById('linkIsActive').checked = linkData.is_active;
+      form.dataset.linkId = linkData.id;
+    } else {
+      modalTitle.textContent = 'Add Organization Link';
+      form.reset();
+      document.getElementById('linkIsActive').checked = true;
+      delete form.dataset.linkId;
+    }
+
+    modal.classList.remove('hidden');
+  }
+
+  hideLinkModal() {
+    document.getElementById('linkModal').classList.add('hidden');
+    document.getElementById('linkForm').reset();
+  }
+
+  async saveLinkForm() {
+    const form = document.getElementById('linkForm');
+    const linkId = form.dataset.linkId;
+    
+    const linkData = {
+      title: document.getElementById('linkTitle').value,
+      url: document.getElementById('linkUrl').value,
+      icon: document.getElementById('linkIcon').value,
+      sort_order: parseInt(document.getElementById('linkSortOrder').value),
+      is_active: document.getElementById('linkIsActive').checked
+    };
+
+    try {
+      const url = linkId ? 
+        `/api/admin/organization/links/${linkId}` : 
+        '/api/admin/organization/links';
+      
+      const method = linkId ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(linkData)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        this.hideLinkModal();
+        this.loadOrganizationLinks();
+        this.showToast(linkId ? 'Link updated successfully!' : 'Link created successfully!');
+      } else {
+        this.showToast(data.error || 'Failed to save link', 'error');
+      }
+    } catch (error) {
+      console.error('Error saving link:', error);
+      this.showToast('Connection error', 'error');
+    }
+  }
+
+  async editLink(linkId) {
+    try {
+      const response = await fetch(`/api/admin/organization/links`);
+      const links = await response.json();
+      
+      const link = links.find(l => l.id === linkId);
+      if (link) {
+        this.showLinkModal(link);
+      } else {
+        this.showToast('Link not found', 'error');
+      }
+    } catch (error) {
+      console.error('Error loading link:', error);
+      this.showToast('Failed to load link', 'error');
+    }
+  }
+
+  async deleteLink(linkId) {
+    if (!confirm('Are you sure you want to delete this link?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/organization/links/${linkId}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        this.loadOrganizationLinks();
+        this.showToast('Link deleted successfully!');
+      } else {
+        this.showToast(data.error || 'Failed to delete link', 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting link:', error);
+      this.showToast('Connection error', 'error');
+    }
+  }
+
+  // Verse Import Methods
+  async loadVerseImportSettings() {
+    try {
+      const response = await fetch('/api/admin/verse-import/settings');
+      const data = await response.json();
+      
+      if (data.success) {
+        const settings = data.settings;
+        document.getElementById('importEnabled').checked = settings.enabled;
+        document.getElementById('bibleVersion').value = settings.bibleVersion;
+        document.getElementById('importTime').value = settings.importTime;
+      }
+    } catch (error) {
+      console.error('Error loading verse import settings:', error);
+      this.showToast('Failed to load import settings', 'error');
+    }
+  }
+
+  async saveImportSettings() {
+    const settings = {
+      enabled: document.getElementById('importEnabled').checked,
+      bibleVersion: document.getElementById('bibleVersion').value,
+      importTime: document.getElementById('importTime').value,
+      fallbackVersions: ['NIV', 'NLT', 'KJV'] // Default fallback order
+    };
+
+    try {
+      const response = await fetch('/api/admin/verse-import/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(settings)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        this.showToast('Import settings saved successfully!');
+      } else {
+        this.showToast(data.error || 'Failed to save settings', 'error');
+      }
+    } catch (error) {
+      console.error('Error saving import settings:', error);
+      this.showToast('Connection error', 'error');
+    }
+  }
+
+  async checkTodayVerse() {
+    const statusContent = document.getElementById('importStatusContent');
+    statusContent.innerHTML = '<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>Checking today\'s verse...';
+
+    try {
+      const bibleVersion = document.getElementById('bibleVersion').value;
+      const response = await fetch('/api/admin/verse-import/check', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ bibleVersion })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        if (data.imported) {
+          statusContent.innerHTML = `<div class="text-green-600">✅ Successfully imported today's verse: ${data.verse.reference}</div>`;
+          this.addImportLog(`Imported verse for today: ${data.verse.reference} (${bibleVersion})`);
+        } else {
+          statusContent.innerHTML = '<div class="text-blue-600">📋 Verse already exists for today</div>';
+        }
+      } else {
+        statusContent.innerHTML = `<div class="text-red-600">❌ Error: ${data.error}</div>`;
+      }
+    } catch (error) {
+      console.error('Error checking today verse:', error);
+      statusContent.innerHTML = '<div class="text-red-600">❌ Connection error</div>';
+    }
+  }
+
+  async importTodayVerse() {
+    const statusContent = document.getElementById('importStatusContent');
+    statusContent.innerHTML = '<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-2"></div>Importing today\'s verse...';
+
+    try {
+      const bibleVersion = document.getElementById('bibleVersion').value;
+      const today = new Date().toISOString().split('T')[0];
+      
+      const response = await fetch('/api/admin/verse-import/manual', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ date: today, bibleVersion })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        statusContent.innerHTML = `<div class="text-green-600">✅ Successfully imported: ${data.verse.reference}</div>`;
+        this.addImportLog(`Manually imported verse for today: ${data.verse.reference} (${bibleVersion})`);
+        this.showToast('Today\'s verse imported successfully!');
+        this.loadVerses(); // Refresh the verses table
+      } else {
+        statusContent.innerHTML = `<div class="text-red-600">❌ Error: ${data.error}</div>`;
+        this.showToast(data.error || 'Failed to import verse', 'error');
+      }
+    } catch (error) {
+      console.error('Error importing today verse:', error);
+      statusContent.innerHTML = '<div class="text-red-600">❌ Connection error</div>';
+      this.showToast('Connection error', 'error');
+    }
+  }
+
+  async manualImportVerse() {
+    const date = document.getElementById('manualImportDate').value;
+    if (!date) {
+      this.showToast('Please select a date', 'error');
+      return;
+    }
+
+    try {
+      const bibleVersion = document.getElementById('bibleVersion').value;
+      
+      const response = await fetch('/api/admin/verse-import/manual', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ date, bibleVersion })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        this.showToast(`Successfully imported verse for ${date}: ${data.verse.reference}`);
+        this.addImportLog(`Manually imported verse for ${date}: ${data.verse.reference} (${bibleVersion})`);
+        document.getElementById('manualImportDate').value = '';
+        this.loadVerses(); // Refresh the verses table
+      } else {
+        this.showToast(data.error || 'Failed to import verse', 'error');
+      }
+    } catch (error) {
+      console.error('Error with manual import:', error);
+      this.showToast('Connection error', 'error');
+    }
+  }
+
+  addImportLog(message) {
+    const logContainer = document.getElementById('importLog');
+    const timestamp = new Date().toLocaleString();
+    
+    // Remove "no activity" message if present
+    const noActivity = logContainer.querySelector('.italic');
+    if (noActivity) {
+      noActivity.remove();
+    }
+    
+    // Add new log entry
+    const logEntry = document.createElement('div');
+    logEntry.className = 'flex justify-between items-center py-2 border-b border-gray-100';
+    logEntry.innerHTML = `
+      <span class="text-gray-700">${message}</span>
+      <span class="text-xs text-gray-500">${timestamp}</span>
+    `;
+    
+    logContainer.insertBefore(logEntry, logContainer.firstChild);
+    
+    // Keep only last 10 entries
+    while (logContainer.children.length > 10) {
+      logContainer.removeChild(logContainer.lastChild);
     }
   }
 }

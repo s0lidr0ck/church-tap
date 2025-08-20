@@ -14,6 +14,7 @@ const cookieParser = require('cookie-parser');
 const compression = require('compression');
 const createRateLimiter = require('./middleware/rateLimit');
 const s3Service = require('./services/s3Service');
+const xml2js = require('xml2js');
 
 // Trust reverse proxy (required for secure cookies behind App Runner/ELB)
 // Ensures req.secure reflects the original HTTPS and session cookies can be set with secure: true
@@ -797,6 +798,220 @@ app.post('/api/verse/generate-image', async (req, res) => {
   }
 });
 
+// VERSE IMPORT SERVICE
+const BIBLE_VERSIONS = {
+  'NASB1995': { id: 275, name: 'New American Standard Bible 1995' },
+  'KJV': { id: 9, name: 'King James Version' },
+  'NIV': { id: 31, name: 'New International Version' },
+  'NLT': { id: 51, name: 'New Living Translation' },
+  'NKJV': { id: 50, name: 'New King James Version' }
+};
+
+class VerseImportService {
+  constructor() {
+    this.isRunning = false;
+  }
+
+  async fetchVerseFromBibleGateway(versionKey = 'NIV') {
+    const version = BIBLE_VERSIONS[versionKey];
+    if (!version) {
+      throw new Error(`Unknown Bible version: ${versionKey}`);
+    }
+
+    const rssUrl = `https://www.biblegateway.com/usage/votd/rss/votd.rdf?$${version.id}`;
+    
+    try {
+      const response = await fetch(rssUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const xmlData = await response.text();
+      const parser = new xml2js.Parser();
+      const result = await parser.parseStringPromise(xmlData);
+      
+      // Extract verse data from RSS - handle both RDF and RSS formats
+      let item, title, description;
+      
+      if (result.rss && result.rss.channel && result.rss.channel[0].item) {
+        // Standard RSS format
+        item = result.rss.channel[0].item[0];
+        title = item.title[0];
+        description = item['content:encoded'] ? item['content:encoded'][0] : item.description[0];
+      } else if (result.rdf && result.rdf.item) {
+        // RDF format
+        item = result.rdf.item[0];
+        title = item.title[0];
+        description = item.description[0];
+      } else {
+        throw new Error('Unexpected RSS format');
+      }
+      
+      // Parse title for reference (e.g., "Psalm 16:8")
+      const reference = title.trim();
+      
+      // Clean up verse text (remove CDATA and extra formatting)
+      let verseText = description.replace(/<!\[CDATA\[|\]\]>/g, '').trim();
+      verseText = verseText.replace(/<[^>]*>/g, '').trim(); // Remove HTML tags
+      
+      // Remove Bible Gateway copyright text
+      verseText = verseText.replace(/Brought to you by BibleGateway\.com\. Copyright \(C\)[^.]*\. All Rights Reserved\./gi, '').trim();
+      verseText = verseText.replace(/Copyright.*All Rights Reserved\.?/gi, '').trim();
+      
+      // Remove HTML entities for quotes
+      verseText = verseText.replace(/&ldquo;/g, '"').replace(/&rdquo;/g, '"').trim();
+      
+      // Generate smart tags
+      const tags = this.generateVerseTags(reference, verseText);
+      
+      return {
+        reference,
+        text: verseText,
+        version: versionKey,
+        source: 'Bible Gateway',
+        tags
+      };
+      
+    } catch (error) {
+      console.error('Error fetching verse from Bible Gateway:', error);
+      throw error;
+    }
+  }
+
+  generateVerseTags(reference, verseText) {
+    const tags = [];
+    
+    // Extract book name from reference (e.g., "Psalm 16:8" -> "Psalm")
+    const bookMatch = reference.match(/^([A-Za-z0-9\s]+)\s+\d+:/);
+    if (bookMatch) {
+      const bookName = bookMatch[1].trim().toLowerCase();
+      tags.push(bookName);
+    }
+    
+    // Common spiritual keywords to look for in the verse
+    const keywords = {
+      'faith': /\b(faith|believe|trust|hope)\b/i,
+      'love': /\b(love|beloved|mercy|compassion|kindness)\b/i,
+      'peace': /\b(peace|rest|calm|still)\b/i,
+      'strength': /\b(strength|power|mighty|strong)\b/i,
+      'joy': /\b(joy|joyful|rejoice|glad|happiness)\b/i,
+      'prayer': /\b(pray|prayer|ask|seek)\b/i,
+      'wisdom': /\b(wisdom|wise|understanding|knowledge)\b/i,
+      'grace': /\b(grace|mercy|forgiveness|forgive)\b/i,
+      'salvation': /\b(salvation|save|saved|savior|redeemer)\b/i,
+      'praise': /\b(praise|glory|worship|honor|blessed)\b/i,
+      'guidance': /\b(guide|lead|path|way|direction)\b/i,
+      'comfort': /\b(comfort|console|refuge|shelter|help)\b/i,
+      'eternal': /\b(eternal|everlasting|forever|heaven)\b/i,
+      'righteousness': /\b(righteous|holy|pure|blameless)\b/i,
+      'provision': /\b(provide|supply|need|gave|blessing)\b/i
+    };
+    
+    // Check verse text for keywords
+    for (const [tag, pattern] of Object.entries(keywords)) {
+      if (pattern.test(verseText)) {
+        tags.push(tag);
+      }
+    }
+    
+    // Limit to 5 tags maximum to keep it manageable
+    return tags.slice(0, 5).join(',');
+  }
+
+  async importVerseForDate(organizationId, date, versionKey = 'NIV') {
+    try {
+      console.log(`📖 Importing verse for ${date} (${versionKey}) for org ${organizationId}`);
+      
+      const verseData = await this.fetchVerseFromBibleGateway(versionKey);
+      
+      // Insert verse into database
+      return new Promise((resolve, reject) => {
+        dbQuery.run(
+          `INSERT INTO CT_verses (organization_id, date, content_type, verse_text, bible_reference, published, tags, created_at)
+           VALUES (?, ?, 'text', ?, ?, true, ?, NOW())`,
+          [organizationId, date, verseData.text, verseData.reference, verseData.tags],
+          function(err) {
+            if (err) {
+              console.error('Error saving imported verse:', err);
+              return reject(err);
+            }
+            
+            console.log(`✅ Successfully imported verse for ${date}: ${verseData.reference}`);
+            resolve({
+              id: this.lastID,
+              ...verseData,
+              date,
+              organizationId
+            });
+          }
+        );
+      });
+      
+    } catch (error) {
+      console.error(`❌ Failed to import verse for ${date}:`, error);
+      throw error;
+    }
+  }
+
+  async checkAndImportMissingVerse(organizationId, date, versionKey = null) {
+    if (this.isRunning) {
+      console.log('Import already running, skipping...');
+      return null;
+    }
+
+    this.isRunning = true;
+    
+    try {
+      // Check if verse already exists for this date
+      const existingVerse = await new Promise((resolve, reject) => {
+        dbQuery.get(
+          `SELECT id FROM CT_verses WHERE organization_id = ? AND date = ?`,
+          [organizationId, date],
+          (err, row) => {
+            if (err) return reject(err);
+            resolve(row);
+          }
+        );
+      });
+
+      if (existingVerse) {
+        console.log(`📋 Verse already exists for ${date}, skipping import`);
+        return null;
+      }
+
+      // Get Bible version from settings if not provided
+      if (!versionKey) {
+        const settings = await new Promise((resolve, reject) => {
+          dbQuery.get(
+            `SELECT bible_version, enabled FROM CT_verse_import_settings WHERE organization_id = ?`,
+            [organizationId],
+            (err, row) => {
+              if (err) return reject(err);
+              resolve(row);
+            }
+          );
+        });
+        
+        versionKey = (settings && settings.bible_version) || 'NIV';
+        
+        // Check if import is enabled
+        if (settings && settings.enabled === false) {
+          console.log(`📋 Verse import disabled for org ${organizationId}, skipping import`);
+          return null;
+        }
+      }
+
+      // Import verse if none exists
+      return await this.importVerseForDate(organizationId, date, versionKey);
+      
+    } finally {
+      this.isRunning = false;
+    }
+  }
+}
+
+const verseImportService = new VerseImportService();
+
 // Admin Authentication Middleware
 const requireAuth = (req, res, next) => {
   if (!req.session.adminId) {
@@ -964,7 +1179,15 @@ app.get('/api/admin/verses', requireOrgAuth, (req, res) => {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
     
-    res.json({ success: true, verses: rows });
+    // Format dates for display
+    const verses = rows.map(verse => ({
+      ...verse,
+      date: verse.date ? new Date(verse.date).toISOString().split('T')[0] : null,
+      created_at: verse.created_at ? new Date(verse.created_at).toLocaleString() : null,
+      updated_at: verse.updated_at ? new Date(verse.updated_at).toLocaleString() : null
+    }));
+    
+    res.json({ success: true, verses });
   });
 });
 
@@ -1262,6 +1485,298 @@ app.get('/api/admin/verses/export', requireOrgAuth, (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename="verses-export.csv"');
     res.send(csv);
   });
+});
+
+// ORGANIZATION LINKS ROUTES
+
+// Get organization links (public endpoint)
+app.get('/api/organization/links', (req, res) => {
+  const orgId = req.organizationId || 1; // Default to organization 1 if no org context
+  
+  dbQuery.all(
+    `SELECT id, title, url, icon, sort_order 
+     FROM CT_organization_links 
+     WHERE organization_id = ? AND is_active = true 
+     ORDER BY sort_order ASC, title ASC`,
+    [orgId],
+    (err, rows) => {
+      if (err) {
+        console.error('Error fetching organization links:', err);
+        return res.status(500).json({ success: false, error: 'Failed to fetch links' });
+      }
+      res.json(rows);
+    }
+  );
+});
+
+// Admin: Get all organization links
+app.get('/api/admin/organization/links', requireOrgAuth, (req, res) => {
+  dbQuery.all(
+    `SELECT * FROM CT_organization_links 
+     WHERE organization_id = ? 
+     ORDER BY sort_order ASC, title ASC`,
+    [req.organizationId],
+    (err, rows) => {
+      if (err) {
+        console.error('Error fetching organization links:', err);
+        return res.status(500).json({ success: false, error: 'Failed to fetch links' });
+      }
+      res.json(rows);
+    }
+  );
+});
+
+// Admin: Create organization link
+app.post('/api/admin/organization/links', requireOrgAuth, (req, res) => {
+  const { title, url, icon, sort_order } = req.body;
+  
+  if (!title || !url) {
+    return res.status(400).json({ success: false, error: 'Title and URL are required' });
+  }
+  
+  dbQuery.run(
+    `INSERT INTO CT_organization_links (organization_id, title, url, icon, sort_order) 
+     VALUES (?, ?, ?, ?, ?)`,
+    [req.organizationId, title, url, icon || 'website', sort_order || 0],
+    function(err) {
+      if (err) {
+        console.error('Error creating organization link:', err);
+        return res.status(500).json({ success: false, error: 'Failed to create link' });
+      }
+      
+      res.json({ 
+        success: true, 
+        link: {
+          id: this.lastID,
+          organization_id: req.organizationId,
+          title,
+          url,
+          icon: icon || 'website',
+          sort_order: sort_order || 0,
+          is_active: true
+        }
+      });
+    }
+  );
+});
+
+// Admin: Update organization link
+app.put('/api/admin/organization/links/:id', requireOrgAuth, (req, res) => {
+  const { id } = req.params;
+  const { title, url, icon, sort_order, is_active } = req.body;
+  
+  if (!title || !url) {
+    return res.status(400).json({ success: false, error: 'Title and URL are required' });
+  }
+  
+  dbQuery.run(
+    `UPDATE CT_organization_links 
+     SET title = ?, url = ?, icon = ?, sort_order = ?, is_active = ?
+     WHERE id = ? AND organization_id = ?`,
+    [title, url, icon || 'website', sort_order || 0, is_active !== undefined ? is_active : true, id, req.organizationId],
+    function(err) {
+      if (err) {
+        console.error('Error updating organization link:', err);
+        return res.status(500).json({ success: false, error: 'Failed to update link' });
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ success: false, error: 'Link not found' });
+      }
+      
+      res.json({ success: true });
+    }
+  );
+});
+
+// Admin: Delete organization link
+app.delete('/api/admin/organization/links/:id', requireOrgAuth, (req, res) => {
+  const { id } = req.params;
+  
+  dbQuery.run(
+    `DELETE FROM CT_organization_links 
+     WHERE id = ? AND organization_id = ?`,
+    [id, req.organizationId],
+    function(err) {
+      if (err) {
+        console.error('Error deleting organization link:', err);
+        return res.status(500).json({ success: false, error: 'Failed to delete link' });
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ success: false, error: 'Link not found' });
+      }
+      
+      res.json({ success: true });
+    }
+  );
+});
+
+// VERSE IMPORT ROUTES
+
+// Get verse import settings
+app.get('/api/admin/verse-import/settings', requireOrgAuth, (req, res) => {
+  const organizationId = req.organizationId;
+  
+  dbQuery.get(
+    `SELECT enabled, bible_version, import_time, fallback_versions 
+     FROM CT_verse_import_settings 
+     WHERE organization_id = ?`,
+    [organizationId],
+    (err, row) => {
+      if (err) {
+        console.error('Error fetching verse import settings:', err);
+        return res.status(500).json({ success: false, error: 'Database error' });
+      }
+      
+      // If no settings exist, return defaults and create them
+      if (!row) {
+        const defaultSettings = {
+          enabled: true,
+          bibleVersion: 'NIV',
+          importTime: '00:00',
+          fallbackVersions: ['NIV', 'NLT', 'KJV']
+        };
+        
+        // Create default settings in database
+        dbQuery.run(
+          `INSERT INTO CT_verse_import_settings (organization_id, enabled, bible_version, import_time, fallback_versions)
+           VALUES (?, ?, ?, ?, ?)`,
+          [organizationId, defaultSettings.enabled, defaultSettings.bibleVersion, 
+           defaultSettings.importTime, JSON.stringify(defaultSettings.fallbackVersions)],
+          (insertErr) => {
+            if (insertErr) {
+              console.error('Error creating default verse import settings:', insertErr);
+            }
+          }
+        );
+        
+        return res.json({ success: true, settings: defaultSettings });
+      }
+      
+      // Return existing settings
+      let fallbackVersions;
+      try {
+        fallbackVersions = typeof row.fallback_versions === 'string' 
+          ? JSON.parse(row.fallback_versions) 
+          : row.fallback_versions || ['NIV', 'NLT', 'KJV'];
+      } catch (e) {
+        console.warn('Invalid fallback_versions JSON:', row.fallback_versions, 'using defaults');
+        fallbackVersions = ['NIV', 'NLT', 'KJV'];
+      }
+      
+      const settings = {
+        enabled: row.enabled,
+        bibleVersion: row.bible_version,
+        importTime: row.import_time,
+        fallbackVersions: fallbackVersions
+      };
+      
+      res.json({ success: true, settings });
+    }
+  );
+});
+
+// Update verse import settings
+app.put('/api/admin/verse-import/settings', requireOrgAuth, (req, res) => {
+  const { enabled, bibleVersion, importTime, fallbackVersions } = req.body;
+  const organizationId = req.organizationId;
+  
+  // Validate bible version
+  if (bibleVersion && !BIBLE_VERSIONS[bibleVersion]) {
+    return res.status(400).json({ success: false, error: 'Invalid Bible version' });
+  }
+  
+  // Update settings in database (using UPSERT)
+  dbQuery.run(
+    `INSERT INTO CT_verse_import_settings (organization_id, enabled, bible_version, import_time, fallback_versions, updated_at)
+     VALUES (?, ?, ?, ?, ?, NOW())
+     ON CONFLICT (organization_id) 
+     DO UPDATE SET 
+       enabled = EXCLUDED.enabled,
+       bible_version = EXCLUDED.bible_version,
+       import_time = EXCLUDED.import_time,
+       fallback_versions = EXCLUDED.fallback_versions,
+       updated_at = NOW()`,
+    [organizationId, enabled, bibleVersion, importTime, JSON.stringify(fallbackVersions || ['NIV', 'NLT', 'KJV'])],
+    function(err) {
+      if (err) {
+        console.error('Error updating verse import settings:', err);
+        return res.status(500).json({ success: false, error: 'Database error' });
+      }
+      
+      console.log(`✅ Updated verse import settings for org ${organizationId}: ${bibleVersion}`);
+      res.json({ 
+        success: true, 
+        message: 'Verse import settings updated',
+        settings: { enabled, bibleVersion, importTime, fallbackVersions }
+      });
+    }
+  );
+});
+
+// Manual import verse for specific date
+app.post('/api/admin/verse-import/manual', requireOrgAuth, async (req, res) => {
+  const { date, bibleVersion = 'NIV' } = req.body;
+  
+  if (!date) {
+    return res.status(400).json({ success: false, error: 'Date is required' });
+  }
+
+  if (!BIBLE_VERSIONS[bibleVersion]) {
+    return res.status(400).json({ success: false, error: 'Invalid Bible version' });
+  }
+
+  try {
+    const result = await verseImportService.importVerseForDate(req.organizationId, date, bibleVersion);
+    res.json({ 
+      success: true, 
+      message: `Successfully imported verse for ${date}`,
+      verse: result
+    });
+  } catch (error) {
+    console.error('Manual import error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to import verse'
+    });
+  }
+});
+
+// Check and import missing verse for today
+app.post('/api/admin/verse-import/check', requireOrgAuth, async (req, res) => {
+  const { bibleVersion = 'NIV' } = req.body;
+  const today = new Date().toISOString().split('T')[0];
+
+  try {
+    const result = await verseImportService.checkAndImportMissingVerse(req.organizationId, today, bibleVersion);
+    
+    if (result) {
+      res.json({ 
+        success: true, 
+        imported: true,
+        message: `Successfully imported today's verse`,
+        verse: result
+      });
+    } else {
+      res.json({ 
+        success: true, 
+        imported: false,
+        message: `Verse already exists for today`
+      });
+    }
+  } catch (error) {
+    console.error('Check import error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to check/import verse'
+    });
+  }
+});
+
+// Get available Bible versions
+app.get('/api/admin/verse-import/versions', (req, res) => {
+  res.json({ success: true, versions: BIBLE_VERSIONS });
 });
 
 // MASTER ADMIN ROUTES
@@ -2731,7 +3246,51 @@ app.post('/api/praise-report/celebrate', rateLimiter('celebrate_action'));
 app.post('/api/verse-community', rateLimiter('verse_community_submit'));
 app.post('/api/verse-community/heart', rateLimiter('verse_community_heart'));
 
+// AUTOMATIC VERSE IMPORT SCHEDULER
+// Check for missing verses every day at 12:01 AM
+cron.schedule('1 0 * * *', async () => {
+  console.log('🕛 Running daily verse check...');
+  
+  try {
+    // Get all organizations
+    const orgs = await new Promise((resolve, reject) => {
+      dbQuery.all('SELECT id FROM CT_organizations WHERE is_active = true', [], (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows);
+      });
+    });
+
+    const today = new Date().toISOString().split('T')[0];
+    
+    for (const org of orgs) {
+      try {
+        await verseImportService.checkAndImportMissingVerse(org.id, today);
+        // Small delay between organizations to avoid overwhelming Bible Gateway
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        console.error(`Failed to import verse for org ${org.id}:`, error);
+      }
+    }
+    
+    console.log('✅ Daily verse check completed');
+  } catch (error) {
+    console.error('❌ Daily verse check failed:', error);
+  }
+});
+
+// Also run a check on server startup for today (in case server was down)
+setTimeout(async () => {
+  console.log('🚀 Running startup verse check...');
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    await verseImportService.checkAndImportMissingVerse(1, today); // Default org
+  } catch (error) {
+    console.error('Startup verse check failed:', error);
+  }
+}, 5000); // Wait 5 seconds after server starts
+
 app.listen(PORT, () => {
   console.log(`Church Tap app running on http://localhost:${PORT}`);
   console.log('🚀 Multi-tenant system ready!');
+  console.log('📖 Automatic verse import system enabled');
 });
