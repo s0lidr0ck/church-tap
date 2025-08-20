@@ -3304,8 +3304,8 @@ setTimeout(async () => {
   }
 }, 5000); // Wait 5 seconds after server starts
 
-app.listen(PORT, () => {
-  console.log(`Church Tap app running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Church Tap app running on http://0.0.0.0:${PORT}`);
   console.log('🚀 Multi-tenant system ready!');
   console.log('📖 Automatic verse import system enabled');
 });
