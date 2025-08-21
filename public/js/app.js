@@ -3596,13 +3596,15 @@ class ChurchTapApp {
   // Load and display organization links
   async loadOrganizationLinks() {
     try {
+      console.log('Loading organization links...');
       const response = await fetch('/api/organization/links');
       if (!response.ok) {
-        console.log('No organization links available');
+        console.log('No organization links available - response not ok');
         return;
       }
       
       const links = await response.json();
+      console.log('Loaded organization links:', links);
       this.displayOrganizationLinks(links);
     } catch (error) {
       console.error('Error loading organization links:', error);
@@ -3613,7 +3615,12 @@ class ChurchTapApp {
     const linksContainer = document.getElementById('organizationLinksList');
     const linksMenu = document.getElementById('organizationLinksMenu');
     
+    console.log('DisplayOrganizationLinks called with:', links);
+    console.log('Links container found:', !!linksContainer);
+    console.log('Links menu found:', !!linksMenu);
+    
     if (!linksContainer || !links || links.length === 0) {
+      console.log('Hiding links menu - no links or container missing');
       if (linksMenu) {
         linksMenu.style.display = 'none';
       }
