@@ -49,6 +49,7 @@ class ChurchTapApp {
       this.checkNotificationPermission();
       this.detectNFCSupport();
       this.loadOrganizationLinks();
+      this.updateMenuIndicators();
     } catch (error) {
       console.error('Init error:', error);
       // Still show the app even if there's an error
@@ -57,14 +58,21 @@ class ChurchTapApp {
   }
 
   setupEventListeners() {
-    // Theme toggle
-    document.getElementById('themeToggle').addEventListener('click', () => {
+    // Theme toggle (now in menu)
+    document.getElementById('themeMenuBtn').addEventListener('click', () => {
       this.toggleTheme();
+      this.updateMenuIndicators();
     });
 
-    // Text size toggle
-    document.getElementById('textSizeBtn').addEventListener('click', () => {
+    // Text size toggle (now in menu)
+    document.getElementById('textSizeMenuBtn').addEventListener('click', () => {
       this.cycleTextSize();
+      this.updateMenuIndicators();
+    });
+
+    // Account/Login button (now in menu)
+    document.getElementById('loginMenuBtnNew').addEventListener('click', () => {
+      document.getElementById('loginMenuBtn').click(); // Reuse existing login functionality
     });
 
     // Navigation
@@ -3641,6 +3649,34 @@ class ChurchTapApp {
     `).join('');
     
     linksMenu.style.display = 'block';
+  }
+
+  // Update menu indicators for theme and text size
+  updateMenuIndicators() {
+    // Update theme indicator
+    const themeIndicator = document.getElementById('themeIndicator');
+    const themeMenuIcon = document.getElementById('themeMenuIcon');
+    if (themeIndicator && themeMenuIcon) {
+      if (this.theme === 'dark') {
+        themeIndicator.textContent = 'Dark';
+        themeMenuIcon.textContent = '🌙';
+      } else {
+        themeIndicator.textContent = 'Light';
+        themeMenuIcon.textContent = '☀️';
+      }
+    }
+
+    // Update text size indicator
+    const textSizeIndicator = document.getElementById('textSizeIndicator');
+    if (textSizeIndicator) {
+      const sizeNames = {
+        'small': 'Small',
+        'medium': 'Medium',
+        'large': 'Large',
+        'xl': 'Extra Large'
+      };
+      textSizeIndicator.textContent = sizeNames[this.textSize] || 'Medium';
+    }
   }
 }
 
