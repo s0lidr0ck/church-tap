@@ -603,41 +603,46 @@
           <button id="addLinkBtn" class="btn-primary-modern">✨ Add New Link</button>
         </div>
 
-        <!-- Links List -->
-        <div id="linksListContainer" class="modern-card overflow-hidden">
-          <div id="emptyLinksState" class="text-center py-12">
-            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-              </svg>
-            </div>
-            <h3 class="text-lg font-medium text-gray-900 mb-2">No links yet</h3>
-            <p class="text-gray-500 mb-6">Add external links that your congregation can access from the main app</p>
-            <button id="addFirstLinkBtn" class="btn-primary-modern">✨ Add Your First Link</button>
+        <!-- Loading State -->
+        <div id="loadingLinksAdmin" class="text-center py-12 hidden">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <p class="mt-4 text-gray-600">Loading links...</p>
+        </div>
+
+        <!-- No Links Message -->
+        <div id="noLinksMessage" class="modern-card text-center py-12 hidden">
+          <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
           </div>
+          <h3 class="text-lg font-medium text-gray-900 mb-2">No links yet</h3>
+          <p class="text-gray-500 mb-6">Add external links that your congregation can access from the main app</p>
+          <button id="addFirstLinkBtn" class="btn-primary-modern">✨ Add Your First Link</button>
+        </div>
           
-          <div id="linksTable" class="hidden">
-            <div class="px-6 py-4 border-b border-gray-200">
-              <h3 class="text-lg font-medium text-gray-900">Manage Links</h3>
-              <p class="text-sm text-gray-500">Links will appear in the main app menu for your congregation</p>
-            </div>
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200 admin-table">
-                <thead>
-                  <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Title</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">URL</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Icon</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Order</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="linksTableBody" class="bg-white divide-y divide-gray-200">
-                  <!-- Links will be loaded here -->
-                </tbody>
-              </table>
-            </div>
+        <!-- Links Table Container -->
+        <div id="linksTableContainer" class="modern-card overflow-hidden hidden">
+          <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">Manage Links</h3>
+            <p class="text-sm text-gray-500">Links will appear in the main app menu for your congregation</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 admin-table">
+              <thead>
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Title</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">URL</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Icon</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Order</th>
+                  <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="linksTableBody" class="bg-white divide-y divide-gray-200">
+                <!-- Links will be loaded here -->
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
