@@ -153,10 +153,13 @@ class ChurchTapApp {
       this.showVerseInsightModal();
     });
 
-    // Authentication event listeners
-    document.getElementById('loginBtn').addEventListener('click', () => {
-      this.showLoginModal();
-    });
+    // Authentication event listeners (now in menu)
+    const loginBtn = document.getElementById('loginBtn');
+    if (loginBtn) {
+      loginBtn.addEventListener('click', () => {
+        this.showLoginModal();
+      });
+    }
 
     document.getElementById('loginMenuBtn').addEventListener('click', () => {
       this.showLoginModal();
@@ -2795,16 +2798,22 @@ class ChurchTapApp {
   }
 
   updateUIForLoggedInUser() {
-    // Show logged in elements
-    document.getElementById('loginBtn').classList.add('hidden');
-    document.getElementById('userMenuBtn').classList.remove('hidden');
-    document.getElementById('userMenuItems').classList.remove('hidden');
-    document.getElementById('guestMenuItems').classList.add('hidden');
+    // Show logged in elements (safely handle missing elements)
+    const loginBtn = document.getElementById('loginBtn');
+    const userMenuBtn = document.getElementById('userMenuBtn');
+    const userMenuItems = document.getElementById('userMenuItems');
+    const guestMenuItems = document.getElementById('guestMenuItems');
+    
+    if (loginBtn) loginBtn.classList.add('hidden');
+    if (userMenuBtn) userMenuBtn.classList.remove('hidden');
+    if (userMenuItems) userMenuItems.classList.remove('hidden');
+    if (guestMenuItems) guestMenuItems.classList.add('hidden');
 
     // Update user avatar with initials
     if (this.currentUser) {
       const initials = this.getUserInitials(this.currentUser);
-      document.getElementById('userAvatar').textContent = initials;
+      const userAvatar = document.getElementById('userAvatar');
+      if (userAvatar) userAvatar.textContent = initials;
     }
     
     // Update translation button labels with user preferences
@@ -2812,11 +2821,16 @@ class ChurchTapApp {
   }
 
   updateUIForLoggedOutUser() {
-    // Show logged out elements
-    document.getElementById('loginBtn').classList.remove('hidden');
-    document.getElementById('userMenuBtn').classList.add('hidden');
-    document.getElementById('userMenuItems').classList.add('hidden');
-    document.getElementById('guestMenuItems').classList.remove('hidden');
+    // Show logged out elements (safely handle missing elements)
+    const loginBtn = document.getElementById('loginBtn');
+    const userMenuBtn = document.getElementById('userMenuBtn');
+    const userMenuItems = document.getElementById('userMenuItems');
+    const guestMenuItems = document.getElementById('guestMenuItems');
+    
+    if (loginBtn) loginBtn.classList.remove('hidden');
+    if (userMenuBtn) userMenuBtn.classList.add('hidden');
+    if (userMenuItems) userMenuItems.classList.add('hidden');
+    if (guestMenuItems) guestMenuItems.classList.remove('hidden');
     
     this.currentUser = null;
   }
