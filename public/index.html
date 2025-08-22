@@ -58,14 +58,36 @@
           <h1 class="text-lg font-semibold text-gray-800 dark:text-white">Church Tap</h1>
         </div>
 
-        <!-- Menu Toggle -->
-        <button id="menuToggle" class="p-2 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-          </svg>
-        </button>
+        <!-- Header Controls -->
+        <div class="flex items-center space-x-2">
+          <!-- Links Menu Toggle -->
+          <button id="linksToggle" class="p-2 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+          </button>
+          
+          <!-- Main Menu Toggle -->
+          <button id="menuToggle" class="p-2 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+        </div>
       </div>
     </header>
+
+    <!-- Organization Links Menu -->
+    <div id="organizationLinksDropdown" class="hidden fixed top-16 right-16 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 min-w-48">
+      <div class="p-4">
+        <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+          Quick Links
+        </div>
+        <div id="organizationLinksDropdownList" class="space-y-1">
+          <!-- Organization links will be loaded here -->
+        </div>
+      </div>
+    </div>
 
     <!-- Quick Menu -->
     <div id="quickMenu" class="hidden fixed top-16 right-4 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 min-w-48">
@@ -112,16 +134,6 @@
             <button id="loginMenuBtnNew" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
               👤 Account / Login
             </button>
-          </div>
-        </div>
-        
-        <!-- Organization Links -->
-        <div id="organizationLinksMenu" class="border-t border-gray-200 dark:border-gray-600 pt-3">
-          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-3">
-            Quick Links
-          </div>
-          <div id="organizationLinksList">
-            <!-- Organization links will be loaded here -->
           </div>
         </div>
         

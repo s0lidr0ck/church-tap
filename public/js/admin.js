@@ -81,10 +81,11 @@ class AdminDashboard {
       e.preventDefault();
       this.showTab('links');
     });
-    document.getElementById('verseImportNav').addEventListener('click', (e) => {
-      e.preventDefault();
-      this.showTab('verseImport');
-    });
+    // Verse import nav removed from admin panel
+    // document.getElementById('verseImportNav').addEventListener('click', (e) => {
+    //   e.preventDefault();
+    //   this.showTab('verseImport');
+    // });
     document.getElementById('settingsNav').addEventListener('click', (e) => {
       e.preventDefault();
       this.showTab('settings');
@@ -538,7 +539,6 @@ class AdminDashboard {
       'community': 'Community Management',
       'users': 'User Management',
       'links': 'Organization Links',
-      'verseImport': 'Verse Import',
       'settings': 'Settings'
     };
     document.getElementById('pageTitle').textContent = titleMap[tabName] || 'Dashboard';
@@ -550,8 +550,6 @@ class AdminDashboard {
       this.loadCommunityData();
     } else if (tabName === 'links') {
       this.loadOrganizationLinks();
-    } else if (tabName === 'verseImport') {
-      this.loadVerseImportSettings();
     }
   }
 

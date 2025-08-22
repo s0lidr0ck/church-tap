@@ -97,6 +97,11 @@ class ChurchTapApp {
       this.toggleQuickMenu();
     });
 
+    // Links dropdown toggle
+    document.getElementById('linksToggle').addEventListener('click', () => {
+      this.toggleLinksDropdown();
+    });
+
     // Main action buttons
     document.getElementById('randomVerseBtn').addEventListener('click', () => {
       this.showRandomVerse();
@@ -181,12 +186,21 @@ class ChurchTapApp {
       this.toggleQuickMenu();
     });
 
-    // Close menu when clicking outside
+    // Close menus when clicking outside
     document.addEventListener('click', (e) => {
       const menu = document.getElementById('quickMenu');
       const toggle = document.getElementById('menuToggle');
+      const linksDropdown = document.getElementById('organizationLinksDropdown');
+      const linksToggle = document.getElementById('linksToggle');
+      
+      // Close quick menu
       if (!menu.contains(e.target) && !toggle.contains(e.target)) {
         menu.classList.add('hidden');
+      }
+      
+      // Close links dropdown
+      if (linksDropdown && linksToggle && !linksDropdown.contains(e.target) && !linksToggle.contains(e.target)) {
+        linksDropdown.classList.add('hidden');
       }
     });
 
@@ -671,6 +685,16 @@ class ChurchTapApp {
   toggleQuickMenu() {
     const menu = document.getElementById('quickMenu');
     menu.classList.toggle('hidden');
+  }
+
+  toggleLinksDropdown() {
+    const dropdown = document.getElementById('organizationLinksDropdown');
+    dropdown.classList.toggle('hidden');
+  }
+
+  closeLinksDropdown() {
+    const dropdown = document.getElementById('organizationLinksDropdown');
+    dropdown.classList.add('hidden');
   }
 
   async toggleHeart() {
@@ -3626,17 +3650,17 @@ class ChurchTapApp {
   }
 
   displayOrganizationLinks(links) {
-    const linksContainer = document.getElementById('organizationLinksList');
-    const linksMenu = document.getElementById('organizationLinksMenu');
+    const linksContainer = document.getElementById('organizationLinksDropdownList');
+    const linksToggle = document.getElementById('linksToggle');
     
     console.log('DisplayOrganizationLinks called with:', links);
     console.log('Links container found:', !!linksContainer);
-    console.log('Links menu found:', !!linksMenu);
+    console.log('Links toggle found:', !!linksToggle);
     
     if (!linksContainer || !links || links.length === 0) {
-      console.log('Hiding links menu - no links or container missing');
-      if (linksMenu) {
-        linksMenu.style.display = 'none';
+      console.log('Hiding links toggle - no links or container missing');
+      if (linksToggle) {
+        linksToggle.style.display = 'none';
       }
       return;
     }
@@ -3662,14 +3686,17 @@ class ChurchTapApp {
     };
 
     linksContainer.innerHTML = links.map(link => `
-      <button onclick="window.open('${link.url}', '_blank')" 
+      <button onclick="window.open('${link.url}', '_blank'); app.closeLinksDropdown();" 
               class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center space-x-2">
         <span>${iconMap[link.icon] || '🌐'}</span>
         <span class="truncate">${link.title}</span>
       </button>
     `).join('');
     
-    linksMenu.style.display = 'block';
+    // Show the links toggle button
+    if (linksToggle) {
+      linksToggle.style.display = 'block';
+    }
   }
 
   // Update menu indicators for theme and text size

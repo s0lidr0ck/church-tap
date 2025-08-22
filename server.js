@@ -133,9 +133,9 @@ const resolveOrganization = (req, res, next) => {
     }
   }
 
-  // Fast-path for localhost/dev: default to organization 1
+  // Fast-path for localhost/dev: default to organization 3 for development
   if (!subdomainCandidate && (host === 'localhost' || host === '127.0.0.1' || host === '::1')) {
-    req.organizationId = 1;
+    req.organizationId = 3;
     return next();
   }
 
@@ -1508,7 +1508,7 @@ app.get('/api/organization/links', (req, res) => {
   
   dbQuery.all(
     `SELECT id, title, url, icon, sort_order 
-     FROM CT_organization_links 
+     FROM ct_organization_links 
      WHERE organization_id = $1 AND is_active = true 
      ORDER BY sort_order ASC, title ASC`,
     [orgId],
@@ -1525,7 +1525,7 @@ app.get('/api/organization/links', (req, res) => {
 // Admin: Get all organization links
 app.get('/api/admin/organization/links', requireOrgAuth, (req, res) => {
   dbQuery.all(
-    `SELECT * FROM CT_organization_links 
+    `SELECT * FROM ct_organization_links 
      WHERE organization_id = $1 
      ORDER BY sort_order ASC, title ASC`,
     [req.organizationId],
@@ -1548,7 +1548,7 @@ app.post('/api/admin/organization/links', requireOrgAuth, (req, res) => {
   }
   
   dbQuery.run(
-    `INSERT INTO CT_organization_links (organization_id, title, url, icon, sort_order) 
+    `INSERT INTO ct_organization_links (organization_id, title, url, icon, sort_order) 
      VALUES (?, ?, ?, ?, ?)`,
     [req.organizationId, title, url, icon || 'website', sort_order || 0],
     function(err) {
@@ -1583,7 +1583,7 @@ app.put('/api/admin/organization/links/:id', requireOrgAuth, (req, res) => {
   }
   
   dbQuery.run(
-    `UPDATE CT_organization_links 
+    `UPDATE ct_organization_links 
      SET title = $1, url = $2, icon = $3, sort_order = $4, is_active = $5
      WHERE id = $6 AND organization_id = $7`,
     [title, url, icon || 'website', sort_order || 0, is_active !== undefined ? is_active : true, id, req.organizationId],
@@ -1607,7 +1607,7 @@ app.delete('/api/admin/organization/links/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   
   dbQuery.run(
-    `DELETE FROM CT_organization_links 
+    `DELETE FROM ct_organization_links 
      WHERE id = $1 AND organization_id = $2`,
     [id, req.organizationId],
     function(err) {
@@ -3244,6 +3244,455 @@ app.post('/api/master/organizations/:id/admins', requireMasterAuth, async (req, 
         return res.status(500).json({ success: false, error: 'Failed to process password' });
       }
     });
+  });
+});
+
+// =============================
+// NFC TAG MANAGEMENT ENDPOINTS
+// =============================
+
+// Get all NFC tags (with optional filters)
+app.get('/api/master/nfc-tags', requireMasterAuth, (req, res) => {
+  const { status, organization_id, batch_name } = req.query;
+  
+  let sql = `
+    SELECT nt.*, o.name as organization_name, o.subdomain, au.username as assigned_by_username
+    FROM ct_nfc_tags nt
+    LEFT JOIN ct_organizations o ON nt.organization_id = o.id
+    LEFT JOIN ct_admin_users au ON nt.assigned_by = au.id
+    WHERE 1=1
+  `;
+  const params = [];
+  let paramIndex = 1;
+  
+  if (status) {
+    sql += ` AND nt.status = $${paramIndex++}`;
+    params.push(status);
+  }
+  
+  if (organization_id) {
+    sql += ` AND nt.organization_id = $${paramIndex++}`;
+    params.push(organization_id);
+  }
+  
+  if (batch_name) {
+    sql += ` AND nt.batch_name = $${paramIndex++}`;
+    params.push(batch_name);
+  }
+  
+  sql += ` ORDER BY nt.created_at DESC`;
+  
+  db.query(sql, params, (err, result) => {
+    if (err) {
+      console.error('Error fetching NFC tags:', err);
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    res.json({ success: true, tags: result.rows || [] });
+  });
+});
+
+// Create new NFC tag
+app.post('/api/master/nfc-tags', requireMasterAuth, (req, res) => {
+  const { custom_id, batch_name, notes } = req.body;
+  
+  if (!custom_id) {
+    return res.status(400).json({ success: false, error: 'Custom ID is required' });
+  }
+  
+  db.query(`
+    INSERT INTO ct_nfc_tags (custom_id, batch_name, notes, assigned_by, status)
+    VALUES ($1, $2, $3, $4, 'available')
+    RETURNING id
+  `, [custom_id, batch_name || null, notes || null, req.session.masterAdminId], 
+  (err, result) => {
+    if (err) {
+      if (err.code === '23505') { // Unique constraint in PostgreSQL
+        return res.status(400).json({ success: false, error: 'Custom ID already exists' });
+      }
+      console.error('Create NFC tag error:', err);
+      return res.status(500).json({ success: false, error: 'Failed to create NFC tag' });
+    }
+    
+    res.json({ success: true, tag_id: result.rows[0].id });
+  });
+});
+
+// Bulk create NFC tags
+app.post('/api/master/nfc-tags/bulk', requireMasterAuth, (req, res) => {
+  const { batch_name, count, prefix, notes } = req.body;
+  
+  if (!batch_name || !count || count <= 0 || count > 1000) {
+    return res.status(400).json({ success: false, error: 'Valid batch name and count (1-1000) are required' });
+  }
+  
+  // Create the VALUES clause for bulk insert
+  const values = [];
+  const params = [];
+  let paramIndex = 1;
+  
+  for (let i = 1; i <= count; i++) {
+    const paddedNum = i.toString().padStart(3, '0');
+    const custom_id = `${prefix || batch_name}-${paddedNum}`;
+    
+    values.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, 'available')`);
+    params.push(custom_id, batch_name, notes || null, req.session.masterAdminId);
+  }
+  
+  db.query(`
+    INSERT INTO ct_nfc_tags (custom_id, batch_name, notes, assigned_by, status)
+    VALUES ${values.join(', ')}
+  `, params, (err, result) => {
+    if (err) {
+      console.error('Bulk insert error:', err);
+      return res.status(500).json({ success: false, error: 'Failed to create NFC tags' });
+    }
+    
+    res.json({ success: true, created_count: count });
+  });
+});
+
+// Assign NFC tag to organization
+app.put('/api/master/nfc-tags/:id/assign', requireMasterAuth, (req, res) => {
+  const { id } = req.params;
+  const { organization_id, nfc_id } = req.body;
+  
+  if (!organization_id) {
+    return res.status(400).json({ success: false, error: 'Organization ID is required' });
+  }
+  
+  // Verify organization exists and get subdomain and tag custom_id for URL generation
+  db.query(`SELECT id, subdomain FROM ct_organizations WHERE id = $1`, [organization_id], (err, orgResult) => {
+    if (err) {
+      console.error('Organization check error:', err);
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    if (orgResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Organization not found' });
+    }
+    
+    const organization = orgResult.rows[0];
+    
+    // Get the tag's custom_id for URL generation
+    db.query(`SELECT custom_id FROM ct_nfc_tags WHERE id = $1`, [id], (err, tagResult) => {
+      if (err) {
+        console.error('Tag lookup error:', err);
+        return res.status(500).json({ success: false, error: 'Database error' });
+      }
+      if (tagResult.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'NFC tag not found' });
+      }
+      
+      const tag = tagResult.rows[0];
+      
+      // Generate NFC ID in format: ?org=subdomain&tag_id=custom_id (unless custom nfc_id provided)
+      const finalNfcId = nfc_id || `?org=${organization.subdomain}&tag_id=${tag.custom_id}`;
+      
+      // Update the NFC tag
+      db.query(`
+        UPDATE ct_nfc_tags SET 
+          organization_id = $1, 
+          nfc_id = $2, 
+          status = 'assigned',
+          assigned_by = $3,
+        assigned_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $4 AND status IN ('available', 'inactive')
+    `, [organization_id, finalNfcId, req.session.masterAdminId, id], 
+    (err, result) => {
+      if (err) {
+        console.error('Assign NFC tag error:', err);
+        return res.status(500).json({ success: false, error: 'Failed to assign NFC tag' });
+      }
+      
+      if (result.rowCount === 0) {
+        return res.status(404).json({ success: false, error: 'NFC tag not found or cannot be assigned' });
+      }
+      
+      res.json({ success: true });
+    });
+    });
+  });
+});
+
+// Bulk assign NFC tags to organization
+app.put('/api/master/nfc-tags/bulk-assign', requireMasterAuth, (req, res) => {
+  const { organization_id, batch_name, count } = req.body;
+  
+  if (!organization_id || !count || count <= 0 || count > 100) {
+    return res.status(400).json({ success: false, error: 'Valid organization ID and count (1-100) are required' });
+  }
+  
+  // Verify organization exists and get subdomain for URL generation
+  db.query(`SELECT id, subdomain FROM ct_organizations WHERE id = $1`, [organization_id], (err, orgResult) => {
+    if (err) {
+      console.error('Organization check error:', err);
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    if (orgResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Organization not found' });
+    }
+    
+    const organization = orgResult.rows[0];
+    
+    // Get available tags for bulk assignment
+    let availableTagsQuery = `
+      SELECT id, custom_id FROM ct_nfc_tags 
+      WHERE status = 'available' 
+      AND organization_id IS NULL
+    `;
+    const queryParams = [];
+    
+    if (batch_name) {
+      availableTagsQuery += ` AND batch_name = $1`;
+      queryParams.push(batch_name);
+    }
+    
+    availableTagsQuery += ` ORDER BY created_at ASC LIMIT $${queryParams.length + 1}`;
+    queryParams.push(count);
+    
+    db.query(availableTagsQuery, queryParams, (err, tagsResult) => {
+      if (err) {
+        console.error('Available tags query error:', err);
+        return res.status(500).json({ success: false, error: 'Database error' });
+      }
+      
+      if (tagsResult.rows.length === 0) {
+        return res.status(400).json({ success: false, error: 'No available tags found' });
+      }
+      
+      if (tagsResult.rows.length < count) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `Only ${tagsResult.rows.length} tags available (requested ${count})` 
+        });
+      }
+      
+      // Bulk assign the tags and generate NFC IDs
+      const tagIds = tagsResult.rows.map(tag => tag.id);
+      const nfcUpdates = tagsResult.rows.map(tag => {
+        // Generate NFC ID in format: ?org=subdomain&tag_id=custom_id
+        const nfcId = `?org=${organization.subdomain}&tag_id=${tag.custom_id}`;
+        return { id: tag.id, nfc_id: nfcId };
+      });
+      
+      // Update all tags in a transaction
+      db.query('BEGIN', (err) => {
+        if (err) {
+          console.error('Transaction begin error:', err);
+          return res.status(500).json({ success: false, error: 'Database error' });
+        }
+        
+        // Build the update query for all tags
+        const updatePromises = nfcUpdates.map(update => {
+          return new Promise((resolve, reject) => {
+            db.query(`
+              UPDATE ct_nfc_tags SET 
+                organization_id = $1,
+                nfc_id = $2,
+                status = 'assigned',
+                assigned_by = $3,
+                assigned_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+              WHERE id = $4
+            `, [organization_id, update.nfc_id, req.session.masterAdminId, update.id], 
+            (err, result) => {
+              if (err) reject(err);
+              else resolve(result);
+            });
+          });
+        });
+        
+        Promise.all(updatePromises)
+          .then(() => {
+            db.query('COMMIT', (err) => {
+              if (err) {
+                console.error('Transaction commit error:', err);
+                return res.status(500).json({ success: false, error: 'Database error' });
+              }
+              
+              res.json({ 
+                success: true, 
+                assigned_count: nfcUpdates.length,
+                assigned_tags: nfcUpdates.map(u => ({ id: u.id, nfc_id: u.nfc_id }))
+              });
+            });
+          })
+          .catch((error) => {
+            console.error('Bulk assignment error:', error);
+            db.query('ROLLBACK', () => {
+              res.status(500).json({ success: false, error: 'Failed to assign tags' });
+            });
+          });
+      });
+    });
+  });
+});
+
+// Update NFC tag status
+app.put('/api/master/nfc-tags/:id/status', requireMasterAuth, (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  
+  const validStatuses = ['available', 'assigned', 'active', 'inactive', 'lost'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ success: false, error: 'Invalid status' });
+  }
+  
+  db.query(`
+    UPDATE ct_nfc_tags SET 
+      status = $1,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = $2
+  `, [status, id], 
+  (err, result) => {
+    if (err) {
+      console.error('Update NFC tag status error:', err);
+      return res.status(500).json({ success: false, error: 'Failed to update NFC tag status' });
+    }
+    
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, error: 'NFC tag not found' });
+    }
+    
+    res.json({ success: true });
+  });
+});
+
+// Record NFC tag scan
+app.post('/api/nfc-tags/scan/:custom_id', (req, res) => {
+  const { custom_id } = req.params;
+  
+  db.query(`
+    UPDATE ct_nfc_tags SET 
+      last_scanned_at = CURRENT_TIMESTAMP,
+      scan_count = scan_count + 1,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE custom_id = $1
+  `, [custom_id], 
+  (err, result) => {
+    if (err) {
+      console.error('Error recording NFC scan:', err);
+      return res.status(500).json({ success: false, error: 'Failed to record scan' });
+    }
+    
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, error: 'NFC tag not found' });
+    }
+    
+    // Get tag info including organization details
+    db.query(`
+      SELECT nt.*, o.subdomain, o.custom_domain
+      FROM ct_nfc_tags nt
+      LEFT JOIN ct_organizations o ON nt.organization_id = o.id
+      WHERE nt.custom_id = $1
+    `, [custom_id], (err, tagResult) => {
+      if (err || tagResult.rows.length === 0) {
+        return res.json({ success: true }); // Still record the scan even if we can't get details
+      }
+      
+      const tag = tagResult.rows[0];
+      // Return redirect information if assigned to an organization
+      if (tag.organization_id && tag.subdomain) {
+        const baseUrl = tag.custom_domain || `${tag.subdomain}.churchtap.app`;
+        return res.json({ 
+          success: true, 
+          redirect_url: `https://${baseUrl}`,
+          organization: tag.subdomain
+        });
+      }
+      
+      res.json({ success: true });
+    });
+  });
+});
+
+// Handle NFC tag scan with organization fallback
+// This handles URLs in format: /?org=subdomain&tag_id=custom_id
+app.get('/', (req, res) => {
+  const { org, tag_id } = req.query;
+  
+  // If this is an NFC tag scan request
+  if (org && tag_id) {
+    // First record the scan
+    db.query(`
+      UPDATE ct_nfc_tags SET 
+        last_scanned_at = CURRENT_TIMESTAMP,
+        scan_count = scan_count + 1,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE custom_id = $1
+    `, [tag_id], (err, result) => {
+      if (err) {
+        console.error('Error recording NFC scan:', err);
+      }
+    });
+    
+    // Try to find organization by subdomain
+    db.query(`
+      SELECT id, subdomain, custom_domain, name
+      FROM ct_organizations 
+      WHERE subdomain = $1 AND is_active = TRUE
+    `, [org], (err, orgResult) => {
+      if (err) {
+        console.error('Error finding organization:', err);
+        return res.status(500).send('Internal server error');
+      }
+      
+      if (orgResult.rows.length === 0) {
+        // Organization not found - could redirect to a default page
+        return res.status(404).send('Organization not found');
+      }
+      
+      const organization = orgResult.rows[0];
+      
+      // Check if organization has a custom domain
+      if (organization.custom_domain) {
+        // Redirect to custom domain
+        return res.redirect(`https://${organization.custom_domain}?tag_id=${tag_id}`);
+      } else {
+        // Redirect to subdomain
+        const domain = process.env.DOMAIN || 'churchtap.app';
+        return res.redirect(`https://${organization.subdomain}.${domain}?tag_id=${tag_id}`);
+      }
+    });
+  } else {
+    // Regular homepage request - serve the main landing page
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  }
+});
+
+// Delete NFC tag
+app.delete('/api/master/nfc-tags/:id', requireMasterAuth, (req, res) => {
+  const { id } = req.params;
+  
+  db.query(`DELETE FROM ct_nfc_tags WHERE id = $1`, [id], (err, result) => {
+    if (err) {
+      console.error('Delete NFC tag error:', err);
+      return res.status(500).json({ success: false, error: 'Failed to delete NFC tag' });
+    }
+    
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, error: 'NFC tag not found' });
+    }
+    
+    res.json({ success: true });
+  });
+});
+
+// Get available batch names
+app.get('/api/master/nfc-tags/batches', requireMasterAuth, (req, res) => {
+  db.query(`
+    SELECT batch_name, COUNT(*) as tag_count, 
+           SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) as available_count
+    FROM ct_nfc_tags 
+    WHERE batch_name IS NOT NULL 
+    GROUP BY batch_name 
+    ORDER BY batch_name
+  `, [], (err, result) => {
+    if (err) {
+      console.error('Get batch names error:', err);
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    res.json({ success: true, batches: result.rows || [] });
   });
 });
 
