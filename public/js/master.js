@@ -173,6 +173,10 @@ class MasterPortal {
       e.preventDefault();
       this.showMasterTab('system');
     });
+    document.getElementById('nfcTagsMasterNav').addEventListener('click', (e) => {
+      e.preventDefault();
+      this.showMasterTab('nfcTags');
+    });
 
     // Menu text theme toggle
     const menuToggle = document.getElementById('menuThemeToggle');
@@ -232,6 +236,84 @@ class MasterPortal {
         .replace(/\s+/g, '-')
         .substring(0, 20);
       document.getElementById('organizationSubdomain').value = subdomain;
+    });
+
+    // NFC Tag Management
+    document.getElementById('addNFCTagBtn').addEventListener('click', () => {
+      this.showNFCTagModal();
+    });
+
+    document.getElementById('bulkCreateTagsBtn').addEventListener('click', () => {
+      this.showBulkNFCTagModal();
+    });
+
+    document.getElementById('bulkAssignTagsBtn').addEventListener('click', () => {
+      this.showBulkAssignNFCTagModal();
+    });
+
+    // NFC Tag modals
+    document.getElementById('cancelNFCTagModal').addEventListener('click', () => {
+      this.hideNFCTagModal();
+    });
+
+    document.getElementById('cancelBulkNFCTagModal').addEventListener('click', () => {
+      this.hideBulkNFCTagModal();
+    });
+
+    document.getElementById('cancelAssignNFCTagModal').addEventListener('click', () => {
+      this.hideAssignNFCTagModal();
+    });
+
+    document.getElementById('cancelNFCWriteModal').addEventListener('click', () => {
+      this.hideNFCWriteModal();
+    });
+
+    document.getElementById('cancelBulkAssignNFCTagModal').addEventListener('click', () => {
+      this.hideBulkAssignNFCTagModal();
+    });
+
+    // NFC Tag forms
+    document.getElementById('nfcTagForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.handleNFCTagSubmit();
+    });
+
+    document.getElementById('bulkNFCTagForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.handleBulkNFCTagSubmit();
+    });
+
+    document.getElementById('assignNFCTagForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.handleAssignNFCTagSubmit();
+    });
+
+    document.getElementById('bulkAssignNFCTagForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.handleBulkAssignNFCTagSubmit();
+    });
+
+    // NFC Tag search and filters
+    document.getElementById('nfcTagSearch').addEventListener('input', () => {
+      this.filterNFCTags();
+    });
+
+    document.getElementById('nfcTagStatusFilter').addEventListener('change', () => {
+      this.filterNFCTags();
+    });
+
+    document.getElementById('nfcTagBatchFilter').addEventListener('change', () => {
+      this.filterNFCTags();
+    });
+
+    // Bulk preview update
+    document.getElementById('bulkBatchName').addEventListener('input', this.updateBulkPreview.bind(this));
+    document.getElementById('bulkTagPrefix').addEventListener('input', this.updateBulkPreview.bind(this));
+    document.getElementById('bulkTagCount').addEventListener('input', this.updateBulkPreview.bind(this));
+
+    // NFC Write functionality
+    document.getElementById('startNFCWrite').addEventListener('click', () => {
+      this.startNFCWrite();
     });
   }
 
@@ -359,6 +441,7 @@ class MasterPortal {
     const titleMap = {
       'dashboard': '🚀 Master Dashboard',
       'organizations': '🏢 Organizations',
+      'nfcTags': '🏷️ NFC Tags',
       'billing': '💳 Billing & Plans', 
       'analytics': '📈 Global Analytics',
       'support': '🎧 Support',
@@ -372,6 +455,9 @@ class MasterPortal {
     // Load data for specific tabs
     if (tabName === 'organizations') {
       this.loadOrganizations();
+    } else if (tabName === 'nfcTags') {
+      this.loadNFCTags();
+      this.loadNFCTagBatches();
     } else if (tabName === 'analytics') {
       this.loadGlobalAnalytics();
     }
@@ -875,6 +961,560 @@ class MasterPortal {
         toast.remove();
       }
     }, 5000);
+  }
+
+  // ============================
+  // NFC TAG MANAGEMENT METHODS
+  // ============================
+
+  async loadNFCTags() {
+    try {
+      const response = await fetch('/api/master/nfc-tags');
+      const data = await response.json();
+
+      if (data.success) {
+        this.nfcTags = data.tags;
+        this.renderNFCTags();
+        this.updateNFCTagStatistics();
+      }
+    } catch (error) {
+      console.error('Error loading NFC tags:', error);
+    }
+  }
+
+  async loadNFCTagBatches() {
+    try {
+      const response = await fetch('/api/master/nfc-tags/batches');
+      const data = await response.json();
+
+      if (data.success) {
+        const batchFilter = document.getElementById('nfcTagBatchFilter');
+        // Clear existing options except first
+        batchFilter.innerHTML = '<option value="">All Batches</option>';
+        
+        data.batches.forEach(batch => {
+          const option = document.createElement('option');
+          option.value = batch.batch_name;
+          option.textContent = `${batch.batch_name} (${batch.available_count}/${batch.tag_count})`;
+          batchFilter.appendChild(option);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading NFC tag batches:', error);
+    }
+  }
+
+  updateNFCTagStatistics() {
+    const total = this.nfcTags.length;
+    const available = this.nfcTags.filter(tag => tag.status === 'available').length;
+    const assigned = this.nfcTags.filter(tag => tag.status === 'assigned').length;
+    const active = this.nfcTags.filter(tag => tag.status === 'active').length;
+
+    document.getElementById('totalNFCTags').textContent = total.toLocaleString();
+    document.getElementById('availableNFCTags').textContent = available.toLocaleString();
+    document.getElementById('assignedNFCTags').textContent = assigned.toLocaleString();
+    document.getElementById('activeNFCTags').textContent = active.toLocaleString();
+  }
+
+  renderNFCTags() {
+    const container = document.getElementById('nfcTagsTable');
+    
+    if (!this.nfcTags || this.nfcTags.length === 0) {
+      container.innerHTML = `
+        <tr>
+          <td colspan="8" class="text-center py-8 text-gray-500">
+            No NFC tags yet. Create your first batch!
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    container.innerHTML = this.nfcTags.map(tag => `
+      <tr class="hover:bg-gray-50">
+        <td class="px-6 py-4 whitespace-nowrap">
+          <div class="flex items-center">
+            <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+              <span class="text-blue-600 text-sm">🏷️</span>
+            </div>
+            <div>
+              <div class="text-sm font-medium text-gray-900">${tag.custom_id}</div>
+              ${tag.nfc_id ? `<div class="text-xs text-gray-500">${tag.nfc_id}</div>` : ''}
+            </div>
+          </div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${tag.batch_name || '—'}</td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          ${tag.organization_name ? 
+            `<div class="text-sm text-gray-900">${tag.organization_name}</div>
+             <div class="text-xs text-gray-500">${tag.subdomain}</div>` 
+            : '<span class="text-sm text-gray-500">—</span>'}
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${this.getNFCTagStatusBadgeClass(tag.status)}">
+            ${tag.status.charAt(0).toUpperCase() + tag.status.slice(1)}
+          </span>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${tag.scan_count || 0}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${tag.last_scanned_at ? this.formatDate(tag.last_scanned_at) : '—'}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${tag.assigned_at ? this.formatDate(tag.assigned_at) : '—'}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+          <div class="flex items-center justify-end space-x-2">
+            ${tag.status === 'available' ? `
+              <button onclick="masterPortal.assignNFCTag(${tag.id})" class="text-blue-600 hover:text-blue-900">Assign</button>
+            ` : ''}
+            ${tag.status === 'assigned' && tag.organization_name ? `
+              <button onclick="masterPortal.writeNFCTag(${tag.id})" class="text-green-600 hover:text-green-900">Write</button>
+            ` : ''}
+            <button onclick="masterPortal.editNFCTagStatus(${tag.id})" class="text-indigo-600 hover:text-indigo-900">Status</button>
+            <button onclick="masterPortal.deleteNFCTag(${tag.id})" class="text-red-600 hover:text-red-900">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  getNFCTagStatusBadgeClass(status) {
+    const classes = {
+      'available': 'bg-green-100 text-green-800',
+      'assigned': 'bg-blue-100 text-blue-800',
+      'active': 'bg-purple-100 text-purple-800',
+      'inactive': 'bg-gray-100 text-gray-800',
+      'lost': 'bg-red-100 text-red-800'
+    };
+    return classes[status] || 'bg-gray-100 text-gray-800';
+  }
+
+  filterNFCTags() {
+    const search = document.getElementById('nfcTagSearch').value.toLowerCase();
+    const statusFilter = document.getElementById('nfcTagStatusFilter').value;
+    const batchFilter = document.getElementById('nfcTagBatchFilter').value;
+    
+    const filtered = this.nfcTags.filter(tag => {
+      const matchesSearch = tag.custom_id.toLowerCase().includes(search) || 
+                           (tag.organization_name || '').toLowerCase().includes(search) ||
+                           (tag.batch_name || '').toLowerCase().includes(search);
+      const matchesStatus = !statusFilter || tag.status === statusFilter;
+      const matchesBatch = !batchFilter || tag.batch_name === batchFilter;
+      
+      return matchesSearch && matchesStatus && matchesBatch;
+    });
+
+    // Temporarily update tags for rendering
+    const originalTags = this.nfcTags;
+    this.nfcTags = filtered;
+    this.renderNFCTags();
+    this.nfcTags = originalTags;
+  }
+
+  showNFCTagModal() {
+    document.getElementById('nfcTagModal').classList.remove('hidden');
+    document.getElementById('nfcTagForm').reset();
+  }
+
+  hideNFCTagModal() {
+    document.getElementById('nfcTagModal').classList.add('hidden');
+  }
+
+  showBulkNFCTagModal() {
+    document.getElementById('bulkNFCTagModal').classList.remove('hidden');
+    document.getElementById('bulkNFCTagForm').reset();
+    this.updateBulkPreview();
+  }
+
+  hideBulkNFCTagModal() {
+    document.getElementById('bulkNFCTagModal').classList.add('hidden');
+  }
+
+  updateBulkPreview() {
+    const batchName = document.getElementById('bulkBatchName').value || 'BATCH2024-01';
+    const prefix = document.getElementById('bulkTagPrefix').value;
+    const count = document.getElementById('bulkTagCount').value || 50;
+    
+    const baseId = prefix || batchName;
+    const previewText = count > 1 ? 
+      `${baseId}-001, ${baseId}-002, ... ${baseId}-${count.toString().padStart(3, '0')}` :
+      `${baseId}-001`;
+    
+    document.getElementById('bulkPreview').textContent = previewText;
+  }
+
+  async handleNFCTagSubmit() {
+    const formData = {
+      custom_id: document.getElementById('nfcTagCustomId').value,
+      batch_name: document.getElementById('nfcTagBatchName').value,
+      notes: document.getElementById('nfcTagNotes').value
+    };
+
+    try {
+      const response = await fetch('/api/master/nfc-tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.hideNFCTagModal();
+        this.loadNFCTags();
+        this.loadNFCTagBatches();
+        this.showToast('NFC tag created successfully!');
+      } else {
+        this.showToast(data.error || 'Failed to create NFC tag', 'error');
+      }
+    } catch (error) {
+      console.error('Error creating NFC tag:', error);
+      this.showToast('Connection error', 'error');
+    }
+  }
+
+  async handleBulkNFCTagSubmit() {
+    const formData = {
+      batch_name: document.getElementById('bulkBatchName').value,
+      count: parseInt(document.getElementById('bulkTagCount').value),
+      prefix: document.getElementById('bulkTagPrefix').value,
+      notes: document.getElementById('bulkTagNotes').value
+    };
+
+    try {
+      const response = await fetch('/api/master/nfc-tags/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.hideBulkNFCTagModal();
+        this.loadNFCTags();
+        this.loadNFCTagBatches();
+        this.showToast(`${data.created_count} NFC tags created successfully!`);
+      } else {
+        this.showToast(data.error || 'Failed to create NFC tags', 'error');
+      }
+    } catch (error) {
+      console.error('Error creating bulk NFC tags:', error);
+      this.showToast('Connection error', 'error');
+    }
+  }
+
+  assignNFCTag(tagId) {
+    const tag = this.nfcTags.find(t => t.id === tagId);
+    if (!tag) return;
+
+    // Load organizations for the select dropdown
+    this.loadOrganizationsForAssignment();
+
+    document.getElementById('assignTagId').value = tagId;
+    document.getElementById('assignTagCustomId').textContent = tag.custom_id;
+    document.getElementById('assignNFCId').value = '';
+    
+    document.getElementById('assignNFCTagModal').classList.remove('hidden');
+  }
+
+  async loadOrganizationsForAssignment() {
+    try {
+      const response = await fetch('/api/master/organizations');
+      const data = await response.json();
+
+      if (data.success) {
+        const select = document.getElementById('assignOrganization');
+        select.innerHTML = '<option value="">Select Organization...</option>';
+        
+        data.organizations.forEach(org => {
+          const option = document.createElement('option');
+          option.value = org.id;
+          option.textContent = `${org.name} (${org.subdomain})`;
+          select.appendChild(option);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading organizations:', error);
+    }
+  }
+
+  hideAssignNFCTagModal() {
+    document.getElementById('assignNFCTagModal').classList.add('hidden');
+  }
+
+  async handleAssignNFCTagSubmit() {
+    const tagId = document.getElementById('assignTagId').value;
+    const organizationId = document.getElementById('assignOrganization').value;
+    const nfcId = document.getElementById('assignNFCId').value;
+
+    try {
+      const response = await fetch(`/api/master/nfc-tags/${tagId}/assign`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organization_id: organizationId, nfc_id: nfcId })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.hideAssignNFCTagModal();
+        this.loadNFCTags();
+        this.showToast('NFC tag assigned successfully!');
+      } else {
+        this.showToast(data.error || 'Failed to assign NFC tag', 'error');
+      }
+    } catch (error) {
+      console.error('Error assigning NFC tag:', error);
+      this.showToast('Connection error', 'error');
+    }
+  }
+
+  writeNFCTag(tagId) {
+    const tag = this.nfcTags.find(t => t.id === tagId);
+    if (!tag) return;
+
+    document.getElementById('writeTagCustomId').textContent = tag.custom_id;
+    document.getElementById('writeTagOrganization').textContent = tag.organization_name;
+    
+    // Reset modal state
+    document.getElementById('nfcWriteReady').classList.remove('hidden');
+    document.getElementById('nfcWriteProgress').classList.add('hidden');
+    document.getElementById('nfcWriteSuccess').classList.add('hidden');
+    document.getElementById('nfcWriteError').classList.add('hidden');
+    
+    this.currentWriteTag = tag;
+    document.getElementById('nfcWriteModal').classList.remove('hidden');
+  }
+
+  hideNFCWriteModal() {
+    document.getElementById('nfcWriteModal').classList.add('hidden');
+    this.currentWriteTag = null;
+  }
+
+  async startNFCWrite() {
+    if (!this.currentWriteTag) return;
+    
+    // Check for NFC support
+    if (!('NDEFWriter' in window)) {
+      this.showNFCWriteError('NFC writing not supported on this device');
+      return;
+    }
+
+    try {
+      // Show progress
+      document.getElementById('nfcWriteReady').classList.add('hidden');
+      document.getElementById('nfcWriteProgress').classList.remove('hidden');
+
+      const ndef = new NDEFWriter();
+      
+      // Create the URL to write
+      const orgUrl = this.currentWriteTag.custom_domain || 
+                     `${this.currentWriteTag.subdomain}.churchtap.app`;
+      const fullUrl = `https://${orgUrl}`;
+      
+      await ndef.write({
+        records: [{
+          recordType: "url",
+          data: fullUrl
+        }]
+      });
+
+      // Update tag status to active
+      await this.updateNFCTagStatus(this.currentWriteTag.id, 'active');
+      
+      // Show success
+      document.getElementById('nfcWriteProgress').classList.add('hidden');
+      document.getElementById('nfcWriteSuccess').classList.remove('hidden');
+      
+      this.loadNFCTags(); // Refresh the list
+      
+    } catch (error) {
+      console.error('NFC write error:', error);
+      this.showNFCWriteError(error.message || 'Failed to write to NFC tag');
+    }
+  }
+
+  showNFCWriteError(message) {
+    document.getElementById('nfcWriteReady').classList.add('hidden');
+    document.getElementById('nfcWriteProgress').classList.add('hidden');
+    document.getElementById('nfcWriteError').classList.remove('hidden');
+    document.getElementById('nfcWriteErrorMessage').textContent = message;
+  }
+
+  async updateNFCTagStatus(tagId, status) {
+    try {
+      const response = await fetch(`/api/master/nfc-tags/${tagId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating NFC tag status:', error);
+      return { success: false, error: 'Connection error' };
+    }
+  }
+
+  editNFCTagStatus(tagId) {
+    const tag = this.nfcTags.find(t => t.id === tagId);
+    if (!tag) return;
+
+    const statuses = ['available', 'assigned', 'active', 'inactive', 'lost'];
+    const currentIndex = statuses.indexOf(tag.status);
+    const nextIndex = (currentIndex + 1) % statuses.length;
+    const newStatus = statuses[nextIndex];
+    
+    const confirmation = confirm(`Change status from "${tag.status}" to "${newStatus}"?`);
+    if (confirmation) {
+      this.updateNFCTagStatus(tagId, newStatus).then(data => {
+        if (data.success) {
+          this.loadNFCTags();
+          this.showToast(`Status updated to ${newStatus}`);
+        } else {
+          this.showToast(data.error || 'Failed to update status', 'error');
+        }
+      });
+    }
+  }
+
+  async deleteNFCTag(tagId) {
+    const tag = this.nfcTags.find(t => t.id === tagId);
+    if (!tag) return;
+
+    if (!confirm(`Are you sure you want to delete NFC tag "${tag.custom_id}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/master/nfc-tags/${tagId}`, {
+        method: 'DELETE'
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.loadNFCTags();
+        this.loadNFCTagBatches();
+        this.showToast('NFC tag deleted successfully!');
+      } else {
+        this.showToast(data.error || 'Failed to delete NFC tag', 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting NFC tag:', error);
+      this.showToast('Connection error', 'error');
+    }
+  }
+
+  showBulkAssignNFCTagModal() {
+    document.getElementById('bulkAssignNFCTagModal').classList.remove('hidden');
+    document.getElementById('bulkAssignNFCTagForm').reset();
+    this.loadOrganizationsForBulkAssign();
+    this.loadBatchesForBulkAssign();
+  }
+
+  hideBulkAssignNFCTagModal() {
+    document.getElementById('bulkAssignNFCTagModal').classList.add('hidden');
+  }
+
+  async loadOrganizationsForBulkAssign() {
+    try {
+      const response = await fetch('/api/master/organizations');
+      const data = await response.json();
+
+      if (data.success) {
+        const select = document.getElementById('bulkAssignOrganization');
+        select.innerHTML = '<option value="">Select Organization</option>';
+        
+        data.organizations.forEach(org => {
+          const option = document.createElement('option');
+          option.value = org.id;
+          option.textContent = `${org.name} (${org.subdomain})`;
+          option.dataset.subdomain = org.subdomain;
+          select.appendChild(option);
+        });
+
+        // Add event listener for URL preview
+        select.addEventListener('change', () => {
+          this.updateBulkAssignUrlPreview();
+        });
+      }
+    } catch (error) {
+      console.error('Error loading organizations:', error);
+    }
+  }
+
+  async loadBatchesForBulkAssign() {
+    try {
+      const response = await fetch('/api/master/nfc-tags/batches');
+      const data = await response.json();
+
+      if (data.success) {
+        const select = document.getElementById('bulkAssignBatch');
+        select.innerHTML = '<option value="">All Available Tags</option>';
+        
+        data.batches.forEach(batch => {
+          const option = document.createElement('option');
+          option.value = batch.batch_name;
+          option.textContent = `${batch.batch_name} (${batch.available_count} available)`;
+          select.appendChild(option);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading batches:', error);
+    }
+  }
+
+  updateBulkAssignUrlPreview() {
+    const orgSelect = document.getElementById('bulkAssignOrganization');
+    const previewDiv = document.getElementById('bulkAssignUrlPreview');
+    
+    if (orgSelect.value) {
+      const subdomain = orgSelect.selectedOptions[0].dataset.subdomain;
+      previewDiv.textContent = `https://your-domain.com/?org=${subdomain}&tag_id=TAG_ID`;
+      previewDiv.classList.remove('text-gray-600');
+      previewDiv.classList.add('text-green-600');
+    } else {
+      previewDiv.textContent = 'Select organization to preview URL format';
+      previewDiv.classList.remove('text-green-600');
+      previewDiv.classList.add('text-gray-600');
+    }
+  }
+
+  async handleBulkAssignNFCTagSubmit() {
+    const organizationId = document.getElementById('bulkAssignOrganization').value;
+    const batchName = document.getElementById('bulkAssignBatch').value || null;
+    const count = parseInt(document.getElementById('bulkAssignCount').value);
+
+    if (!organizationId || !count) {
+      this.showToast('Please select organization and enter count', 'error');
+      return;
+    }
+
+    const formData = {
+      organization_id: organizationId,
+      batch_name: batchName,
+      count: count
+    };
+
+    try {
+      const response = await fetch('/api/master/nfc-tags/bulk-assign', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.hideBulkAssignNFCTagModal();
+        this.loadNFCTags();
+        this.loadNFCTagBatches();
+        this.showToast(`${data.assigned_count} NFC tags assigned successfully!`);
+      } else {
+        this.showToast(data.error || 'Failed to assign NFC tags', 'error');
+      }
+    } catch (error) {
+      console.error('Error bulk assigning NFC tags:', error);
+      this.showToast('Connection error', 'error');
+    }
   }
 }
 

@@ -76,6 +76,11 @@
                 Organizations
               </a>
               
+              <a href="#" id="nfcTagsMasterNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-lg">
+                <span class="mr-3 text-lg">🏷️</span>
+                NFC Tags
+              </a>
+              
               <a href="#" id="billingMasterNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-lg">
                 <span class="mr-3 text-lg">💳</span>
                 Billing & Plans
@@ -149,6 +154,11 @@
               <a href="#" class="master-mobile-nav-item group flex items-center px-3 py-3 text-sm font-medium rounded-lg" data-target="organizationsMasterContent">
                 <span class="mr-3 text-lg">🏢</span>
                 Organizations
+              </a>
+              
+              <a href="#" class="master-mobile-nav-item group flex items-center px-3 py-3 text-sm font-medium rounded-lg" data-target="nfcTagsMasterContent">
+                <span class="mr-3 text-lg">🏷️</span>
+                NFC Tags
               </a>
               
               <a href="#" class="master-mobile-nav-item group flex items-center px-3 py-3 text-sm font-medium rounded-lg" data-target="billingMasterContent">
@@ -367,6 +377,131 @@
               </div>
             </div>
 
+            <!-- NFC Tags Tab -->
+            <div id="nfcTagsMasterContent" class="tab-content hidden">
+              <div class="mb-6 flex justify-between items-center flex-wrap gap-4">
+                <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">🏷️ NFC Tags</h1>
+                <div class="flex items-center space-x-3">
+                  <button id="bulkCreateTagsBtn" class="btn-secondary-modern">📦 Bulk Create</button>
+                  <button id="addNFCTagBtn" class="btn-primary-modern">✨ Add New Tag</button>
+                </div>
+              </div>
+
+              <!-- Tag Statistics Cards -->
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="modern-card p-6">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                        <span class="text-white text-lg">📊</span>
+                      </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Total Tags</dt>
+                        <dd id="totalNFCTags" class="text-2xl font-bold text-gray-900">--</dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="modern-card p-6">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <div class="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                        <span class="text-white text-lg">✅</span>
+                      </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Available</dt>
+                        <dd id="availableNFCTags" class="text-2xl font-bold text-gray-900">--</dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="modern-card p-6">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <div class="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+                        <span class="text-white text-lg">🎯</span>
+                      </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Assigned</dt>
+                        <dd id="assignedNFCTags" class="text-2xl font-bold text-gray-900">--</dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="modern-card p-6">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                      <div class="w-10 h-10 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center">
+                        <span class="text-white text-lg">📱</span>
+                      </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                      <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Active</dt>
+                        <dd id="activeNFCTags" class="text-2xl font-bold text-gray-900">--</dd>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- NFC Tags List -->
+              <div class="modern-card overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                  <div class="flex items-center justify-between flex-wrap gap-4">
+                    <h3 class="text-lg font-medium text-gray-900">All NFC Tags</h3>
+                    <div class="flex items-center space-x-2 flex-wrap gap-2">
+                      <input type="text" id="nfcTagSearch" placeholder="Search tags..." 
+                             class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                      <select id="nfcTagStatusFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Statuses</option>
+                        <option value="available">Available</option>
+                        <option value="assigned">Assigned</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="lost">Lost</option>
+                      </select>
+                      <select id="nfcTagBatchFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Batches</option>
+                      </select>
+                      <button id="bulkAssignTagsBtn" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors">
+                        🎯 Bulk Assign
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200 admin-table">
+                    <thead>
+                      <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Tag ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Batch</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Organization</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Scan Count</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Last Scanned</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Assigned</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="nfcTagsTable" class="bg-white divide-y divide-gray-200">
+                      <!-- NFC tags will be loaded here -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
             <!-- Other tab contents... -->
             <div id="billingMasterContent" class="tab-content hidden">
               <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-8">💳 Billing & Plans</h1>
@@ -458,6 +593,237 @@
           <div class="flex justify-end space-x-3 pt-4">
             <button type="button" id="cancelOrganizationModal" class="btn-secondary-modern">Cancel</button>
             <button type="submit" class="btn-primary-modern">Create Organization</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add NFC Tag Modal -->
+  <div id="nfcTagModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-xl bg-white">
+      <div class="mt-3">
+        <h3 id="nfcTagModalTitle" class="text-lg font-medium text-gray-900 mb-4">✨ Add New NFC Tag</h3>
+        
+        <form id="nfcTagForm" class="space-y-4">
+          <input type="hidden" id="nfcTagId">
+          
+          <div>
+            <label for="nfcTagCustomId" class="block text-sm font-medium text-gray-700">Custom ID</label>
+            <input type="text" id="nfcTagCustomId" required 
+                   class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="e.g., BATCH1-001">
+          </div>
+          
+          <div>
+            <label for="nfcTagBatchName" class="block text-sm font-medium text-gray-700">Batch Name</label>
+            <input type="text" id="nfcTagBatchName" 
+                   class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="e.g., BATCH1">
+          </div>
+          
+          <div>
+            <label for="nfcTagNotes" class="block text-sm font-medium text-gray-700">Notes</label>
+            <textarea id="nfcTagNotes" rows="3"
+                      class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Optional notes about this tag..."></textarea>
+          </div>
+
+          <div class="flex justify-end space-x-3 pt-4">
+            <button type="button" id="cancelNFCTagModal" class="btn-secondary-modern">Cancel</button>
+            <button type="submit" class="btn-primary-modern">Create Tag</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Create NFC Tags Modal -->
+  <div id="bulkNFCTagModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-xl bg-white">
+      <div class="mt-3">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">📦 Bulk Create NFC Tags</h3>
+        
+        <form id="bulkNFCTagForm" class="space-y-4">
+          <div>
+            <label for="bulkBatchName" class="block text-sm font-medium text-gray-700">Batch Name</label>
+            <input type="text" id="bulkBatchName" required 
+                   class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="e.g., BATCH2024-01">
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label for="bulkTagCount" class="block text-sm font-medium text-gray-700">Number of Tags</label>
+              <input type="number" id="bulkTagCount" required min="1" max="1000"
+                     class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                     placeholder="50">
+            </div>
+            
+            <div>
+              <label for="bulkTagPrefix" class="block text-sm font-medium text-gray-700">ID Prefix (Optional)</label>
+              <input type="text" id="bulkTagPrefix" 
+                     class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                     placeholder="TAG">
+            </div>
+          </div>
+          
+          <div>
+            <label for="bulkTagNotes" class="block text-sm font-medium text-gray-700">Notes</label>
+            <textarea id="bulkTagNotes" rows="2"
+                      class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Optional notes for all tags in this batch..."></textarea>
+          </div>
+
+          <div class="bg-blue-50 p-4 rounded-lg">
+            <p class="text-sm text-blue-800">
+              <strong>Preview:</strong> Tags will be created with IDs like: 
+              <span id="bulkPreview" class="font-mono">BATCH2024-01-001, BATCH2024-01-002, ...</span>
+            </p>
+          </div>
+
+          <div class="flex justify-end space-x-3 pt-4">
+            <button type="button" id="cancelBulkNFCTagModal" class="btn-secondary-modern">Cancel</button>
+            <button type="submit" class="btn-primary-modern">Create Tags</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assign NFC Tag Modal -->
+  <div id="assignNFCTagModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-xl bg-white">
+      <div class="mt-3">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">🎯 Assign NFC Tag</h3>
+        
+        <form id="assignNFCTagForm" class="space-y-4">
+          <input type="hidden" id="assignTagId">
+          
+          <div class="bg-gray-50 p-4 rounded-lg">
+            <p class="text-sm text-gray-600">
+              <strong>Tag ID:</strong> <span id="assignTagCustomId" class="font-mono"></span>
+            </p>
+          </div>
+          
+          <div>
+            <label for="assignOrganization" class="block text-sm font-medium text-gray-700">Organization</label>
+            <select id="assignOrganization" required 
+                    class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+              <option value="">Select Organization...</option>
+            </select>
+          </div>
+          
+          <div>
+            <label for="assignNFCId" class="block text-sm font-medium text-gray-700">Physical NFC ID (Optional)</label>
+            <input type="text" id="assignNFCId" 
+                   class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="Physical NFC tag identifier">
+            <p class="mt-1 text-xs text-gray-500">This will be written to the physical NFC tag</p>
+          </div>
+
+          <div class="flex justify-end space-x-3 pt-4">
+            <button type="button" id="cancelAssignNFCTagModal" class="btn-secondary-modern">Cancel</button>
+            <button type="submit" class="btn-primary-modern">Assign Tag</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- NFC Write Modal -->
+  <div id="nfcWriteModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-xl bg-white">
+      <div class="mt-3">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">📱 Write NFC Tag</h3>
+        
+        <div class="space-y-4">
+          <div class="bg-blue-50 p-4 rounded-lg">
+            <p class="text-sm text-blue-800">
+              <strong>Tag:</strong> <span id="writeTagCustomId" class="font-mono"></span><br>
+              <strong>Organization:</strong> <span id="writeTagOrganization"></span>
+            </p>
+          </div>
+          
+          <div id="nfcWriteStatus" class="text-center">
+            <div id="nfcWriteReady" class="">
+              <div class="text-4xl mb-4">📱</div>
+              <p class="text-lg font-medium text-gray-900 mb-2">Ready to Write</p>
+              <p class="text-sm text-gray-600 mb-4">Tap your NFC-enabled device to the tag to write the organization URL</p>
+              <button id="startNFCWrite" class="btn-primary-modern">🏷️ Write to Tag</button>
+            </div>
+            
+            <div id="nfcWriteProgress" class="hidden">
+              <div class="text-4xl mb-4">⏳</div>
+              <p class="text-lg font-medium text-gray-900 mb-2">Writing...</p>
+              <p class="text-sm text-gray-600">Keep the tag close to your device</p>
+            </div>
+            
+            <div id="nfcWriteSuccess" class="hidden">
+              <div class="text-4xl mb-4">✅</div>
+              <p class="text-lg font-medium text-green-800 mb-2">Successfully Written!</p>
+              <p class="text-sm text-gray-600">The tag now redirects to the organization</p>
+            </div>
+            
+            <div id="nfcWriteError" class="hidden">
+              <div class="text-4xl mb-4">❌</div>
+              <p class="text-lg font-medium text-red-800 mb-2">Write Failed</p>
+              <p id="nfcWriteErrorMessage" class="text-sm text-gray-600">Something went wrong</p>
+            </div>
+          </div>
+
+          <div class="flex justify-end space-x-3 pt-4">
+            <button type="button" id="cancelNFCWriteModal" class="btn-secondary-modern">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Assign NFC Tags Modal -->
+  <div id="bulkAssignNFCTagModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-xl bg-white">
+      <div class="mt-3">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">🎯 Bulk Assign NFC Tags</h3>
+        
+        <form id="bulkAssignNFCTagForm" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="bulkAssignOrganization" class="block text-sm font-medium text-gray-700">Organization</label>
+              <select id="bulkAssignOrganization" required 
+                      class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Select Organization</option>
+              </select>
+            </div>
+            
+            <div>
+              <label for="bulkAssignBatch" class="block text-sm font-medium text-gray-700">Batch (Optional)</label>
+              <select id="bulkAssignBatch" 
+                      class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                <option value="">All Available Tags</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label for="bulkAssignCount" class="block text-sm font-medium text-gray-700">Number of Tags to Assign</label>
+            <input type="number" id="bulkAssignCount" min="1" max="100" required 
+                   class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="e.g., 10">
+            <p class="mt-1 text-xs text-gray-500">Maximum 100 tags per batch assignment</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700">URL Format Preview</label>
+            <div id="bulkAssignUrlPreview" class="mt-1 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono text-gray-600">
+              Select organization to preview URL format
+            </div>
+            <p class="mt-1 text-xs text-gray-500">This URL format will be written to the NFC tags</p>
+          </div>
+
+          <div class="flex justify-end space-x-3 pt-4">
+            <button type="button" id="cancelBulkAssignNFCTagModal" class="btn-secondary-modern">Cancel</button>
+            <button type="submit" class="btn-primary-modern">Assign Tags</button>
           </div>
         </form>
       </div>
