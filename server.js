@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const https = require('https');
 const path = require('path');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
@@ -3753,8 +3754,36 @@ setTimeout(async () => {
   }
 }, 5000); // Wait 5 seconds after server starts
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Church Tap app running on http://0.0.0.0:${PORT}`);
-  console.log('🚀 Multi-tenant system ready!');
-  console.log('📖 Automatic verse import system enabled');
-});
+// For development HTTPS (needed for NFC on mobile)
+if (process.env.NODE_ENV === 'development' && process.env.HTTPS === 'true') {
+  try {
+    const httpsOptions = {
+      key: fs.readFileSync(path.join(__dirname, 'ssl', 'key.pem')),
+      cert: fs.readFileSync(path.join(__dirname, 'ssl', 'cert.pem'))
+    };
+
+    https.createServer(httpsOptions, app).listen(PORT, '0.0.0.0', () => {
+      console.log(`Church Tap app running on https://0.0.0.0:${PORT}`);
+      console.log('🚀 Multi-tenant system ready!');
+      console.log('📖 Automatic verse import system enabled');
+      console.log('🔒 HTTPS enabled for NFC development');
+      console.log('⚠️  Using self-signed certificate - you\'ll need to accept security warning');
+    });
+  } catch (error) {
+    console.error('❌ Failed to start HTTPS server:', error.message);
+    console.log('💡 Falling back to HTTP...');
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Church Tap app running on http://0.0.0.0:${PORT}`);
+      console.log('🚀 Multi-tenant system ready!');
+      console.log('📖 Automatic verse import system enabled');
+      console.log('💡 For NFC testing on mobile, ensure SSL certificates exist in ssl/ directory');
+    });
+  }
+} else {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Church Tap app running on http://0.0.0.0:${PORT}`);
+    console.log('🚀 Multi-tenant system ready!');
+    console.log('📖 Automatic verse import system enabled');
+    console.log('💡 For NFC testing on mobile, set NODE_ENV=development and HTTPS=true');
+  });
+}

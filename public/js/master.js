@@ -1291,9 +1291,15 @@ class MasterPortal {
   async startNFCWrite() {
     if (!this.currentWriteTag) return;
     
+    // Check for HTTPS requirement
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      this.showNFCWriteError('NFC writing requires HTTPS. Please access this site via HTTPS.');
+      return;
+    }
+    
     // Check for NFC support
     if (!('NDEFWriter' in window)) {
-      this.showNFCWriteError('NFC writing not supported on this device');
+      this.showNFCWriteError('NFC writing not supported on this device or browser. Try Chrome on Android.');
       return;
     }
 
