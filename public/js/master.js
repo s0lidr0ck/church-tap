@@ -173,14 +173,20 @@ class MasterPortal {
       e.preventDefault();
       this.showMasterTab('support');
     });
-    document.getElementById('systemMasterNav').addEventListener('click', (e) => {
-      e.preventDefault();
-      this.showMasterTab('system');
-    });
-    document.getElementById('nfcTagsMasterNav').addEventListener('click', (e) => {
-      e.preventDefault();
-      this.showMasterTab('nfcTags');
-    });
+    const systemNav = document.getElementById('systemMasterNav');
+    if (systemNav) {
+      systemNav.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showMasterTab('system');
+      });
+    }
+    const nfcTagsNav = document.getElementById('nfcTagsMasterNav');
+    if (nfcTagsNav) {
+      nfcTagsNav.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showMasterTab('nfcTags');
+      });
+    }
 
     // Menu text theme toggle
     const menuToggle = document.getElementById('menuThemeToggle');
@@ -243,72 +249,122 @@ class MasterPortal {
     });
 
     // NFC Tag Management
-    document.getElementById('addNFCTagBtn').addEventListener('click', () => {
-      this.showNFCTagModal();
-    });
+    const addNFCTagBtn = document.getElementById('addNFCTagBtn');
+    if (addNFCTagBtn) {
+      addNFCTagBtn.addEventListener('click', () => {
+        this.showNFCTagModal();
+      });
+    }
 
-    document.getElementById('bulkCreateTagsBtn').addEventListener('click', () => {
-      this.showBulkNFCTagModal();
-    });
+    const bulkCreateTagsBtn = document.getElementById('bulkCreateTagsBtn');
+    if (bulkCreateTagsBtn) {
+      bulkCreateTagsBtn.addEventListener('click', () => {
+        this.showBulkNFCTagModal();
+      });
+    }
 
 
     // NFC Tag modals
-    document.getElementById('cancelNFCTagModal').addEventListener('click', () => {
-      this.hideNFCTagModal();
-    });
+    const cancelNFCTagModal = document.getElementById('cancelNFCTagModal');
+    if (cancelNFCTagModal) {
+      cancelNFCTagModal.addEventListener('click', () => {
+        this.hideNFCTagModal();
+      });
+    }
 
-    document.getElementById('cancelBulkNFCTagModal').addEventListener('click', () => {
-      this.hideBulkNFCTagModal();
-    });
+    const cancelBulkNFCTagModal = document.getElementById('cancelBulkNFCTagModal');
+    if (cancelBulkNFCTagModal) {
+      cancelBulkNFCTagModal.addEventListener('click', () => {
+        this.hideBulkNFCTagModal();
+      });
+    }
 
-    document.getElementById('cancelAssignNFCTagModal').addEventListener('click', () => {
-      this.hideAssignNFCTagModal();
-    });
+    const cancelAssignNFCTagModal = document.getElementById('cancelAssignNFCTagModal');
+    if (cancelAssignNFCTagModal) {
+      cancelAssignNFCTagModal.addEventListener('click', () => {
+        this.hideAssignNFCTagModal();
+      });
+    }
 
-    document.getElementById('cancelNFCWriteModal').addEventListener('click', () => {
-      this.hideNFCWriteModal();
-    });
+    const cancelNFCWriteModal = document.getElementById('cancelNFCWriteModal');
+    if (cancelNFCWriteModal) {
+      cancelNFCWriteModal.addEventListener('click', () => {
+        this.hideNFCWriteModal();
+      });
+    }
 
 
     // NFC Tag forms
-    document.getElementById('nfcTagForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.handleNFCTagSubmit();
-    });
+    const nfcTagForm = document.getElementById('nfcTagForm');
+    if (nfcTagForm) {
+      nfcTagForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.handleNFCTagSubmit();
+      });
+    }
 
-    document.getElementById('bulkNFCTagForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.handleBulkNFCTagSubmit();
-    });
+    const bulkNFCTagForm = document.getElementById('bulkNFCTagForm');
+    if (bulkNFCTagForm) {
+      bulkNFCTagForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.handleBulkNFCTagSubmit();
+      });
+    }
 
-    document.getElementById('assignNFCTagForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.handleAssignNFCTagSubmit();
-    });
+    const assignNFCTagForm = document.getElementById('assignNFCTagForm');
+    if (assignNFCTagForm) {
+      assignNFCTagForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.handleAssignNFCTagSubmit();
+      });
+    }
 
 
     // NFC Tag search and filters
-    document.getElementById('nfcTagSearch').addEventListener('input', () => {
-      this.filterNFCTags();
-    });
+    const nfcTagSearch = document.getElementById('nfcTagSearch');
+    if (nfcTagSearch) {
+      nfcTagSearch.addEventListener('input', () => {
+        this.filterNFCTags();
+      });
+    }
 
-    document.getElementById('nfcTagStatusFilter').addEventListener('change', () => {
-      this.filterNFCTags();
-    });
+    const nfcTagStatusFilter = document.getElementById('nfcTagStatusFilter');
+    if (nfcTagStatusFilter) {
+      nfcTagStatusFilter.addEventListener('change', () => {
+        this.filterNFCTags();
+      });
+    }
 
-    document.getElementById('nfcTagBatchFilter').addEventListener('change', () => {
-      this.filterNFCTags();
-    });
+    const nfcTagBatchFilter = document.getElementById('nfcTagBatchFilter');
+    if (nfcTagBatchFilter) {
+      nfcTagBatchFilter.addEventListener('change', () => {
+        this.filterNFCTags();
+      });
+    }
 
     // Bulk preview update
-    document.getElementById('bulkBatchName').addEventListener('input', this.updateBulkPreview.bind(this));
-    document.getElementById('bulkTagPrefix').addEventListener('input', this.updateBulkPreview.bind(this));
-    document.getElementById('bulkTagCount').addEventListener('input', this.updateBulkPreview.bind(this));
+    const bulkBatchName = document.getElementById('bulkBatchName');
+    if (bulkBatchName) {
+      bulkBatchName.addEventListener('input', this.updateBulkPreview.bind(this));
+    }
+    
+    const bulkTagPrefix = document.getElementById('bulkTagPrefix');
+    if (bulkTagPrefix) {
+      bulkTagPrefix.addEventListener('input', this.updateBulkPreview.bind(this));
+    }
+    
+    const bulkTagCount = document.getElementById('bulkTagCount');
+    if (bulkTagCount) {
+      bulkTagCount.addEventListener('input', this.updateBulkPreview.bind(this));
+    }
 
     // NFC Write functionality
-    document.getElementById('startNFCWrite').addEventListener('click', () => {
-      this.startNFCWrite();
-    });
+    const startNFCWrite = document.getElementById('startNFCWrite');
+    if (startNFCWrite) {
+      startNFCWrite.addEventListener('click', () => {
+        this.startNFCWrite();
+      });
+    }
   }
 
   applySavedBrandTheme() {
@@ -422,14 +478,19 @@ class MasterPortal {
     // Update navigation relying on CSS only
     document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
     const activeBtn = document.getElementById(`${tabName}MasterNav`);
-    activeBtn.classList.add('active');
+    if (activeBtn) {
+      activeBtn.classList.add('active');
+    }
 
     // Update content
     document.querySelectorAll('.tab-content').forEach(content => {
       content.classList.add('hidden');
     });
     
-    document.getElementById(`${tabName}MasterContent`).classList.remove('hidden');
+    const contentElement = document.getElementById(`${tabName}MasterContent`);
+    if (contentElement) {
+      contentElement.classList.remove('hidden');
+    }
 
     // Update page title with icons
     const titleMap = {
@@ -1411,6 +1472,9 @@ class MasterPortal {
     setTimeout(() => {
       this.initMap();
     }, 100); // Small delay to ensure DOM is ready
+    
+    // Load analytics stats
+    this.loadAnalyticsStats();
   }
 
   // Analytics functionality
@@ -1427,11 +1491,13 @@ class MasterPortal {
     document.getElementById('analyticsTimeframe').addEventListener('change', (e) => {
       this.currentTimeframe = e.target.value;
       this.loadMapData();
+      this.loadAnalyticsStats();
     });
     
     document.getElementById('analyticsOrganization').addEventListener('change', (e) => {
       this.currentOrganization = e.target.value;
       this.loadMapData();
+      this.loadAnalyticsStats();
     });
   }
 
@@ -1465,8 +1531,15 @@ class MasterPortal {
       return; // Already initialized
     }
 
+    // Check if map element exists
+    const mapElement = document.getElementById('worldMap');
+    if (!mapElement) {
+      console.error('Map element not found');
+      return;
+    }
+
     // Initialize Leaflet map centered on US
-    this.map = L.map('analyticsMap').setView([39.8283, -98.5795], 4);
+    this.map = L.map('worldMap').setView([39.8283, -98.5795], 4);
     
     // Add tile layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -1497,6 +1570,37 @@ class MasterPortal {
     } catch (error) {
       console.error('Error loading map data:', error);
       this.showToast('Error loading map data', 'error');
+    }
+  }
+
+  async loadAnalyticsStats() {
+    try {
+      const params = new URLSearchParams({
+        timeframe: this.currentTimeframe
+      });
+      
+      if (this.currentOrganization) {
+        params.append('organization_id', this.currentOrganization);
+      }
+
+      const response = await fetch(`/api/master/analytics/stats?${params}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        const totalScansEl = document.getElementById('totalScans');
+        if (totalScansEl) totalScansEl.textContent = data.stats.totalScans;
+        
+        const uniqueTagsEl = document.getElementById('uniqueTags');
+        if (uniqueTagsEl) uniqueTagsEl.textContent = data.stats.uniqueTags;
+        
+        const activeSessionsEl = document.getElementById('activeSessions');
+        if (activeSessionsEl) activeSessionsEl.textContent = data.stats.activeSessions;
+        
+        const uniqueCountriesEl = document.getElementById('uniqueCountries');
+        if (uniqueCountriesEl) uniqueCountriesEl.textContent = data.stats.uniqueCountries;
+      }
+    } catch (error) {
+      console.error('Error loading analytics stats:', error);
     }
   }
 
@@ -1815,10 +1919,17 @@ class MasterPortal {
       const data = await response.json();
       
       if (data.success) {
-        document.getElementById('totalScansCount').textContent = data.stats.totalScans;
-        document.getElementById('uniqueTagsCount').textContent = data.stats.uniqueTags;
-        document.getElementById('activeSessionsCount').textContent = data.stats.activeSessions;
-        document.getElementById('followupActivitiesCount').textContent = data.stats.followupActivities;
+        const totalScansEl = document.getElementById('totalScansCount');
+        if (totalScansEl) totalScansEl.textContent = data.stats.totalScans;
+        
+        const uniqueTagsEl = document.getElementById('uniqueTagsCount');
+        if (uniqueTagsEl) uniqueTagsEl.textContent = data.stats.uniqueTags;
+        
+        const activeSessionsEl = document.getElementById('activeSessionsCount');
+        if (activeSessionsEl) activeSessionsEl.textContent = data.stats.activeSessions;
+        
+        const followupActivitiesEl = document.getElementById('followupActivitiesCount');
+        if (followupActivitiesEl) followupActivitiesEl.textContent = data.stats.followupActivities;
       }
     } catch (error) {
       console.error('Error loading tag activities stats:', error);
@@ -1827,9 +1938,13 @@ class MasterPortal {
 
   async loadTagActivitiesData() {
     // Show loading state
-    document.getElementById('tagActivitiesLoading').classList.remove('hidden');
-    document.getElementById('tagActivitiesTableContainer').classList.add('hidden');
-    document.getElementById('tagActivitiesEmpty').classList.add('hidden');
+    const loadingEl = document.getElementById('tagActivitiesLoading');
+    const containerEl = document.getElementById('tagActivitiesTableContainer');
+    const emptyEl = document.getElementById('tagActivitiesEmpty');
+    
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    if (containerEl) containerEl.classList.add('hidden');
+    if (emptyEl) emptyEl.classList.add('hidden');
 
     try {
       const params = new URLSearchParams({
@@ -1850,26 +1965,29 @@ class MasterPortal {
       const data = await response.json();
       
       // Hide loading state
-      document.getElementById('tagActivitiesLoading').classList.add('hidden');
+      if (loadingEl) loadingEl.classList.add('hidden');
       
       if (data.success) {
-        if (data.activities.length === 0) {
-          document.getElementById('tagActivitiesEmpty').classList.remove('hidden');
-        } else {
-          document.getElementById('tagActivitiesTableContainer').classList.remove('hidden');
+        if (data.activities && data.activities.length === 0) {
+          if (emptyEl) emptyEl.classList.remove('hidden');
+        } else if (data.activities && data.activities.length > 0) {
+          if (containerEl) containerEl.classList.remove('hidden');
           this.renderTagActivitiesTable(data.activities);
           this.updateTagActivitiesPagination(data.pagination, data.total);
         }
+      } else {
+        console.error('Tag activities API error:', data.error);
+        if (emptyEl) emptyEl.classList.remove('hidden');
       }
     } catch (error) {
       console.error('Error loading tag activities data:', error);
-      document.getElementById('tagActivitiesLoading').classList.add('hidden');
-      document.getElementById('tagActivitiesEmpty').classList.remove('hidden');
+      if (loadingEl) loadingEl.classList.add('hidden');
+      if (emptyEl) emptyEl.classList.remove('hidden');
     }
   }
 
   renderTagActivitiesTable(activities) {
-    const tbody = document.getElementById('tagActivitiesTableBody');
+    const tbody = document.getElementById('tagActivitiesTable');
     if (!tbody) return;
 
     tbody.innerHTML = activities.map(activity => {

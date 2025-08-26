@@ -245,7 +245,13 @@ async function getLocationFromIP(ip) {
 
 // Enhanced tracking middleware for anonymous sessions and interactions
 async function trackInteraction(req, res, next) {
-  const ip = req.ip || req.connection.remoteAddress;
+  let ip = req.ip || req.connection.remoteAddress;
+  
+  // For testing: Replace localhost IPs with a test IP for realistic geolocation
+  if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') {
+    ip = '158.120.66.99';
+  }
+  
   const userAgent = req.get('User-Agent');
   const tagId = req.query.tag_id;
   const org = req.query.org;
@@ -3760,6 +3766,95 @@ app.get('/api/master/analytics/map-data', requireMasterAuth, (req, res) => {
   });
 });
 
+// Get global analytics stats for master dashboard
+app.get('/api/master/analytics/stats', requireMasterAuth, (req, res) => {
+  const { timeframe = '7d', organization_id } = req.query;
+  
+  let timeFilter = '';
+  switch(timeframe) {
+    case '24h':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '24 hours'";
+      break;
+    case '7d':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '7 days'";
+      break;
+    case '30d':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '30 days'";
+      break;
+    case '90d':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '90 days'";
+      break;
+  }
+  
+  let orgFilter = '';
+  let params = [];
+  if (organization_id) {
+    orgFilter = 'AND organization_id = $1';
+    params = [organization_id];
+  }
+
+  Promise.all([
+    // Total scans
+    new Promise((resolve, reject) => {
+      const { sql: totalScansSql, params: totalScansParams } = convertQueryParams(
+        `SELECT COUNT(*) as count FROM tag_interactions WHERE 1=1 ${timeFilter.replace('created_at', 'tag_interactions.created_at')} ${orgFilter}`, params
+      );
+      db.query(totalScansSql, totalScansParams, (err, result) => {
+        if (err) reject(err);
+        else resolve(result.rows[0]?.count || 0);
+      });
+    }),
+    
+    // Unique tags
+    new Promise((resolve, reject) => {
+      const { sql: uniqueTagsSql, params: uniqueTagsParams } = convertQueryParams(
+        `SELECT COUNT(DISTINCT tag_id) as count FROM tag_interactions WHERE 1=1 ${timeFilter.replace('created_at', 'tag_interactions.created_at')} ${orgFilter}`, params
+      );
+      db.query(uniqueTagsSql, uniqueTagsParams, (err, result) => {
+        if (err) reject(err);
+        else resolve(result.rows[0]?.count || 0);
+      });
+    }),
+    
+    // Active sessions
+    new Promise((resolve, reject) => {
+      const { sql: sessionsSql, params: sessionsParams } = convertQueryParams(
+        `SELECT COUNT(DISTINCT session_id) as count FROM tag_interactions WHERE 1=1 ${timeFilter.replace('created_at', 'tag_interactions.created_at')} ${orgFilter}`, params
+      );
+      db.query(sessionsSql, sessionsParams, (err, result) => {
+        if (err) reject(err);
+        else resolve(result.rows[0]?.count || 0);
+      });
+    }),
+    
+    // Unique countries
+    new Promise((resolve, reject) => {
+      const { sql: countriesSql, params: countriesParams } = convertQueryParams(
+        `SELECT COUNT(DISTINCT s.country) as count FROM anonymous_sessions s 
+         INNER JOIN tag_interactions t ON s.session_id = t.session_id 
+         WHERE s.country IS NOT NULL AND s.country != 'Local' ${timeFilter.replace('created_at', 't.created_at')} ${orgFilter.replace('organization_id', 't.organization_id')}`, params
+      );
+      db.query(countriesSql, countriesParams, (err, result) => {
+        if (err) reject(err);
+        else resolve(result.rows[0]?.count || 0);
+      });
+    })
+  ]).then(([totalScans, uniqueTags, activeSessions, uniqueCountries]) => {
+    res.json({
+      success: true,
+      stats: {
+        totalScans,
+        uniqueTags,
+        activeSessions,
+        uniqueCountries
+      }
+    });
+  }).catch(error => {
+    console.error('Analytics stats error:', error);
+    res.status(500).json({ success: false, error: 'Failed to get analytics stats' });
+  });
+});
+
 // Get tag activities for master dashboard
 app.get('/api/master/analytics/tag-activities', requireMasterAuth, (req, res) => {
   const { timeframe = '7d', organization_id, tag_id, limit = 50, offset = 0 } = req.query;
@@ -3938,99 +4033,53 @@ app.get('/api/master/analytics/session-details/:sessionId', requireMasterAuth, (
   Promise.all([
     // Basic session info and tag interactions
     new Promise((resolve, reject) => {
-      dbQuery.all(`
+      const { sql, params } = convertQueryParams(`
         SELECT 
           ti.tag_id,
           ti.organization_id,
           ti.ip_address,
           ti.user_agent,
-          ti.geolocation,
           ti.created_at as scan_time,
-          s.created_at as session_start,
-          s.last_activity,
-          s.page_views,
-          s.total_time_spent
+          s.first_seen_at as session_start,
+          s.last_seen_at as last_activity,
+          s.total_interactions,
+          s.country,
+          s.region,
+          s.city,
+          s.latitude,
+          s.longitude,
+          o.name as organization_name
         FROM tag_interactions ti
-        LEFT JOIN sessions s ON s.session_id = ti.session_id
-        WHERE ti.session_id = ?
+        LEFT JOIN anonymous_sessions s ON s.session_id = ti.session_id
+        LEFT JOIN ct_organizations o ON ti.organization_id = o.id
+        WHERE ti.session_id = $1
         ORDER BY ti.created_at DESC
-      `, [sessionId], (err, rows) => {
+      `, [sessionId]);
+      
+      db.query(sql, params, (err, result) => {
         if (err) reject(err);
-        else resolve(rows);
+        else resolve(result.rows);
       });
     }),
     
-    // Analytics data (page views and interactions)
+    // Analytics data - simplified for now (no analytics table exists)
     new Promise((resolve, reject) => {
-      dbQuery.all(`
-        SELECT 
-          action,
-          page,
-          organization_id,
-          metadata,
-          created_at
-        FROM analytics 
-        WHERE session_id = ?
-        ORDER BY created_at ASC
-      `, [sessionId], (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
-      });
+      resolve([]);
     }),
     
-    // Prayer requests
+    // Prayer requests - simplified (no session_id tracking)
     new Promise((resolve, reject) => {
-      dbQuery.all(`
-        SELECT 
-          id,
-          organization_id,
-          content,
-          is_anonymous,
-          created_at
-        FROM ct_prayer_requests 
-        WHERE session_id = ?
-        ORDER BY created_at DESC
-      `, [sessionId], (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
-      });
+      resolve([]);
     }),
     
-    // Praise reports
+    // Praise reports - simplified (no session_id tracking)  
     new Promise((resolve, reject) => {
-      dbQuery.all(`
-        SELECT 
-          id,
-          organization_id,
-          content,
-          is_anonymous,
-          created_at
-        FROM ct_praise_reports 
-        WHERE session_id = ?
-        ORDER BY created_at DESC
-      `, [sessionId], (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
-      });
+      resolve([]);
     }),
     
-    // Community posts/insights
+    // Community posts/insights - simplified (no session_id tracking)
     new Promise((resolve, reject) => {
-      dbQuery.all(`
-        SELECT 
-          id,
-          organization_id,
-          verse_reference,
-          insight_text,
-          is_anonymous,
-          created_at
-        FROM ct_verse_community_posts 
-        WHERE session_id = ?
-        ORDER BY created_at DESC
-      `, [sessionId], (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
-      });
+      resolve([]);
     })
   ]).then(([sessionInfo, analytics, prayerRequests, praiseReports, insights]) => {
     
