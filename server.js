@@ -402,22 +402,9 @@ app.get('/', trackInteraction, (req, res) => {
       const organization = orgResult.rows[0];
       console.log(`✅ Organization found: ${organization.name}`);
       
-      // For local development, serve the interface directly
-      if (host.includes('localhost') || host.includes('127.0.0.1')) {
-        console.log(`🔧 Local development - serving interface directly`);
-        return res.sendFile(path.join(__dirname, 'public', 'index.html'));
-      }
-      
-      // Check if organization has a custom domain
-      if (organization.custom_domain) {
-        console.log(`🔄 Redirecting to custom domain: ${organization.custom_domain}`);
-        return res.redirect(`https://${organization.custom_domain}?tag_id=${tag_id}`);
-      } else {
-        // Redirect to subdomain
-        const domain = process.env.DOMAIN || 'churchtap.app';
-        console.log(`🔄 Redirecting to subdomain: ${organization.subdomain}.${domain}`);
-        return res.redirect(`https://${organization.subdomain}.${domain}?tag_id=${tag_id}`);
-      }
+      // Serve the interface directly instead of redirecting
+      console.log(`✅ Serving interface for organization: ${organization.name} (${org}) with tag: ${tag_id}`);
+      return res.sendFile(path.join(__dirname, 'public', 'index.html'));
     });
   } else {
     // Regular homepage request
