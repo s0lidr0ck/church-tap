@@ -29,7 +29,6 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
 app.use(cookieParser());
 app.use(compression());
 
@@ -204,6 +203,134 @@ const trackAnalytics = (action) => {
   };
 };
 
+// Geolocation service using ip-api.com (free tier)
+async function getLocationFromIP(ip) {
+  try {
+    // Skip localhost and private IPs
+    if (ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
+      return {
+        country: 'Local',
+        region: 'Local',
+        city: 'Local',
+        latitude: null,
+        longitude: null
+      };
+    }
+
+    const fetch = (await import('node-fetch')).default;
+    const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,regionName,city,lat,lon`);
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      return {
+        country: data.country,
+        region: data.regionName,
+        city: data.city,
+        latitude: data.lat,
+        longitude: data.lon
+      };
+    }
+  } catch (error) {
+    console.error('Geolocation error:', error);
+  }
+  
+  return {
+    country: 'Unknown',
+    region: 'Unknown', 
+    city: 'Unknown',
+    latitude: null,
+    longitude: null
+  };
+}
+
+// Enhanced tracking middleware for anonymous sessions and interactions
+async function trackInteraction(req, res, next) {
+  const ip = req.ip || req.connection.remoteAddress;
+  const userAgent = req.get('User-Agent');
+  const tagId = req.query.tag_id;
+  const org = req.query.org;
+  
+  console.log('🏷️ TrackInteraction called:', { ip, tagId, org, url: req.originalUrl });
+
+  try {
+    // Generate or get session ID (could use cookie or generate based on IP+UserAgent)
+    let sessionId = req.cookies?.trackingSession;
+    if (!sessionId) {
+      sessionId = `${ip}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      res.cookie('trackingSession', sessionId, { 
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production'
+      });
+    }
+
+    // Get geolocation data
+    const location = await getLocationFromIP(ip);
+
+    // Look up organization ID if we have the org subdomain
+    let orgId = req.organizationId || null;
+    if (!orgId && org) {
+      try {
+        const orgResult = await db.query('SELECT id FROM ct_organizations WHERE subdomain = $1 AND is_active = TRUE', [org]);
+        if (orgResult.rows.length > 0) {
+          orgId = orgResult.rows[0].id;
+        }
+      } catch (error) {
+        console.error('Error looking up organization for tracking:', error);
+      }
+    }
+
+    // Create or update anonymous session
+    const { sql: sessionSql, params: sessionParams } = convertQueryParams(`
+      INSERT INTO anonymous_sessions (
+        session_id, ip_address, user_agent, country, region, city, 
+        latitude, longitude, organization_id, first_seen_at, last_seen_at, total_interactions
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)
+      ON CONFLICT (session_id) DO UPDATE SET
+        last_seen_at = CURRENT_TIMESTAMP,
+        total_interactions = anonymous_sessions.total_interactions + 1,
+        organization_id = COALESCE(anonymous_sessions.organization_id, ?)
+    `, [sessionId, ip, userAgent, location.country, location.region, location.city, 
+        location.latitude, location.longitude, orgId, orgId]);
+
+    await db.query(sessionSql, sessionParams);
+
+    // Record tag interaction if this is a tag scan
+    if (tagId) {
+      const interactionData = {
+        url: req.originalUrl,
+        method: req.method,
+        referrer: req.get('Referrer'),
+        timestamp: new Date().toISOString()
+      };
+
+      const { sql: interactionSql, params: interactionParams } = convertQueryParams(`
+        INSERT INTO tag_interactions (
+          session_id, tag_id, interaction_type, page_url, referrer,
+          user_agent, ip_address, organization_id, interaction_data
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [sessionId, tagId, 'scan', req.originalUrl, req.get('Referrer'), 
+          userAgent, ip, orgId, JSON.stringify(interactionData)]);
+
+      await db.query(interactionSql, interactionParams);
+    }
+
+    // Store session info in request for use by other middleware
+    req.trackingSession = {
+      sessionId,
+      location,
+      ip,
+      userAgent,
+      organizationId: orgId
+    };
+
+  } catch (error) {
+    console.error('Tracking error:', error);
+  }
+
+  next();
+}
+
 // Optional authentication middleware (doesn't fail if no token)
 const optionalAuth = (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '') || req.cookies?.authToken;
@@ -223,20 +350,80 @@ const optionalAuth = (req, res, next) => {
 // Routes
 // Resolve organization for all requests before handling routes
 app.use(resolveOrganization);
-app.get('/', (req, res) => {
+app.get('/', trackInteraction, (req, res) => {
   const hostHeader = req.headers['x-forwarded-host'] || req.headers.host || '';
   const host = hostHeader.split(':')[0].toLowerCase();
+  const { org, tag_id } = req.query;
   
-  console.log(`🏠 Homepage request - Host: ${host}`);
+  console.log(`🏠 Homepage request - Host: ${host}, org: ${org}, tag_id: ${tag_id}`);
   
-  // If it's the root domain (no subdomain), serve marketing homepage
-  if (host === 'churchtap.app' || host === 'www.churchtap.app') {
-    console.log(`📄 Serving marketing homepage for: ${host}`);
-    res.sendFile(path.join(__dirname, 'public', 'homepage.html'));
+  // Handle NFC tag scan requests
+  if (org && tag_id) {
+    console.log(`🏷️ NFC tag scan detected: org=${org}, tag_id=${tag_id}`);
+    
+    // Record the tag scan
+    db.query(`
+      UPDATE ct_nfc_tags SET 
+        last_scanned_at = CURRENT_TIMESTAMP,
+        scan_count = scan_count + 1,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE custom_id = $1
+    `, [tag_id], (err, result) => {
+      if (err) {
+        console.error('Error recording NFC scan:', err);
+      } else {
+        console.log(`📊 Tag scan recorded for: ${tag_id}`);
+      }
+    });
+    
+    // Try to find organization by subdomain
+    db.query(`
+      SELECT id, subdomain, custom_domain, name
+      FROM ct_organizations 
+      WHERE subdomain = $1 AND is_active = TRUE
+    `, [org], (err, orgResult) => {
+      if (err) {
+        console.error('Error finding organization:', err);
+        return res.status(500).send('Internal server error');
+      }
+      
+      if (orgResult.rows.length === 0) {
+        console.log(`❌ Organization not found: ${org}`);
+        // Organization not found - serve default interface
+        return res.sendFile(path.join(__dirname, 'public', 'index.html'));
+      }
+      
+      const organization = orgResult.rows[0];
+      console.log(`✅ Organization found: ${organization.name}`);
+      
+      // For local development, serve the interface directly
+      if (host.includes('localhost') || host.includes('127.0.0.1')) {
+        console.log(`🔧 Local development - serving interface directly`);
+        return res.sendFile(path.join(__dirname, 'public', 'index.html'));
+      }
+      
+      // Check if organization has a custom domain
+      if (organization.custom_domain) {
+        console.log(`🔄 Redirecting to custom domain: ${organization.custom_domain}`);
+        return res.redirect(`https://${organization.custom_domain}?tag_id=${tag_id}`);
+      } else {
+        // Redirect to subdomain
+        const domain = process.env.DOMAIN || 'churchtap.app';
+        console.log(`🔄 Redirecting to subdomain: ${organization.subdomain}.${domain}`);
+        return res.redirect(`https://${organization.subdomain}.${domain}?tag_id=${tag_id}`);
+      }
+    });
   } else {
-    // Subdomain or localhost - serve church interface
-    console.log(`⛪ Serving church interface for: ${host}`);
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    // Regular homepage request
+    // If it's the root domain (no subdomain), serve marketing homepage
+    if (host === 'churchtap.app' || host === 'www.churchtap.app') {
+      console.log(`📄 Serving marketing homepage for: ${host}`);
+      res.sendFile(path.join(__dirname, 'public', 'homepage.html'));
+    } else {
+      // Subdomain or localhost - serve church interface
+      console.log(`⛪ Serving church interface for: ${host}`);
+      res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    }
   }
 });
 
@@ -1508,7 +1695,7 @@ app.get('/api/organization/links', (req, res) => {
   
   dbQuery.all(
     `SELECT id, title, url, icon, sort_order 
-     FROM CT_organization_links 
+     FROM ct_organization_links 
      WHERE organization_id = $1 AND is_active = true 
      ORDER BY sort_order ASC, title ASC`,
     [orgId],
@@ -1525,7 +1712,7 @@ app.get('/api/organization/links', (req, res) => {
 // Admin: Get all organization links
 app.get('/api/admin/organization/links', requireOrgAuth, (req, res) => {
   dbQuery.all(
-    `SELECT * FROM CT_organization_links 
+    `SELECT * FROM ct_organization_links 
      WHERE organization_id = $1 
      ORDER BY sort_order ASC, title ASC`,
     [req.organizationId],
@@ -1548,7 +1735,7 @@ app.post('/api/admin/organization/links', requireOrgAuth, (req, res) => {
   }
   
   dbQuery.run(
-    `INSERT INTO CT_organization_links (organization_id, title, url, icon, sort_order) 
+    `INSERT INTO ct_organization_links (organization_id, title, url, icon, sort_order) 
      VALUES (?, ?, ?, ?, ?)`,
     [req.organizationId, title, url, icon || 'website', sort_order || 0],
     function(err) {
@@ -1583,7 +1770,7 @@ app.put('/api/admin/organization/links/:id', requireOrgAuth, (req, res) => {
   }
   
   dbQuery.run(
-    `UPDATE CT_organization_links 
+    `UPDATE ct_organization_links 
      SET title = $1, url = $2, icon = $3, sort_order = $4, is_active = $5
      WHERE id = $6 AND organization_id = $7`,
     [title, url, icon || 'website', sort_order || 0, is_active !== undefined ? is_active : true, id, req.organizationId],
@@ -1607,7 +1794,7 @@ app.delete('/api/admin/organization/links/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   
   dbQuery.run(
-    `DELETE FROM CT_organization_links 
+    `DELETE FROM ct_organization_links 
      WHERE id = $1 AND organization_id = $2`,
     [id, req.organizationId],
     function(err) {
@@ -3247,6 +3434,821 @@ app.post('/api/master/organizations/:id/admins', requireMasterAuth, async (req, 
   });
 });
 
+// =============================
+// NFC TAG MANAGEMENT ENDPOINTS
+// =============================
+
+// Get all NFC tags (with optional filters)
+app.get('/api/master/nfc-tags', requireMasterAuth, (req, res) => {
+  const { status, organization_id, batch_name } = req.query;
+  
+  let sql = `
+    SELECT nt.*, o.name as organization_name, o.subdomain, au.username as assigned_by_username
+    FROM ct_nfc_tags nt
+    LEFT JOIN ct_organizations o ON nt.organization_id = o.id
+    LEFT JOIN ct_admin_users au ON nt.assigned_by = au.id
+    WHERE 1=1
+  `;
+  const params = [];
+  let paramIndex = 1;
+  
+  if (status) {
+    sql += ` AND nt.status = $${paramIndex++}`;
+    params.push(status);
+  }
+  
+  if (organization_id) {
+    sql += ` AND nt.organization_id = $${paramIndex++}`;
+    params.push(organization_id);
+  }
+  
+  if (batch_name) {
+    sql += ` AND nt.batch_name = $${paramIndex++}`;
+    params.push(batch_name);
+  }
+  
+  sql += ` ORDER BY nt.created_at DESC`;
+  
+  db.query(sql, params, (err, result) => {
+    if (err) {
+      console.error('Error fetching NFC tags:', err);
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    res.json({ success: true, tags: result.rows || [] });
+  });
+});
+
+// Create new NFC tag
+app.post('/api/master/nfc-tags', requireMasterAuth, (req, res) => {
+  const { custom_id, batch_name, notes } = req.body;
+  
+  if (!custom_id) {
+    return res.status(400).json({ success: false, error: 'Custom ID is required' });
+  }
+  
+  db.query(`
+    INSERT INTO ct_nfc_tags (custom_id, batch_name, notes, assigned_by, status)
+    VALUES ($1, $2, $3, $4, 'available')
+    RETURNING id
+  `, [custom_id, batch_name || null, notes || null, req.session.masterAdminId], 
+  (err, result) => {
+    if (err) {
+      if (err.code === '23505') { // Unique constraint in PostgreSQL
+        return res.status(400).json({ success: false, error: 'Custom ID already exists' });
+      }
+      console.error('Create NFC tag error:', err);
+      return res.status(500).json({ success: false, error: 'Failed to create NFC tag' });
+    }
+    
+    res.json({ success: true, tag_id: result.rows[0].id });
+  });
+});
+
+// Bulk create NFC tags
+app.post('/api/master/nfc-tags/bulk', requireMasterAuth, (req, res) => {
+  const { batch_name, count, prefix, notes } = req.body;
+  
+  if (!batch_name || !count || count <= 0 || count > 1000) {
+    return res.status(400).json({ success: false, error: 'Valid batch name and count (1-1000) are required' });
+  }
+  
+  // Create the VALUES clause for bulk insert
+  const values = [];
+  const params = [];
+  let paramIndex = 1;
+  
+  for (let i = 1; i <= count; i++) {
+    const paddedNum = i.toString().padStart(3, '0');
+    const custom_id = `${prefix || batch_name}-${paddedNum}`;
+    
+    values.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, 'available')`);
+    params.push(custom_id, batch_name, notes || null, req.session.masterAdminId);
+  }
+  
+  db.query(`
+    INSERT INTO ct_nfc_tags (custom_id, batch_name, notes, assigned_by, status)
+    VALUES ${values.join(', ')}
+  `, params, (err, result) => {
+    if (err) {
+      console.error('Bulk insert error:', err);
+      return res.status(500).json({ success: false, error: 'Failed to create NFC tags' });
+    }
+    
+    res.json({ success: true, created_count: count });
+  });
+});
+
+// Assign NFC tag to organization
+app.put('/api/master/nfc-tags/:id/assign', requireMasterAuth, (req, res) => {
+  const { id } = req.params;
+  const { organization_id, nfc_id } = req.body;
+  
+  if (!organization_id) {
+    return res.status(400).json({ success: false, error: 'Organization ID is required' });
+  }
+  
+  // Verify organization exists and get subdomain and tag custom_id for URL generation
+  db.query(`SELECT id, subdomain FROM ct_organizations WHERE id = $1`, [organization_id], (err, orgResult) => {
+    if (err) {
+      console.error('Organization check error:', err);
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    if (orgResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Organization not found' });
+    }
+    
+    const organization = orgResult.rows[0];
+    
+    // Get the tag's custom_id for URL generation
+    db.query(`SELECT custom_id FROM ct_nfc_tags WHERE id = $1`, [id], (err, tagResult) => {
+      if (err) {
+        console.error('Tag lookup error:', err);
+        return res.status(500).json({ success: false, error: 'Database error' });
+      }
+      if (tagResult.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'NFC tag not found' });
+      }
+      
+      const tag = tagResult.rows[0];
+      
+      // Update the NFC tag
+      db.query(`
+        UPDATE ct_nfc_tags SET 
+          organization_id = $1, 
+          status = 'assigned',
+          assigned_by = $2,
+          assigned_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3 AND status IN ('available', 'inactive')
+    `, [organization_id, req.session.masterAdminId, id], 
+    (err, result) => {
+      if (err) {
+        console.error('Assign NFC tag error:', err);
+        return res.status(500).json({ success: false, error: 'Failed to assign NFC tag' });
+      }
+      
+      if (result.rowCount === 0) {
+        return res.status(404).json({ success: false, error: 'NFC tag not found or cannot be assigned' });
+      }
+      
+      res.json({ success: true });
+    });
+    });
+  });
+});
+
+
+// Update NFC tag status
+app.put('/api/master/nfc-tags/:id/status', requireMasterAuth, (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  
+  const validStatuses = ['available', 'assigned', 'active', 'inactive', 'lost'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ success: false, error: 'Invalid status' });
+  }
+  
+  db.query(`
+    UPDATE ct_nfc_tags SET 
+      status = $1,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = $2
+  `, [status, id], 
+  (err, result) => {
+    if (err) {
+      console.error('Update NFC tag status error:', err);
+      return res.status(500).json({ success: false, error: 'Failed to update NFC tag status' });
+    }
+    
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, error: 'NFC tag not found' });
+    }
+    
+    res.json({ success: true });
+  });
+});
+
+// Record NFC tag scan
+app.post('/api/nfc-tags/scan/:custom_id', (req, res) => {
+  const { custom_id } = req.params;
+  
+  db.query(`
+    UPDATE ct_nfc_tags SET 
+      last_scanned_at = CURRENT_TIMESTAMP,
+      scan_count = scan_count + 1,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE custom_id = $1
+  `, [custom_id], 
+  (err, result) => {
+    if (err) {
+      console.error('Error recording NFC scan:', err);
+      return res.status(500).json({ success: false, error: 'Failed to record scan' });
+    }
+    
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, error: 'NFC tag not found' });
+    }
+    
+    // Get tag info including organization details
+    db.query(`
+      SELECT nt.*, o.subdomain, o.custom_domain
+      FROM ct_nfc_tags nt
+      LEFT JOIN ct_organizations o ON nt.organization_id = o.id
+      WHERE nt.custom_id = $1
+    `, [custom_id], (err, tagResult) => {
+      if (err || tagResult.rows.length === 0) {
+        return res.json({ success: true }); // Still record the scan even if we can't get details
+      }
+      
+      const tag = tagResult.rows[0];
+      // Return redirect information if assigned to an organization
+      if (tag.organization_id && tag.subdomain) {
+        const baseUrl = tag.custom_domain || `${tag.subdomain}.churchtap.app`;
+        return res.json({ 
+          success: true, 
+          redirect_url: `https://${baseUrl}`,
+          organization: tag.subdomain
+        });
+      }
+      
+      res.json({ success: true });
+    });
+  });
+});
+
+
+// Delete NFC tag
+app.delete('/api/master/nfc-tags/:id', requireMasterAuth, (req, res) => {
+  const { id } = req.params;
+  
+  db.query(`DELETE FROM ct_nfc_tags WHERE id = $1`, [id], (err, result) => {
+    if (err) {
+      console.error('Delete NFC tag error:', err);
+      return res.status(500).json({ success: false, error: 'Failed to delete NFC tag' });
+    }
+    
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, error: 'NFC tag not found' });
+    }
+    
+    res.json({ success: true });
+  });
+});
+
+// Get available batch names
+app.get('/api/master/nfc-tags/batches', requireMasterAuth, (req, res) => {
+  db.query(`
+    SELECT batch_name, COUNT(*) as tag_count, 
+           SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) as available_count
+    FROM ct_nfc_tags 
+    WHERE batch_name IS NOT NULL 
+    GROUP BY batch_name 
+    ORDER BY batch_name
+  `, [], (err, result) => {
+    if (err) {
+      console.error('Get batch names error:', err);
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    res.json({ success: true, batches: result.rows || [] });
+  });
+});
+
+// Analytics API endpoints
+app.get('/api/master/analytics/map-data', requireMasterAuth, (req, res) => {
+  const { timeframe = '7d', organization_id } = req.query;
+  
+  let timeFilter = '';
+  switch(timeframe) {
+    case '24h':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '24 hours'";
+      break;
+    case '7d':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '7 days'";
+      break;
+    case '30d':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '30 days'";
+      break;
+    case '90d':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '90 days'";
+      break;
+  }
+
+  let orgFilter = organization_id ? 'AND organization_id = $1' : '';
+  let params = organization_id ? [organization_id] : [];
+
+  dbQuery.all(`
+    SELECT 
+      country,
+      city,
+      latitude,
+      longitude,
+      COUNT(*) as session_count,
+      SUM(total_interactions) as total_interactions,
+      COUNT(DISTINCT ip_address) as unique_ips
+    FROM anonymous_sessions 
+    WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+    ${timeFilter} ${orgFilter}
+    GROUP BY country, city, latitude, longitude
+    ORDER BY session_count DESC
+  `, params, (err, rows) => {
+    if (err) {
+      console.error('Map data error:', err);
+      return res.status(500).json({ success: false, error: 'Failed to get map data' });
+    }
+    
+    res.json({ success: true, locations: rows || [] });
+  });
+});
+
+// Get tag activities for master dashboard
+app.get('/api/master/analytics/tag-activities', requireMasterAuth, (req, res) => {
+  const { timeframe = '7d', organization_id, tag_id, limit = 50, offset = 0 } = req.query;
+  
+  let timeFilter = '';
+  switch(timeframe) {
+    case '24h':
+      timeFilter = "AND t.created_at >= NOW() - INTERVAL '24 hours'";
+      break;
+    case '7d':
+      timeFilter = "AND t.created_at >= NOW() - INTERVAL '7 days'";
+      break;
+    case '30d':
+      timeFilter = "AND t.created_at >= NOW() - INTERVAL '30 days'";
+      break;
+    case '90d':
+      timeFilter = "AND t.created_at >= NOW() - INTERVAL '90 days'";
+      break;
+  }
+
+  let orgFilter = organization_id ? 'AND t.organization_id = ?' : '';
+  let tagFilter = tag_id ? 'AND t.tag_id LIKE ?' : '';
+  
+  let params = [];
+  if (organization_id) params.push(organization_id);
+  if (tag_id) params.push(`%${tag_id}%`);
+  params.push(parseInt(limit));
+  params.push(parseInt(offset));
+
+  dbQuery.all(`
+    SELECT 
+      t.id,
+      t.session_id,
+      t.tag_id,
+      t.interaction_type,
+      t.page_url,
+      t.referrer,
+      t.created_at,
+      s.ip_address,
+      s.country,
+      s.city,
+      s.latitude,
+      s.longitude,
+      o.name as organization_name,
+      o.subdomain,
+      -- Count follow-up activities (simplified for now)
+      0 as prayer_count,
+      0 as praise_count,
+      0 as insight_count
+    FROM tag_interactions t
+    LEFT JOIN anonymous_sessions s ON t.session_id = s.session_id
+    LEFT JOIN ct_organizations o ON t.organization_id = o.id
+    WHERE 1=1 ${timeFilter} ${orgFilter} ${tagFilter}
+    ORDER BY t.created_at DESC
+    LIMIT ? OFFSET ?
+  `, params, (err, rows) => {
+    if (err) {
+      console.error('Tag activities error:', err);
+      return res.status(500).json({ success: false, error: 'Failed to get tag activities' });
+    }
+    
+    // Get total count for pagination
+    let countParams = [];
+    if (organization_id) countParams.push(organization_id);
+    if (tag_id) countParams.push(`%${tag_id}%`);
+    
+    dbQuery.get(`
+      SELECT COUNT(*) as total
+      FROM tag_interactions t
+      WHERE 1=1 ${timeFilter} ${orgFilter} ${tagFilter}
+    `, countParams, (countErr, countResult) => {
+      if (countErr) {
+        console.error('Tag activities count error:', countErr);
+        return res.status(500).json({ success: false, error: 'Failed to get count' });
+      }
+      
+      res.json({ 
+        success: true, 
+        activities: rows || [], 
+        total: countResult?.total || 0,
+        pagination: {
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          hasMore: (parseInt(offset) + parseInt(limit)) < (countResult?.total || 0)
+        }
+      });
+    });
+  });
+});
+
+// Get tag activities statistics for master dashboard
+app.get('/api/master/analytics/tag-activities/stats', requireMasterAuth, (req, res) => {
+  const { timeframe = '7d', organization_id } = req.query;
+  
+  let timeFilter = '';
+  switch(timeframe) {
+    case '24h':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '24 hours'";
+      break;
+    case '7d':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '7 days'";
+      break;
+    case '30d':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '30 days'";
+      break;
+    case '90d':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '90 days'";
+      break;
+  }
+
+  let orgFilter = organization_id ? 'AND organization_id = ?' : '';
+  let params = organization_id ? [organization_id] : [];
+
+  // Get multiple stats in parallel
+  Promise.all([
+    // Total scans
+    new Promise((resolve, reject) => {
+      dbQuery.get(`SELECT COUNT(*) as count FROM tag_interactions WHERE 1=1 ${timeFilter} ${orgFilter}`, params, (err, row) => {
+        if (err) reject(err);
+        else resolve(row?.count || 0);
+      });
+    }),
+    
+    // Unique tags
+    new Promise((resolve, reject) => {
+      dbQuery.get(`SELECT COUNT(DISTINCT tag_id) as count FROM tag_interactions WHERE 1=1 ${timeFilter} ${orgFilter}`, params, (err, row) => {
+        if (err) reject(err);
+        else resolve(row?.count || 0);
+      });
+    }),
+    
+    // Active sessions
+    new Promise((resolve, reject) => {
+      dbQuery.get(`SELECT COUNT(DISTINCT session_id) as count FROM tag_interactions WHERE 1=1 ${timeFilter} ${orgFilter}`, params, (err, row) => {
+        if (err) reject(err);
+        else resolve(row?.count || 0);
+      });
+    }),
+    
+    // Follow-up activities from actual tables
+    new Promise((resolve, reject) => {
+      const interval = timeframe === '24h' ? '24 hours' : timeframe === '7d' ? '7 days' : timeframe === '30d' ? '30 days' : '90 days';
+      dbQuery.get(`
+        SELECT 
+          (SELECT COUNT(*) FROM ct_prayer_requests WHERE created_at >= NOW() - INTERVAL '${interval}') +
+          (SELECT COUNT(*) FROM ct_praise_reports WHERE created_at >= NOW() - INTERVAL '${interval}') +
+          (SELECT COUNT(*) FROM ct_verse_community_posts WHERE created_at >= NOW() - INTERVAL '${interval}') as count
+      `, [], (err, row) => {
+        if (err) reject(err);
+        else resolve(row?.count || 0);
+      });
+    })
+  ]).then(([totalScans, uniqueTags, activeSessions, followupActivities]) => {
+    res.json({
+      success: true,
+      stats: {
+        totalScans,
+        uniqueTags,
+        activeSessions,
+        followupActivities
+      }
+    });
+  }).catch(error => {
+    console.error('Tag activities stats error:', error);
+    res.status(500).json({ success: false, error: 'Failed to get stats' });
+  });
+});
+
+// Get session details by session_id
+app.get('/api/master/analytics/session-details/:sessionId', requireMasterAuth, (req, res) => {
+  const { sessionId } = req.params;
+  
+  console.log('🔍 Getting session details for:', sessionId);
+  
+  // Get session data with all related information
+  Promise.all([
+    // Basic session info and tag interactions
+    new Promise((resolve, reject) => {
+      dbQuery.all(`
+        SELECT 
+          ti.tag_id,
+          ti.organization_id,
+          ti.ip_address,
+          ti.user_agent,
+          ti.geolocation,
+          ti.created_at as scan_time,
+          s.created_at as session_start,
+          s.last_activity,
+          s.page_views,
+          s.total_time_spent
+        FROM tag_interactions ti
+        LEFT JOIN sessions s ON s.session_id = ti.session_id
+        WHERE ti.session_id = ?
+        ORDER BY ti.created_at DESC
+      `, [sessionId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    }),
+    
+    // Analytics data (page views and interactions)
+    new Promise((resolve, reject) => {
+      dbQuery.all(`
+        SELECT 
+          action,
+          page,
+          organization_id,
+          metadata,
+          created_at
+        FROM analytics 
+        WHERE session_id = ?
+        ORDER BY created_at ASC
+      `, [sessionId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    }),
+    
+    // Prayer requests
+    new Promise((resolve, reject) => {
+      dbQuery.all(`
+        SELECT 
+          id,
+          organization_id,
+          content,
+          is_anonymous,
+          created_at
+        FROM ct_prayer_requests 
+        WHERE session_id = ?
+        ORDER BY created_at DESC
+      `, [sessionId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    }),
+    
+    // Praise reports
+    new Promise((resolve, reject) => {
+      dbQuery.all(`
+        SELECT 
+          id,
+          organization_id,
+          content,
+          is_anonymous,
+          created_at
+        FROM ct_praise_reports 
+        WHERE session_id = ?
+        ORDER BY created_at DESC
+      `, [sessionId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    }),
+    
+    // Community posts/insights
+    new Promise((resolve, reject) => {
+      dbQuery.all(`
+        SELECT 
+          id,
+          organization_id,
+          verse_reference,
+          insight_text,
+          is_anonymous,
+          created_at
+        FROM ct_verse_community_posts 
+        WHERE session_id = ?
+        ORDER BY created_at DESC
+      `, [sessionId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    })
+  ]).then(([sessionInfo, analytics, prayerRequests, praiseReports, insights]) => {
+    
+    // Parse geolocation if available
+    let location = null;
+    if (sessionInfo.length > 0 && sessionInfo[0].geolocation) {
+      try {
+        location = JSON.parse(sessionInfo[0].geolocation);
+      } catch (e) {
+        console.error('Error parsing geolocation:', e);
+      }
+    }
+    
+    // Parse user agent for device info
+    let deviceInfo = {
+      browser: 'Unknown',
+      os: 'Unknown',
+      device: 'Unknown'
+    };
+    
+    if (sessionInfo.length > 0 && sessionInfo[0].user_agent) {
+      const userAgent = sessionInfo[0].user_agent;
+      // Basic user agent parsing
+      if (userAgent.includes('Chrome')) deviceInfo.browser = 'Chrome';
+      else if (userAgent.includes('Firefox')) deviceInfo.browser = 'Firefox';
+      else if (userAgent.includes('Safari')) deviceInfo.browser = 'Safari';
+      else if (userAgent.includes('Edge')) deviceInfo.browser = 'Edge';
+      
+      if (userAgent.includes('Windows')) deviceInfo.os = 'Windows';
+      else if (userAgent.includes('Mac')) deviceInfo.os = 'macOS';
+      else if (userAgent.includes('Linux')) deviceInfo.os = 'Linux';
+      else if (userAgent.includes('Android')) deviceInfo.os = 'Android';
+      else if (userAgent.includes('iPhone') || userAgent.includes('iPad')) deviceInfo.os = 'iOS';
+      
+      if (userAgent.includes('Mobile')) deviceInfo.device = 'Mobile';
+      else if (userAgent.includes('Tablet') || userAgent.includes('iPad')) deviceInfo.device = 'Tablet';
+      else deviceInfo.device = 'Desktop';
+    }
+    
+    // Process analytics data to create user journey
+    const userJourney = analytics.map(item => ({
+      action: item.action,
+      page: item.page,
+      timestamp: item.created_at,
+      metadata: item.metadata ? JSON.parse(item.metadata) : null
+    }));
+    
+    // Calculate time spent on different sections
+    const sectionTime = {};
+    let currentPage = null;
+    let currentPageStart = null;
+    
+    analytics.forEach((item, index) => {
+      if (item.action === 'view' || item.action === 'visit') {
+        if (currentPage && currentPageStart) {
+          const timeSpent = new Date(item.created_at) - new Date(currentPageStart);
+          sectionTime[currentPage] = (sectionTime[currentPage] || 0) + timeSpent;
+        }
+        currentPage = item.page;
+        currentPageStart = item.created_at;
+      }
+    });
+    
+    // Add final page time if available
+    if (currentPage && currentPageStart && sessionInfo.length > 0) {
+      const sessionEnd = sessionInfo[0].last_activity || sessionInfo[0].session_start;
+      const timeSpent = new Date(sessionEnd) - new Date(currentPageStart);
+      sectionTime[currentPage] = (sectionTime[currentPage] || 0) + timeSpent;
+    }
+    
+    res.json({
+      success: true,
+      sessionDetails: {
+        sessionId: sessionId,
+        sessionInfo: sessionInfo.length > 0 ? {
+          sessionStart: sessionInfo[0].session_start,
+          lastActivity: sessionInfo[0].last_activity,
+          totalPageViews: sessionInfo[0].page_views || 0,
+          totalTimeSpent: sessionInfo[0].total_time_spent || 0,
+          ipAddress: sessionInfo[0].ip_address,
+          tagScans: sessionInfo.map(item => ({
+            tagId: item.tag_id,
+            organizationId: item.organization_id,
+            scanTime: item.scan_time
+          }))
+        } : null,
+        location: location,
+        deviceInfo: deviceInfo,
+        userJourney: userJourney,
+        sectionTimeSpent: Object.entries(sectionTime).map(([page, time]) => ({
+          page,
+          timeMs: time,
+          timeFormatted: Math.floor(time / 1000) + 's'
+        })),
+        activities: {
+          prayerRequests: prayerRequests.map(pr => ({
+            id: pr.id,
+            content: pr.content,
+            isAnonymous: pr.is_anonymous,
+            createdAt: pr.created_at,
+            organizationId: pr.organization_id
+          })),
+          praiseReports: praiseReports.map(pr => ({
+            id: pr.id,
+            content: pr.content,
+            isAnonymous: pr.is_anonymous,
+            createdAt: pr.created_at,
+            organizationId: pr.organization_id
+          })),
+          insights: insights.map(insight => ({
+            id: insight.id,
+            verseReference: insight.verse_reference,
+            insightText: insight.insight_text,
+            isAnonymous: insight.is_anonymous,
+            createdAt: insight.created_at,
+            organizationId: insight.organization_id
+          }))
+        }
+      }
+    });
+  }).catch(error => {
+    console.error('Session details error:', error);
+    res.status(500).json({ success: false, error: 'Failed to get session details' });
+  });
+});
+
+// Get interaction details by IP
+app.get('/api/master/analytics/ip-details/:ip', requireMasterAuth, (req, res) => {
+  const { ip } = req.params;
+  const { timeframe = '7d' } = req.query;
+  
+  let timeFilter = '';
+  switch(timeframe) {
+    case '24h':
+      timeFilter = "AND s.created_at >= NOW() - INTERVAL '24 hours'";
+      break;
+    case '7d':
+      timeFilter = "AND s.created_at >= NOW() - INTERVAL '7 days'";
+      break;
+    case '30d':
+      timeFilter = "AND s.created_at >= NOW() - INTERVAL '30 days'";
+      break;
+  }
+
+  dbQuery.all(`
+    SELECT 
+      s.session_id,
+      s.country,
+      s.city,
+      s.first_seen_at,
+      s.last_seen_at,
+      s.total_interactions,
+      o.name as organization_name,
+      array_agg(
+        json_build_object(
+          'tag_id', t.tag_id,
+          'interaction_type', t.interaction_type,
+          'page_url', t.page_url,
+          'created_at', t.created_at
+        ) ORDER BY t.created_at DESC
+      ) as interactions
+    FROM anonymous_sessions s
+    LEFT JOIN ct_organizations o ON s.organization_id = o.id
+    LEFT JOIN tag_interactions t ON s.session_id = t.session_id
+    WHERE s.ip_address = ? ${timeFilter}
+    GROUP BY s.session_id, s.country, s.city, s.first_seen_at, s.last_seen_at, s.total_interactions, o.name
+    ORDER BY s.last_seen_at DESC
+  `, [ip], (err, rows) => {
+    if (err) {
+      console.error('IP details error:', err);
+      return res.status(500).json({ success: false, error: 'Failed to get IP details' });
+    }
+    
+    res.json({ success: true, sessions: rows || [] });
+  });
+});
+
+// Get tag interaction details
+app.get('/api/master/analytics/tag-details/:tagId', requireMasterAuth, (req, res) => {
+  const { tagId } = req.params;
+  const { timeframe = '7d' } = req.query;
+  
+  let timeFilter = '';
+  switch(timeframe) {
+    case '24h':
+      timeFilter = "AND t.created_at >= NOW() - INTERVAL '24 hours'";
+      break;
+    case '7d':
+      timeFilter = "AND t.created_at >= NOW() - INTERVAL '7 days'";
+      break;
+    case '30d':
+      timeFilter = "AND t.created_at >= NOW() - INTERVAL '30 days'";
+      break;
+  }
+
+  db.query(`
+    SELECT 
+      t.*,
+      s.country,
+      s.city,
+      s.latitude,
+      s.longitude,
+      o.name as organization_name
+    FROM tag_interactions t
+    LEFT JOIN anonymous_sessions s ON t.session_id = s.session_id
+    LEFT JOIN ct_organizations o ON t.organization_id = o.id
+    WHERE t.tag_id = $1 ${timeFilter}
+    ORDER BY t.created_at DESC
+  `, [tagId], (err, result) => {
+    if (err) {
+      console.error('Tag details error:', err);
+      return res.status(500).json({ success: false, error: 'Failed to get tag details' });
+    }
+    
+    res.json({ success: true, interactions: result.rows || [] });
+  });
+});
+
 // Basic rate limiting for community endpoints (IP + org scoped)
 const rateLimiter = createRateLimiter({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '', 10) || undefined,
@@ -3303,6 +4305,9 @@ setTimeout(async () => {
     console.error('Startup verse check failed:', error);
   }
 }, 5000); // Wait 5 seconds after server starts
+
+// Static files - put at the end so dynamic routes take precedence
+app.use(express.static('public'));
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Church Tap app running on http://0.0.0.0:${PORT}`);
