@@ -6,6 +6,10 @@ class AdminDashboard {
     this.filters = { search: '', type: 'all', status: 'all' };
     this.brand = null;
     
+    // PWA install prompt
+    this.deferredPrompt = null;
+    this.setupPWAInstall();
+    
     this.init();
   }
 
@@ -1712,6 +1716,122 @@ class AdminDashboard {
     // Keep only last 10 entries
     while (logContainer.children.length > 10) {
       logContainer.removeChild(logContainer.lastChild);
+    }
+  }
+
+  // PWA Install Functions
+  setupPWAInstall() {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      console.log('CT Admin PWA install prompt available');
+      e.preventDefault();
+      this.deferredPrompt = e;
+      this.showInstallButton();
+    });
+
+    window.addEventListener('appinstalled', () => {
+      console.log('CT Admin PWA was installed');
+      this.hideInstallButton();
+      this.deferredPrompt = null;
+    });
+  }
+
+  showInstallButton() {
+    // Create install button if it doesn't exist
+    let installBtn = document.getElementById('adminInstallBtn');
+    if (!installBtn) {
+      installBtn = document.createElement('button');
+      installBtn.id = 'adminInstallBtn';
+      installBtn.innerHTML = `
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+        </svg>
+        Install CT Admin
+      `;
+      installBtn.className = 'flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors duration-200';
+      
+      // Add to login screen initially, then move to header after login
+      const loginScreen = document.getElementById('loginScreen');
+      if (loginScreen && !loginScreen.classList.contains('hidden')) {
+        const loginForm = loginScreen.querySelector('.max-w-md');
+        if (loginForm) {
+          loginForm.appendChild(installBtn);
+        }
+      } else {
+        // Add to header area (after login)
+        const headerArea = document.querySelector('.flex.justify-between.items-center');
+        if (headerArea) {
+          headerArea.appendChild(installBtn);
+        }
+      }
+      
+      installBtn.addEventListener('click', () => {
+        this.installApp();
+      });
+    }
+    installBtn.style.display = 'flex';
+    
+    // Also create a debug button for testing (remove in production)
+    this.createDebugInstallButton();
+  }
+
+  createDebugInstallButton() {
+    let debugBtn = document.getElementById('debugInstallBtn');
+    if (!debugBtn) {
+      debugBtn = document.createElement('button');
+      debugBtn.id = 'debugInstallBtn';
+      debugBtn.innerHTML = 'Debug: Force PWA Check';
+      debugBtn.className = 'mt-2 px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600';
+      debugBtn.style.position = 'fixed';
+      debugBtn.style.bottom = '10px';
+      debugBtn.style.right = '10px';
+      debugBtn.style.zIndex = '9999';
+      
+      document.body.appendChild(debugBtn);
+      
+      debugBtn.addEventListener('click', () => {
+        console.log('Debug: Checking PWA install status...');
+        console.log('deferredPrompt:', this.deferredPrompt);
+        console.log('Service Worker registered:', 'serviceWorker' in navigator);
+        
+        if (this.deferredPrompt) {
+          console.log('PWA install prompt available - triggering...');
+          this.installApp();
+        } else {
+          console.log('No install prompt available. Check PWA requirements.');
+          
+          // Force show install button for testing
+          this.showInstallButton();
+        }
+      });
+    }
+  }
+
+  hideInstallButton() {
+    const installBtn = document.getElementById('adminInstallBtn');
+    if (installBtn) {
+      installBtn.style.display = 'none';
+    }
+  }
+
+  async installApp() {
+    if (!this.deferredPrompt) {
+      return;
+    }
+
+    try {
+      this.deferredPrompt.prompt();
+      const { outcome } = await this.deferredPrompt.userChoice;
+      
+      if (outcome === 'accepted') {
+        console.log('Admin accepted the install prompt');
+      } else {
+        console.log('Admin dismissed the install prompt');
+      }
+      
+      this.deferredPrompt = null;
+      this.hideInstallButton();
+    } catch (error) {
+      console.error('Admin install prompt error:', error);
     }
   }
 }
