@@ -151,6 +151,27 @@
           </button>
         </div>
         
+        <!-- NFC Tag Session Info -->
+        <div id="tagSessionInfo" class="hidden border-t border-gray-200 dark:border-gray-600 pt-3">
+          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-3">
+            NFC Session
+          </div>
+          <div class="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg mb-2 mx-3">
+            <div class="flex items-center justify-between">
+              <div class="text-sm">
+                <span class="text-blue-600 dark:text-blue-400">🏷️</span>
+                <span class="text-gray-700 dark:text-gray-300">Connected to tag</span>
+              </div>
+            </div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <span id="tagSessionId">Loading...</span>
+            </div>
+          </div>
+          <button id="clearTagSessionBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-red-600 dark:text-red-400">
+            🗑️ Clear NFC Session
+          </button>
+        </div>
+        
         <button id="feedbackBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
           💬 Send Feedback
         </button>

@@ -8,14 +8,22 @@ class ChurchTapApp {
     this.favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
     this.recentlyViewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
     
-    // Get organization parameter from URL
+    // Get organization and tag parameters from URL
     const urlParams = new URLSearchParams(window.location.search);
     this.orgParam = urlParams.get('org');
+    this.tagIdParam = urlParams.get('tag_id');
+    
+    // Handle tag_id persistence with cookies
+    this.setupTagIdTracking();
     
     this.currentCommunity = null;
     this.userInteractions = JSON.parse(localStorage.getItem('userInteractions') || '{}');
     this.currentUser = null;
     this.authToken = null;
+    
+    // PWA install prompt
+    this.deferredPrompt = null;
+    this.setupPWAInstall();
     
     this.init();
   }
@@ -50,6 +58,7 @@ class ChurchTapApp {
       this.detectNFCSupport();
       this.loadOrganizationLinks();
       this.updateMenuIndicators();
+      this.updateTagSessionUI();
     } catch (error) {
       console.error('Init error:', error);
       // Still show the app even if there's an error
@@ -95,6 +104,11 @@ class ChurchTapApp {
     // Menu toggle
     document.getElementById('menuToggle').addEventListener('click', () => {
       this.toggleQuickMenu();
+    });
+
+    // Clear tag session
+    document.getElementById('clearTagSessionBtn').addEventListener('click', () => {
+      this.clearTagSession();
     });
 
     // Main action buttons
@@ -673,6 +687,11 @@ class ChurchTapApp {
     menu.classList.toggle('hidden');
   }
 
+  hideQuickMenu() {
+    const menu = document.getElementById('quickMenu');
+    menu.classList.add('hidden');
+  }
+
   async toggleHeart() {
     if (!this.currentVerse) return;
     
@@ -1051,14 +1070,24 @@ class ChurchTapApp {
     return token;
   }
 
-  // Helper method to add org parameter to API URLs
+  // Helper method to add org and tag_id parameters to API URLs
   buildApiUrl(path) {
     try {
+      let url = path;
+      let hasParams = path.includes('?');
+      
       if (this.orgParam) {
-        const separator = path.includes('?') ? '&' : '?';
-        return `${path}${separator}org=${this.orgParam}`;
+        const separator = hasParams ? '&' : '?';
+        url += `${separator}org=${this.orgParam}`;
+        hasParams = true;
       }
-      return path;
+      
+      if (this.currentTagId) {
+        const separator = hasParams ? '&' : '?';
+        url += `${separator}tag_id=${this.currentTagId}`;
+      }
+      
+      return url;
     } catch (error) {
       console.error('Error in buildApiUrl:', error);
       return path;
@@ -2249,6 +2278,243 @@ class ChurchTapApp {
     } else {
       console.log('NFC not supported');
       this.nfcSupported = false;
+    }
+  }
+
+  // Tag ID Tracking Functions
+  setupTagIdTracking() {
+    // If tag_id is in URL (new scan), store it in cookie
+    if (this.tagIdParam) {
+      console.log(`🏷️ New tag scan detected: ${this.tagIdParam}`);
+      this.setTagIdCookie(this.tagIdParam);
+      this.currentTagId = this.tagIdParam;
+    } else {
+      // Check if we have any stored tag sessions
+      const lastTagId = this.getLastTagId();
+      if (lastTagId) {
+        this.currentTagId = lastTagId;
+        console.log(`🔄 Returning to previous tag session: ${lastTagId}`);
+      }
+    }
+    
+    // Track tag-specific interactions
+    if (this.currentTagId) {
+      this.trackTagSession();
+    }
+  }
+
+  setTagIdCookie(tagId) {
+    // Set cookie to expire in 10 years (effectively indefinite)
+    const expires = new Date();
+    expires.setTime(expires.getTime() + (10 * 365 * 24 * 60 * 60 * 1000));
+    
+    // Store individual tag session data
+    const cookieName = `nfc_tag_${tagId}`;
+    const sessionData = JSON.stringify({
+      tagId: tagId,
+      firstSeen: Date.now(),
+      lastSeen: Date.now()
+    });
+    
+    document.cookie = `${cookieName}=${sessionData}; expires=${expires.toUTCString()}; path=/; SameSite=Strict`;
+    
+    // Also set a "last active tag" cookie
+    document.cookie = `nfc_last_tag=${tagId}; expires=${expires.toUTCString()}; path=/; SameSite=Strict`;
+    
+    console.log(`🍪 Tag cookie set for: ${tagId} (persists indefinitely)`);
+  }
+
+  getTagIdCookie(tagId) {
+    const cookieName = `nfc_tag_${tagId}`;
+    const name = `${cookieName}=`;
+    const decodedCookie = decodeURIComponent(document.cookie);
+    const ca = decodedCookie.split(';');
+    
+    for(let i = 0; i < ca.length; i++) {
+      let c = ca[i];
+      while (c.charAt(0) === ' ') {
+        c = c.substring(1);
+      }
+      if (c.indexOf(name) === 0) {
+        try {
+          return JSON.parse(c.substring(name.length, c.length));
+        } catch (e) {
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
+  getLastTagId() {
+    const name = "nfc_last_tag=";
+    const decodedCookie = decodeURIComponent(document.cookie);
+    const ca = decodedCookie.split(';');
+    
+    for(let i = 0; i < ca.length; i++) {
+      let c = ca[i];
+      while (c.charAt(0) === ' ') {
+        c = c.substring(1);
+      }
+      if (c.indexOf(name) === 0) {
+        return c.substring(name.length, c.length);
+      }
+    }
+    return null;
+  }
+
+  clearTagIdCookie() {
+    if (this.currentTagId) {
+      const cookieName = `nfc_tag_${this.currentTagId}`;
+      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Strict`;
+      document.cookie = `nfc_last_tag=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Strict`;
+      localStorage.removeItem('nfc_tag_session');
+      this.currentTagId = null;
+      console.log('🗑️ Current tag session cleared');
+    }
+  }
+
+  removeUrlParameter(url, parameter) {
+    const urlParts = url.split('?');
+    if (urlParts.length >= 2) {
+      const prefix = encodeURIComponent(parameter) + '=';
+      const parts = urlParts[1].split(/[&;]/g);
+      
+      for (let i = parts.length; i-- > 0;) {
+        if (parts[i].lastIndexOf(prefix, 0) !== -1) {
+          parts.splice(i, 1);
+        }
+      }
+      
+      return urlParts[0] + (parts.length > 0 ? '?' + parts.join('&') : '');
+    }
+    return url;
+  }
+
+  trackTagSession() {
+    // Track that user is in a tag-based session
+    const sessionData = {
+      tagId: this.currentTagId,
+      orgParam: this.orgParam,
+      startTime: Date.now(),
+      lastActivity: Date.now(),
+      pageViews: 1
+    };
+
+    // Load existing session or create new one
+    const existingSession = JSON.parse(localStorage.getItem('nfc_tag_session') || 'null');
+    if (existingSession && existingSession.tagId === this.currentTagId) {
+      sessionData.startTime = existingSession.startTime;
+      sessionData.pageViews = (existingSession.pageViews || 0) + 1;
+    }
+
+    localStorage.setItem('nfc_tag_session', JSON.stringify(sessionData));
+    console.log(`📊 Tag session tracked: ${this.currentTagId} (${sessionData.pageViews} views)`);
+  }
+
+  getTagSession() {
+    return JSON.parse(localStorage.getItem('nfc_tag_session') || 'null');
+  }
+
+  updateTagSessionUI() {
+    const tagSessionInfo = document.getElementById('tagSessionInfo');
+    const tagSessionId = document.getElementById('tagSessionId');
+    
+    if (this.currentTagId) {
+      const session = this.getTagSession();
+      tagSessionInfo.classList.remove('hidden');
+      
+      if (session && session.pageViews) {
+        tagSessionId.textContent = `${this.currentTagId} • ${session.pageViews} views`;
+      } else {
+        tagSessionId.textContent = this.currentTagId;
+      }
+    } else {
+      tagSessionInfo.classList.add('hidden');
+    }
+  }
+
+  clearTagSession() {
+    if (confirm('Clear your NFC tag session? This will disconnect from the current tag.')) {
+      this.clearTagIdCookie();
+      localStorage.removeItem('nfc_tag_session');
+      this.updateTagSessionUI();
+      this.showToast('NFC session cleared');
+      
+      // Hide menu after action
+      this.hideQuickMenu();
+    }
+  }
+
+  // PWA Install Functions
+  setupPWAInstall() {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      console.log('PWA install prompt available');
+      e.preventDefault();
+      this.deferredPrompt = e;
+      this.showInstallButton();
+    });
+
+    window.addEventListener('appinstalled', () => {
+      console.log('PWA was installed');
+      this.hideInstallButton();
+      this.deferredPrompt = null;
+    });
+  }
+
+  showInstallButton() {
+    // Create install button if it doesn't exist
+    let installBtn = document.getElementById('installAppBtn');
+    if (!installBtn) {
+      installBtn = document.createElement('button');
+      installBtn.id = 'installAppBtn';
+      installBtn.innerHTML = `
+        <span class="flex items-center space-x-2">
+          <span>📱</span>
+          <span>Install App</span>
+        </span>
+      `;
+      installBtn.className = 'w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-green-600 dark:text-green-400';
+      
+      // Add to menu
+      const settingsSection = document.querySelector('#quickMenu .border-t');
+      if (settingsSection) {
+        settingsSection.parentNode.insertBefore(installBtn, settingsSection);
+      }
+      
+      installBtn.addEventListener('click', () => {
+        this.installApp();
+      });
+    }
+    installBtn.style.display = 'block';
+  }
+
+  hideInstallButton() {
+    const installBtn = document.getElementById('installAppBtn');
+    if (installBtn) {
+      installBtn.style.display = 'none';
+    }
+  }
+
+  async installApp() {
+    if (!this.deferredPrompt) {
+      return;
+    }
+
+    try {
+      this.deferredPrompt.prompt();
+      const { outcome } = await this.deferredPrompt.userChoice;
+      
+      if (outcome === 'accepted') {
+        console.log('User accepted the install prompt');
+      } else {
+        console.log('User dismissed the install prompt');
+      }
+      
+      this.deferredPrompt = null;
+      this.hideInstallButton();
+    } catch (error) {
+      console.error('Install prompt error:', error);
     }
   }
 
