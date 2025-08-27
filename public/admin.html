@@ -3,9 +3,35 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Church Tap - Admin Dashboard</title>
+  <meta name="theme-color" content="#1f2937">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="CT Admin">
+  
+  <title>CT Admin - Dashboard</title>
+  <meta name="description" content="Church Tap Administration Dashboard">
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/admin-manifest.json">
+  
+  <!-- Apple Touch Icons -->
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/admin-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/admin-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/admin-icon-192x192.png">
+  
   <link href="/css/style.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(registration => console.log('CT Admin SW registered'))
+          .catch(error => console.log('CT Admin SW registration failed'));
+      });
+    }
+  </script>
 </head>
 <body class="h-full bg-gray-50">
   <!-- Login Screen -->
