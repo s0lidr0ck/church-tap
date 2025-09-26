@@ -1,7 +1,6 @@
 const express = require('express');
 const QRCode = require('qrcode');
 const { dbQuery } = require('../config/database');
-const { optionalAuth } = require('../config/middleware');
 const { generateVerseImage } = require('../services/imageService');
 const { getBookName } = require('../config/constants');
 
@@ -73,7 +72,7 @@ router.get('/random', async (req, res) => {
 });
 
 // Get verse by date (with personalization support)
-router.get('/:date', optionalAuth, async (req, res) => {
+router.get('/:date', async (req, res) => {
   const { date } = req.params;
   const orgId = req.organizationId || 1;
   
