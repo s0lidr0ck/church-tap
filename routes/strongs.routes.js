@@ -1,11 +1,10 @@
 const express = require('express');
 const { dbQuery } = require('../config/database');
-const { trackAnalytics } = require('../services/analyticsService');
 
 const router = express.Router();
 
 // Get verse with Strong's numbers (KJV only)
-router.get('/:book/:chapter/:verse', trackAnalytics('strongs_view'), async (req, res) => {
+router.get('/:book/:chapter/:verse', async (req, res) => {
   const { book, chapter, verse } = req.params;
   
   try {
@@ -32,7 +31,7 @@ router.get('/:book/:chapter/:verse', trackAnalytics('strongs_view'), async (req,
 });
 
 // Get Strong's number definition
-router.get('/definition/:number', trackAnalytics('strongs_definition'), async (req, res) => {
+router.get('/definition/:number', async (req, res) => {
   const { number } = req.params;
   
   // First check if we have it cached

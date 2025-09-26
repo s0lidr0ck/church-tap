@@ -1,11 +1,10 @@
 const express = require('express');
 const { dbQuery } = require('../config/database');
-const { trackAnalytics } = require('../services/analyticsService');
 
 const router = express.Router();
 
 // Get community content for a specific date
-router.get('/:date', trackAnalytics('community_view'), (req, res) => {
+router.get('/:date', (req, res) => {
   const { date } = req.params;
   const orgId = req.organizationId || 1;
   

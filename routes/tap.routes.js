@@ -1,31 +1,95 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const { db } = require('../config/database');
-const { trackInteraction } = require('../services/analyticsService');
 
 const router = express.Router();
 
+// Helper function to serve HTML with injected organization context
+function serveHtmlWithOrgContext(res, orgData, tagUid) {
+  const htmlPath = path.join(__dirname, '../public', 'index.html');
+
+  fs.readFile(htmlPath, 'utf8', (err, html) => {
+    if (err) {
+      console.error('Error reading HTML file:', err);
+      return res.status(500).send('Internal server error');
+    }
+
+    // Inject organization context script before closing head tag
+    const orgScript = `
+    <script>
+      window.nfcOrgContext = {
+        orgParam: '${orgData.subdomain}',
+        tagIdParam: '${tagUid}',
+        organization: {
+          id: ${orgData.id},
+          name: '${orgData.name.replace(/'/g, "\\'")}',
+          subdomain: '${orgData.subdomain}'
+        }
+      };
+    </script>
+  </head>`;
+
+    const modifiedHtml = html.replace('</head>', orgScript);
+    res.send(modifiedHtml);
+  });
+}
+
 // Handle NFC bracelet tap: /t/<UID>
-router.get('/t/:uid', trackInteraction, async (req, res) => {
+router.get('/t/:uid', async (req, res) => {
   const { uid } = req.params;
   
   console.log(`🏷️ Bracelet tap detected: ${uid}`);
   
   try {
-    // Look up the bracelet in the database
-    const tagQuery = `
-      SELECT nt.*, o.subdomain, o.custom_domain, o.name as org_name
-      FROM ct_nfc_tags nt
-      LEFT JOIN CT_organizations o ON nt.organization_id = o.id
-      WHERE nt.custom_id = $1
+    // First check for approved bracelet memberships
+    const membershipQuery = `
+      SELECT
+        bm.organization_id, bm.bracelet_uid as custom_id,
+        o.subdomain, o.custom_domain, o.name as org_name
+      FROM ct_bracelet_memberships bm
+      LEFT JOIN CT_organizations o ON bm.organization_id = o.id
+      WHERE bm.bracelet_uid = $1 AND bm.status = 'approved'
     `;
-    
-    db.query(tagQuery, [uid], (err, result) => {
+
+    db.query(membershipQuery, [uid], (err, membershipResult) => {
       if (err) {
-        console.error('Error looking up bracelet:', err);
+        console.error('Error looking up bracelet membership:', err);
         return res.status(500).send('Internal server error');
       }
-      
-      if (result.rows.length === 0) {
+
+      if (membershipResult.rows.length > 0) {
+        // Found in bracelet memberships
+        const bracelet = membershipResult.rows[0];
+        console.log(`✅ Bracelet claimed to organization: ${bracelet.org_name} (${bracelet.subdomain})`);
+
+        // Record the scan
+        console.log(`📊 Scan recorded for bracelet: ${uid}`);
+
+        // Serve the index.html with organization context
+        const orgData = {
+          id: bracelet.organization_id,
+          name: bracelet.org_name,
+          subdomain: bracelet.subdomain
+        };
+        return serveHtmlWithOrgContext(res, orgData, uid);
+      }
+
+      // If not found in memberships, check NFC tags
+      const tagQuery = `
+        SELECT nt.*, o.subdomain, o.custom_domain, o.name as org_name
+        FROM ct_nfc_tags nt
+        LEFT JOIN CT_organizations o ON nt.organization_id = o.id
+        WHERE nt.custom_id = $1
+      `;
+
+      db.query(tagQuery, [uid], (err, result) => {
+        if (err) {
+          console.error('Error looking up bracelet:', err);
+          return res.status(500).send('Internal server error');
+        }
+
+        if (result.rows.length === 0) {
         console.log(`❌ Bracelet not found: ${uid}, redirecting to organization chooser`);
         // Redirect unknown bracelets to the organization chooser
         return res.redirect(`/choose-organization?uid=${uid}`);
@@ -64,25 +128,28 @@ router.get('/t/:uid', trackInteraction, async (req, res) => {
           const hasPendingMembership = membershipResult.rows.length > 0 && 
                                      membershipResult.rows[0].status === 'pending';
           
-          // Redirect to organization using legacy format
-          // For development, stay on the same host
-          const protocol = req.secure ? 'https' : 'http';
-          const host = req.get('host');
-          let redirectUrl;
-          
-          if (host.includes('localhost') || host.includes('127.0.0.1')) {
-            // Development environment - stay on localhost
-            redirectUrl = `${protocol}://${host}/?org=${bracelet.subdomain}&tag_id=${uid}`;
-          } else {
-            // Production environment
-            redirectUrl = `https://churchtap.app/?org=${bracelet.subdomain}&tag_id=${uid}`;
-          }
-          
-          if (hasPendingMembership) {
-            redirectUrl += '&status=pending_approval';
-          }
-          
-          return res.redirect(redirectUrl);
+          // Set organization context for the request (for analytics tracking)
+          req.organization = {
+            id: bracelet.organization_id,
+            subdomain: bracelet.subdomain,
+            name: bracelet.org_name
+          };
+
+          // Add tag information to request for frontend
+          req.tagInfo = {
+            uid: uid,
+            organization: bracelet.subdomain,
+            hasPendingMembership: hasPendingMembership
+          };
+
+          // Serve the main app with organization context injected!
+          console.log(`🎯 Serving app for organization: ${bracelet.org_name} (${bracelet.subdomain})`);
+          const orgData = {
+            id: bracelet.organization_id,
+            name: bracelet.org_name,
+            subdomain: bracelet.subdomain
+          };
+          return serveHtmlWithOrgContext(res, orgData, uid);
         });
       } else {
         console.log(`🤔 Unclaimed bracelet, showing organization chooser: ${uid}`);
@@ -90,6 +157,7 @@ router.get('/t/:uid', trackInteraction, async (req, res) => {
         // Redirect to choose organization page
         return res.redirect(`/choose-organization?uid=${uid}`);
       }
+      });
     });
   } catch (error) {
     console.error('Unexpected error in tap handler:', error);

@@ -8,7 +8,7 @@ router.post('/', (req, res) => {
   const { action, verse_id, user_token, timestamp, originating_tag_id: originatingTagFromBody } = req.body;
   const ip = req.ip || req.connection.remoteAddress;
   const userAgent = req.get('User-Agent');
-  const orgId = req.organizationId || 1;
+  const orgId = req.organizationId || req.organization?.id || null;
   
   // Get session attribution from cookies
   let taggedSessionId = req.cookies?.taggedSession;
@@ -29,9 +29,15 @@ router.post('/', (req, res) => {
   
   tryResolveAttribution(() => {
     console.log(`Analytics tracking - action: ${action}, verse_id: ${verse_id}, taggedSession: ${taggedSessionId}, originatingTag: ${originatingTagId}, sessionId: ${sessionIdCookie}`);
-    
-    dbQuery.run(`INSERT INTO ct_analytics 
-      (verse_id, action, ip_address, user_agent, organization_id, tagged_session_id, originating_tag_id) 
+
+    // Only track analytics if we have a valid organization
+    if (!orgId) {
+      console.log('Skipping analytics tracking - no organization ID available');
+      return res.json({ success: true });
+    }
+
+    dbQuery.run(`INSERT INTO ct_analytics
+      (verse_id, action, ip_address, user_agent, organization_id, tagged_session_id, originating_tag_id)
       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [verse_id, action, ip, userAgent, orgId, taggedSessionId, originatingTagId], (err) => {
       if (err) {
@@ -40,7 +46,7 @@ router.post('/', (req, res) => {
       }
       
       // Also mirror to tag_interactions so session analytics reflect the event immediately
-      if (sessionIdCookie && originatingTagId) {
+      if (sessionIdCookie && originatingTagId && orgId) {
         const interactionData = { action, verse_id };
         dbQuery.run(`
           INSERT INTO tag_interactions (
@@ -75,7 +81,7 @@ router.post('/', (req, res) => {
 router.post('/sync', (req, res) => {
   const ip = req.ip || req.connection.remoteAddress;
   const userAgent = req.get('User-Agent');
-  const orgId = req.organizationId || 1;
+  const orgId = req.organizationId || req.organization?.id || null;
 
   // Get session attribution from cookies
   const taggedSessionId = req.cookies?.taggedSession;

@@ -27,6 +27,11 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Account is disabled' });
     }
     
+    req.session.master_admin = {
+      id: user.id,
+      username: user.username,
+      role: user.role
+    };
     req.session.masterAdminId = user.id;
     req.session.masterAdminUsername = user.username;
     
@@ -46,14 +51,11 @@ router.post('/logout', (req, res) => {
 
 // Check master admin session status
 router.get('/check-session', (req, res) => {
-  if (req.session.masterAdminId) {
-    res.json({ 
-      success: true, 
+  if (req.session.master_admin) {
+    res.json({
+      success: true,
       authenticated: true,
-      admin: { 
-        id: req.session.masterAdminId, 
-        username: req.session.masterAdminUsername 
-      }
+      admin: req.session.master_admin
     });
   } else {
     res.json({ 

@@ -40,6 +40,13 @@ router.post('/login', async (req, res) => {
     req.session.adminUsername = user.username;
     req.session.organizationId = user.organization_id;
     req.session.organizationName = user.organization_name;
+    req.session.admin = {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      organization_id: user.organization_id,
+      organization_name: user.organization_name
+    };
     
     res.json({ success: true, admin: { 
       id: user.id, 
@@ -927,6 +934,426 @@ router.get('/analytics', requireOrgAuth, (req, res) => {
   .catch(error => {
     console.error('Admin analytics error:', error);
     res.status(500).json({ success: false, error: 'Failed to load analytics data', details: error.message });
+  });
+});
+
+// Get community data (prayer requests, praise reports)
+router.get('/community', requireOrgAuth, (req, res) => {
+  const days = parseInt(req.query.days) || 7;
+  const organizationId = req.organizationId;
+  
+  Promise.all([
+    // Prayer requests
+    new Promise((resolve, reject) => {
+      dbQuery.all(`
+        SELECT COUNT(*) as count, DATE(created_at) as date
+        FROM ct_prayer_requests 
+        WHERE organization_id = $1 AND created_at >= NOW() - INTERVAL '${days} days'
+        GROUP BY DATE(created_at)
+        ORDER BY date DESC
+      `, [organizationId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    }),
+    
+    // Praise reports
+    new Promise((resolve, reject) => {
+      dbQuery.all(`
+        SELECT COUNT(*) as count, DATE(created_at) as date
+        FROM ct_praise_reports 
+        WHERE organization_id = $1 AND created_at >= NOW() - INTERVAL '${days} days'
+        GROUP BY DATE(created_at)
+        ORDER BY date DESC
+      `, [organizationId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    }),
+    
+    // Recent prayer requests
+    new Promise((resolve, reject) => {
+      dbQuery.all(`
+        SELECT id, content, prayer_count, created_at, is_hidden
+        FROM ct_prayer_requests 
+        WHERE organization_id = $1 
+        ORDER BY created_at DESC 
+        LIMIT 20
+      `, [organizationId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    }),
+    
+    // Recent praise reports
+    new Promise((resolve, reject) => {
+      dbQuery.all(`
+        SELECT id, content, celebration_count, created_at, is_hidden
+        FROM ct_praise_reports 
+        WHERE organization_id = $1 
+        ORDER BY created_at DESC 
+        LIMIT 20
+      `, [organizationId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    }),
+    
+    // Recent verse insights
+    new Promise((resolve, reject) => {
+      dbQuery.all(`
+        SELECT 
+          p.id, 
+          p.content, 
+          COUNT(i.id) as heart_count, 
+          p.created_at, 
+          p.is_hidden
+        FROM ct_verse_community_posts p
+        LEFT JOIN ct_verse_community_interactions i ON p.id = i.post_id
+        WHERE p.organization_id = $1 
+        GROUP BY p.id, p.content, p.created_at, p.is_hidden
+        ORDER BY p.created_at DESC 
+        LIMIT 20
+      `, [organizationId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    })
+  ])
+  .then(([prayerData, praiseData, recentPrayers, recentPraise, recentInsights]) => {
+    res.json({
+      success: true,
+      community: {
+        prayer_requests: prayerData,
+        praise_reports: praiseData,
+        recent_prayers: recentPrayers,
+        recent_praise: recentPraise,
+        verse_insights: recentInsights || [],
+        timeframe: `${days} days`
+      }
+    });
+  })
+  .catch(error => {
+    console.error('Community data error:', error);
+    res.status(500).json({ success: false, error: 'Failed to load community data' });
+  });
+});
+
+// Get bracelet requests
+router.get('/bracelet-requests', requireOrgAuth, (req, res) => {
+  const organizationId = req.organizationId;
+  
+  dbQuery.all(`
+    SELECT br.*, u.email, u.first_name, u.last_name 
+    FROM ct_bracelet_requests br
+    LEFT JOIN ct_users u ON br.user_id = u.id
+    WHERE br.organization_id = $1 
+    ORDER BY br.created_at DESC
+  `, [organizationId], (err, rows) => {
+    if (err) {
+      console.error('Bracelet requests error:', err);
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    
+    const requests = rows.map(request => ({
+      ...request,
+      created_at: request.created_at ? new Date(request.created_at).toLocaleString() : null,
+      updated_at: request.updated_at ? new Date(request.updated_at).toLocaleString() : null
+    }));
+    
+    res.json({ success: true, requests });
+  });
+});
+
+// Update bracelet request status
+router.put('/bracelet-requests/:id', requireOrgAuth, (req, res) => {
+  const { id } = req.params;
+  const { status, admin_notes } = req.body;
+  const organizationId = req.organizationId;
+  
+  dbQuery.run(`
+    UPDATE ct_bracelet_requests 
+    SET status = $1, admin_notes = $2, updated_at = NOW()
+    WHERE id = $3 AND organization_id = $4
+  `, [status, admin_notes, id, organizationId], function(err) {
+    if (err) {
+      console.error('Update bracelet request error:', err);
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    
+    res.json({ success: true });
+  });
+});
+
+// Prayer Request Moderation
+router.put('/prayer-request/:id', requireOrgAuth, (req, res) => {
+  const { id } = req.params;
+  const { action, reason } = req.body; // action: 'hide' or 'unhide'
+  const organizationId = req.organizationId;
+  
+  if (action === 'hide') {
+    dbQuery.run(`
+      UPDATE ct_prayer_requests 
+      SET is_hidden = true 
+      WHERE id = $1 AND organization_id = $2
+    `, [id, organizationId], function(err) {
+      if (err) {
+        console.error('Error hiding prayer request:', err);
+        return res.status(500).json({ success: false, error: 'Failed to hide prayer request' });
+      }
+      res.json({ success: true, message: 'Prayer request hidden' });
+    });
+  } else if (action === 'unhide') {
+    dbQuery.run(`
+      UPDATE ct_prayer_requests 
+      SET is_hidden = false 
+      WHERE id = $1 AND organization_id = $2
+    `, [id, organizationId], function(err) {
+      if (err) {
+        console.error('Error unhiding prayer request:', err);
+        return res.status(500).json({ success: false, error: 'Failed to unhide prayer request' });
+      }
+      res.json({ success: true, message: 'Prayer request unhidden' });
+    });
+  } else {
+    res.status(400).json({ success: false, error: 'Invalid action. Use "hide" or "unhide"' });
+  }
+});
+
+// Praise Report Moderation
+router.put('/praise-report/:id', requireOrgAuth, (req, res) => {
+  const { id } = req.params;
+  const { action, reason } = req.body; // action: 'hide' or 'unhide'
+  const organizationId = req.organizationId;
+  
+  if (action === 'hide') {
+    dbQuery.run(`
+      UPDATE ct_praise_reports 
+      SET is_hidden = true 
+      WHERE id = $1 AND organization_id = $2
+    `, [id, organizationId], function(err) {
+      if (err) {
+        console.error('Error hiding praise report:', err);
+        return res.status(500).json({ success: false, error: 'Failed to hide praise report' });
+      }
+      res.json({ success: true, message: 'Praise report hidden' });
+    });
+  } else if (action === 'unhide') {
+    dbQuery.run(`
+      UPDATE ct_praise_reports 
+      SET is_hidden = false 
+      WHERE id = $1 AND organization_id = $2
+    `, [id, organizationId], function(err) {
+      if (err) {
+        console.error('Error unhiding praise report:', err);
+        return res.status(500).json({ success: false, error: 'Failed to unhide praise report' });
+      }
+      res.json({ success: true, message: 'Praise report unhidden' });
+    });
+  } else {
+    res.status(400).json({ success: false, error: 'Invalid action. Use "hide" or "unhide"' });
+  }
+});
+
+// Verse Insight Moderation
+router.put('/verse-insight/:id', requireOrgAuth, (req, res) => {
+  const { id } = req.params;
+  const { action, reason } = req.body; // action: 'hide' or 'unhide'
+  const organizationId = req.organizationId;
+
+  if (action === 'hide') {
+    dbQuery.run(`
+      UPDATE ct_verse_community_posts
+      SET is_hidden = true
+      WHERE id = $1 AND organization_id = $2
+    `, [id, organizationId], function(err) {
+      if (err) {
+        console.error('Error hiding verse insight:', err);
+        return res.status(500).json({ success: false, error: 'Failed to hide verse insight' });
+      }
+      res.json({ success: true, message: 'Verse insight hidden' });
+    });
+  } else if (action === 'unhide') {
+    dbQuery.run(`
+      UPDATE ct_verse_community_posts
+      SET is_hidden = false
+      WHERE id = $1 AND organization_id = $2
+    `, [id, organizationId], function(err) {
+      if (err) {
+        console.error('Error unhiding verse insight:', err);
+        return res.status(500).json({ success: false, error: 'Failed to unhide verse insight' });
+      }
+      res.json({ success: true, message: 'Verse insight unhidden' });
+    });
+  } else {
+    res.status(400).json({ success: false, error: 'Invalid action. Use "hide" or "unhide"' });
+  }
+});
+
+// Get user tag data for organization
+router.get('/users', requireOrgAuth, (req, res) => {
+  const organizationId = req.organizationId;
+
+  Promise.all([
+    // Get all tag IDs that have interacted with this organization
+    new Promise((resolve, reject) => {
+      dbQuery.all(`
+        SELECT DISTINCT
+          ti.tag_id,
+          ti.ip_address,
+          MAX(ti.created_at) as last_activity,
+          MIN(ti.created_at) as first_activity,
+          COUNT(*) as total_interactions,
+          COUNT(DISTINCT DATE(ti.created_at)) as active_days
+        FROM tag_interactions ti
+        WHERE ti.organization_id = $1
+        GROUP BY ti.tag_id, ti.ip_address
+        ORDER BY last_activity DESC
+      `, [organizationId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    }),
+
+    // Get community post counts by tag
+    new Promise((resolve, reject) => {
+      dbQuery.all(`
+        SELECT
+          originating_tag_id as tag_id,
+          COUNT(CASE WHEN table_name = 'prayer_requests' THEN 1 END) as prayer_count,
+          COUNT(CASE WHEN table_name = 'praise_reports' THEN 1 END) as praise_count,
+          COUNT(CASE WHEN table_name = 'verse_insights' THEN 1 END) as insight_count,
+          COUNT(*) as total_posts
+        FROM (
+          SELECT originating_tag_id, 'prayer_requests' as table_name
+          FROM ct_prayer_requests
+          WHERE organization_id = $1 AND originating_tag_id IS NOT NULL
+
+          UNION ALL
+
+          SELECT originating_tag_id, 'praise_reports' as table_name
+          FROM ct_praise_reports
+          WHERE organization_id = $1 AND originating_tag_id IS NOT NULL
+
+          UNION ALL
+
+          SELECT originating_tag_id, 'verse_insights' as table_name
+          FROM ct_verse_community_posts
+          WHERE organization_id = $1 AND originating_tag_id IS NOT NULL
+        ) combined_posts
+        WHERE originating_tag_id IS NOT NULL
+        GROUP BY originating_tag_id
+      `, [organizationId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    })
+  ])
+  .then(([tagInteractions, communityPosts]) => {
+    // Merge the data
+    const communityMap = new Map();
+    communityPosts.forEach(post => {
+      communityMap.set(post.tag_id, post);
+    });
+
+    const userTags = tagInteractions.map(tag => ({
+      ...tag,
+      community_posts: communityMap.get(tag.tag_id) || {
+        prayer_count: 0,
+        praise_count: 0,
+        insight_count: 0,
+        total_posts: 0
+      }
+    }));
+
+    res.json({
+      success: true,
+      users: userTags,
+      stats: {
+        total_tags: userTags.length,
+        active_tags: userTags.filter(u => u.total_interactions > 0).length,
+        community_contributors: userTags.filter(u => u.community_posts.total_posts > 0).length
+      }
+    });
+  })
+  .catch(error => {
+    console.error('Users data error:', error);
+    res.status(500).json({ success: false, error: 'Failed to load user data' });
+  });
+});
+
+// Get detailed posts for a specific tag
+router.get('/users/:tagId/posts', requireOrgAuth, (req, res) => {
+  const { tagId } = req.params;
+  const organizationId = req.organizationId;
+
+  Promise.all([
+    // Prayer requests
+    new Promise((resolve, reject) => {
+      dbQuery.all(`
+        SELECT id, content, prayer_count, created_at, is_hidden, 'prayer_request' as type
+        FROM ct_prayer_requests
+        WHERE organization_id = $1 AND originating_tag_id = $2
+        ORDER BY created_at DESC
+      `, [organizationId, tagId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    }),
+
+    // Praise reports
+    new Promise((resolve, reject) => {
+      dbQuery.all(`
+        SELECT id, content, celebration_count as prayer_count, created_at, is_hidden, 'praise_report' as type
+        FROM ct_praise_reports
+        WHERE organization_id = $1 AND originating_tag_id = $2
+        ORDER BY created_at DESC
+      `, [organizationId, tagId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    }),
+
+    // Verse insights
+    new Promise((resolve, reject) => {
+      dbQuery.all(`
+        SELECT
+          p.id,
+          p.content,
+          COUNT(i.id) as prayer_count,
+          p.created_at,
+          p.is_hidden,
+          'verse_insight' as type
+        FROM ct_verse_community_posts p
+        LEFT JOIN ct_verse_community_interactions i ON p.id = i.post_id
+        WHERE p.organization_id = $1 AND p.originating_tag_id = $2
+        GROUP BY p.id, p.content, p.created_at, p.is_hidden
+        ORDER BY p.created_at DESC
+      `, [organizationId, tagId], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    })
+  ])
+  .then(([prayers, praise, insights]) => {
+    const allPosts = [...prayers, ...praise, ...insights]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    res.json({
+      success: true,
+      tagId,
+      posts: allPosts,
+      stats: {
+        prayer_requests: prayers.length,
+        praise_reports: praise.length,
+        verse_insights: insights.length,
+        total: allPosts.length
+      }
+    });
+  })
+  .catch(error => {
+    console.error('Tag posts error:', error);
+    res.status(500).json({ success: false, error: 'Failed to load tag posts' });
   });
 });
 

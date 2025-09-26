@@ -115,7 +115,9 @@ module.exports = router;
 // ===========================
 router.get('/events', requireOrgAuth, (req, res) => {
   dbQuery.all(`
-    SELECT id, title, description, location, address, start_at, end_at, all_day, link, is_active, notify_lead_minutes
+    SELECT id, title, description, location, address, start_at, end_at, all_day, link, is_active, notify_lead_minutes,
+           is_recurring, recurrence_type, recurrence_interval, recurrence_days, recurrence_end_date,
+           parent_event_id, instance_date, is_instance
     FROM CT_events 
     WHERE organization_id = $1
     ORDER BY start_at DESC
@@ -128,23 +130,49 @@ router.get('/events', requireOrgAuth, (req, res) => {
   });
 });
 
-router.post('/events', requireOrgAuth, (req, res) => {
-  const { title, description, location, address, start_at, end_at, all_day, link, is_active, notify_lead_minutes } = req.body || {};
+router.post('/events', requireOrgAuth, async (req, res) => {
+  const { 
+    title, description, location, address, start_at, end_at, all_day, link, is_active, notify_lead_minutes,
+    is_recurring, recurrence_type, recurrence_interval, recurrence_days, recurrence_end_date
+  } = req.body || {};
+  
   if (!title || !start_at) {
     return res.status(400).json({ success: false, error: 'Title and start_at are required' });
   }
-  dbQuery.run(`
-    INSERT INTO CT_events (organization_id, title, description, location, address, start_at, end_at, all_day, link, is_active, notify_lead_minutes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `, [
-    req.organizationId, title, description || null, location || null, address || null, start_at, end_at || null, !!all_day, link || null, is_active !== false, notify_lead_minutes || 120
-  ], function(err) {
-    if (err) {
-      console.error('Error creating event:', err);
-      return res.status(500).json({ success: false, error: 'Failed to create event' });
+
+  try {
+    const result = await db.query(`
+      INSERT INTO CT_events (
+        organization_id, title, description, location, address, start_at, end_at, all_day, link, is_active, notify_lead_minutes,
+        is_recurring, recurrence_type, recurrence_interval, recurrence_days, recurrence_end_date
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      RETURNING id
+    `, [
+      req.organizationId, title, description || null, location || null, address || null, 
+      start_at, end_at || null, !!all_day, link || null, is_active !== false, notify_lead_minutes || 120,
+      !!is_recurring, recurrence_type || null, recurrence_interval || 1, 
+      recurrence_days ? JSON.stringify(recurrence_days) : null, recurrence_end_date || null
+    ]);
+
+    const eventId = result.rows[0].id;
+
+    // If it's a recurring event, generate instances
+    if (is_recurring) {
+      const RecurringEventService = require('../services/recurringEventService');
+      const event = { 
+        id: eventId, 
+        ...req.body, 
+        organization_id: req.organizationId,
+        is_recurring: true
+      };
+      await RecurringEventService.generateInstancesForEvent(event, new Date(Date.now() + 90 * 24 * 60 * 60 * 1000));
     }
-    res.json({ success: true, id: this.lastID });
-  });
+
+    res.json({ success: true, id: eventId });
+  } catch (err) {
+    console.error('Error creating event:', err);
+    return res.status(500).json({ success: false, error: 'Failed to create event' });
+  }
 });
 
 router.put('/events/:id', requireOrgAuth, (req, res) => {
@@ -407,6 +435,94 @@ router.post('/bracelet-requests/:id/deny', requireOrgAuth, (req, res) => {
       });
     });
   });
+});
+
+// Get organization CTAs (Call to Actions)
+router.get('/ctas', requireOrgAuth, (req, res) => {
+  dbQuery.all(`
+    SELECT * FROM ct_organization_cta 
+    WHERE organization_id = $1 AND is_active = true
+    ORDER BY sort_order ASC, created_at DESC
+  `, [req.organizationId], (err, rows) => {
+    if (err) {
+      console.error('Error fetching CTAs:', err);
+      return res.status(500).json({ success: false, error: 'Failed to fetch CTAs' });
+    }
+    
+    res.json({ success: true, ctas: rows || [] });
+  });
+});
+
+// Create CTA
+router.post('/ctas', requireOrgAuth, (req, res) => {
+  const { title, description, url, button_text, sort_order, is_active } = req.body;
+  const organizationId = req.organizationId;
+  
+  dbQuery.run(`
+    INSERT INTO ct_organization_cta (organization_id, title, description, url, button_text, sort_order, is_active, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+  `, [organizationId, title, description, url, button_text, sort_order || 0, is_active !== false], function(err) {
+    if (err) {
+      console.error('Error creating CTA:', err);
+      return res.status(500).json({ success: false, error: 'Failed to create CTA' });
+    }
+    
+    res.json({ success: true, cta_id: this.lastID });
+  });
+});
+
+// Update CTA
+router.put('/ctas/:id', requireOrgAuth, (req, res) => {
+  const { id } = req.params;
+  const { title, description, url, button_text, sort_order, is_active } = req.body;
+  const organizationId = req.organizationId;
+  
+  dbQuery.run(`
+    UPDATE ct_organization_cta 
+    SET title = $1, description = $2, url = $3, button_text = $4, sort_order = $5, is_active = $6, updated_at = NOW()
+    WHERE id = $7 AND organization_id = $8
+  `, [title, description, url, button_text, sort_order, is_active, id, organizationId], function(err) {
+    if (err) {
+      console.error('Error updating CTA:', err);
+      return res.status(500).json({ success: false, error: 'Failed to update CTA' });
+    }
+    
+    res.json({ success: true });
+  });
+});
+
+// Delete CTA
+router.delete('/ctas/:id', requireOrgAuth, (req, res) => {
+  const { id } = req.params;
+  const organizationId = req.organizationId;
+  
+  dbQuery.run(`
+    DELETE FROM ct_organization_cta 
+    WHERE id = $1 AND organization_id = $2
+  `, [id, organizationId], function(err) {
+    if (err) {
+      console.error('Error deleting CTA:', err);
+      return res.status(500).json({ success: false, error: 'Failed to delete CTA' });
+    }
+    
+    res.json({ success: true });
+  });
+});
+
+// Generate recurring event instances (useful for maintenance/testing)
+router.post('/events/generate-instances', requireOrgAuth, async (req, res) => {
+  try {
+    const RecurringEventService = require('../services/recurringEventService');
+    const generatedCount = await RecurringEventService.generateUpcomingInstances(90);
+    res.json({ 
+      success: true, 
+      message: `Generated ${generatedCount} recurring event instances`,
+      generated: generatedCount 
+    });
+  } catch (err) {
+    console.error('Error generating recurring instances:', err);
+    res.status(500).json({ success: false, error: 'Failed to generate instances' });
+  }
 });
 
 module.exports = router;

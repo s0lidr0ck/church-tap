@@ -1,5 +1,5 @@
 const express = require('express');
-const { db, dbQuery, convertQueryParams } = require('../config/database');
+const { db, dbQuery } = require('../config/database');
 const { requireMasterAuth } = require('../config/middleware');
 const { getLocationFromIP } = require('../services/locationService');
 
@@ -82,10 +82,8 @@ router.get('/stats', requireMasterAuth, (req, res) => {
   Promise.all([
     // Total scans
     new Promise((resolve, reject) => {
-      const { sql: totalScansSql, params: totalScansParams } = convertQueryParams(
-        `SELECT COUNT(*) as count FROM tag_interactions WHERE 1=1 ${timeFilter.replace('created_at', 'tag_interactions.created_at')} ${orgFilter}`, params
-      );
-      db.query(totalScansSql, totalScansParams, (err, result) => {
+      const sql = `SELECT COUNT(*) as count FROM tag_interactions WHERE 1=1 ${timeFilter.replace('created_at', 'tag_interactions.created_at')} ${orgFilter}`;
+      db.query(sql, params, (err, result) => {
         if (err) reject(err);
         else resolve(result.rows[0]?.count || 0);
       });
@@ -93,10 +91,8 @@ router.get('/stats', requireMasterAuth, (req, res) => {
     
     // Unique tags
     new Promise((resolve, reject) => {
-      const { sql: uniqueTagsSql, params: uniqueTagsParams } = convertQueryParams(
-        `SELECT COUNT(DISTINCT tag_id) as count FROM tag_interactions WHERE 1=1 ${timeFilter.replace('created_at', 'tag_interactions.created_at')} ${orgFilter}`, params
-      );
-      db.query(uniqueTagsSql, uniqueTagsParams, (err, result) => {
+      const sql = `SELECT COUNT(DISTINCT tag_id) as count FROM tag_interactions WHERE 1=1 ${timeFilter.replace('created_at', 'tag_interactions.created_at')} ${orgFilter}`;
+      db.query(sql, params, (err, result) => {
         if (err) reject(err);
         else resolve(result.rows[0]?.count || 0);
       });
@@ -104,10 +100,8 @@ router.get('/stats', requireMasterAuth, (req, res) => {
     
     // Active sessions
     new Promise((resolve, reject) => {
-      const { sql: sessionsSql, params: sessionsParams } = convertQueryParams(
-        `SELECT COUNT(DISTINCT session_id) as count FROM tag_interactions WHERE 1=1 ${timeFilter.replace('created_at', 'tag_interactions.created_at')} ${orgFilter}`, params
-      );
-      db.query(sessionsSql, sessionsParams, (err, result) => {
+      const sql = `SELECT COUNT(DISTINCT session_id) as count FROM tag_interactions WHERE 1=1 ${timeFilter.replace('created_at', 'tag_interactions.created_at')} ${orgFilter}`;
+      db.query(sql, params, (err, result) => {
         if (err) reject(err);
         else resolve(result.rows[0]?.count || 0);
       });
@@ -115,12 +109,10 @@ router.get('/stats', requireMasterAuth, (req, res) => {
     
     // Unique countries
     new Promise((resolve, reject) => {
-      const { sql: countriesSql, params: countriesParams } = convertQueryParams(
-        `SELECT COUNT(DISTINCT s.country) as count FROM anonymous_sessions s 
-         INNER JOIN tag_interactions t ON s.session_id = t.session_id 
-         WHERE s.country IS NOT NULL AND s.country != 'Local' ${timeFilter.replace('created_at', 't.created_at')} ${orgFilter.replace('organization_id', 't.organization_id')}`, params
-      );
-      db.query(countriesSql, countriesParams, (err, result) => {
+      const sql = `SELECT COUNT(DISTINCT s.country) as count FROM anonymous_sessions s
+         INNER JOIN tag_interactions t ON s.session_id = t.session_id
+         WHERE s.country IS NOT NULL AND s.country != 'Local' ${timeFilter.replace('created_at', 't.created_at')} ${orgFilter.replace('organization_id', 't.organization_id')}`;
+      db.query(sql, params, (err, result) => {
         if (err) reject(err);
         else resolve(result.rows[0]?.count || 0);
       });
@@ -223,12 +215,25 @@ router.get('/tag-activities', requireMasterAuth, (req, res) => {
       break;
   }
 
-  let orgFilter = organization_id ? 'AND t.organization_id = ?' : '';
-  let tagFilter = tag_id ? 'AND t.tag_id LIKE ?' : '';
-  
   let params = [];
-  if (organization_id) params.push(organization_id);
-  if (tag_id) params.push(`%${tag_id}%`);
+  let paramIndex = 1;
+
+  let orgFilter = '';
+  if (organization_id) {
+    orgFilter = `AND t.organization_id = $${paramIndex}`;
+    params.push(organization_id);
+    paramIndex++;
+  }
+
+  let tagFilter = '';
+  if (tag_id) {
+    tagFilter = `AND t.tag_id LIKE $${paramIndex}`;
+    params.push(`%${tag_id}%`);
+    paramIndex++;
+  }
+
+  const limitParam = `$${paramIndex}`;
+  const offsetParam = `$${paramIndex + 1}`;
   params.push(parseInt(limit));
   params.push(parseInt(offset));
 
@@ -299,7 +304,7 @@ router.get('/tag-activities', requireMasterAuth, (req, res) => {
     LEFT JOIN ct_organizations o ON t.organization_id = o.id
     WHERE 1=1 ${timeFilter} ${orgFilter} ${tagFilter}
     ORDER BY t.created_at DESC
-    LIMIT ? OFFSET ?
+    LIMIT ${limitParam} OFFSET ${offsetParam}
   `, params, (err, rows) => {
     if (err) {
       console.error('Tag activities error:', err);
@@ -308,13 +313,26 @@ router.get('/tag-activities', requireMasterAuth, (req, res) => {
     
     // Get total count for pagination
     let countParams = [];
-    if (organization_id) countParams.push(organization_id);
-    if (tag_id) countParams.push(`%${tag_id}%`);
-    
+    let countParamIndex = 1;
+    let countOrgFilter = '';
+    let countTagFilter = '';
+
+    if (organization_id) {
+      countOrgFilter = `AND t.organization_id = $${countParamIndex}`;
+      countParams.push(organization_id);
+      countParamIndex++;
+    }
+
+    if (tag_id) {
+      countTagFilter = `AND t.tag_id LIKE $${countParamIndex}`;
+      countParams.push(`%${tag_id}%`);
+      countParamIndex++;
+    }
+
     dbQuery.get(`
       SELECT COUNT(*) as total
       FROM tag_interactions t
-      WHERE 1=1 ${timeFilter} ${orgFilter} ${tagFilter}
+      WHERE 1=1 ${timeFilter} ${countOrgFilter} ${countTagFilter}
     `, countParams, (countErr, countResult) => {
       if (countErr) {
         console.error('Tag activities count error:', countErr);
