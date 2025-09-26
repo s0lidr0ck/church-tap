@@ -72,89 +72,22 @@ router.get('/random', async (req, res) => {
 });
 
 // Get verse by date (with personalization support)
-router.get('/:date', async (req, res) => {
+router.get('/:date', (req, res) => {
   const { date } = req.params;
   const orgId = req.organizationId || 1;
-  
-  try {
-    dbQuery.get(`SELECT * FROM ct_verses WHERE date = $1 AND published = TRUE AND organization_id = $2`, [date, orgId], async (err, scheduledVerse) => {
-      if (err) {
-        return res.status(500).json({ success: false, error: 'Database error' });
-      }
-      
-      if (!req.user || !scheduledVerse) {
-        if (scheduledVerse) {
-          return res.json({ success: true, verse: scheduledVerse });
-        } else {
-          return res.json({ success: false, message: 'No verse found for this date' });
-        }
-      }
 
-      // For logged-in users, try to find a personalized verse
-      try {
-        dbQuery.get(`SELECT * FROM ct_user_preferences WHERE user_id = $1`, [req.user.userId], (err, prefs) => {
-          if (err || !prefs) {
-            return res.json({ success: true, verse: scheduledVerse });
-          }
+  dbQuery.get(`SELECT * FROM ct_verses WHERE date = $1 AND published = TRUE AND organization_id = $2`, [date, orgId], (err, scheduledVerse) => {
+    if (err) {
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
 
-          const interests = prefs.interests ? JSON.parse(prefs.interests) : [];
-          const struggles = prefs.struggles ? JSON.parse(prefs.struggles) : [];
-          const allTopics = [...interests, ...struggles];
-          
-          if (allTopics.length === 0) {
-            return res.json({ success: true, verse: scheduledVerse });
-          }
-
-          // Build personalization query
-          let conditions = allTopics.map(() => 'tags LIKE ? OR context LIKE ?').join(' OR ');
-          let searchParams = [];
-          allTopics.forEach(topic => {
-            searchParams.push(`%${topic}%`, `%${topic}%`);
-          });
-
-          let personalizedQuery = `
-            SELECT *, 
-            (
-              CASE 
-                ${allTopics.map((topic, i) => 
-                  `WHEN (tags LIKE '%${topic}%' OR context LIKE '%${topic}%') THEN ${struggles.includes(topic) ? 4 : 2}`
-                ).join(' ')}
-                ELSE 1
-              END
-            ) as relevance_score
-            FROM ct_verses 
-            WHERE published = TRUE 
-            AND date <= $1 
-            AND (${conditions})
-            AND organization_id = $2
-            ORDER BY relevance_score DESC, ABS((date - $3::date)) ASC
-            LIMIT 1
-          `;
-
-          dbQuery.get(personalizedQuery, [...searchParams, date, orgId, date], (err, personalizedVerse) => {
-            if (err) {
-              console.error('Personalization query error:', err);
-              return res.json({ success: true, verse: scheduledVerse });
-            }
-
-            if (personalizedVerse && personalizedVerse.relevance_score > 2) {
-              personalizedVerse.personalized = true;
-              personalizedVerse.reason = 'Selected based on your interests and preferences';
-              return res.json({ success: true, verse: personalizedVerse });
-            }
-
-            return res.json({ success: true, verse: scheduledVerse });
-          });
-        });
-      } catch (error) {
-        console.error('Personalization error:', error);
-        return res.json({ success: true, verse: scheduledVerse });
-      }
-    });
-  } catch (error) {
-    console.error('Verse fetch error:', error);
-    res.status(500).json({ success: false, error: 'Server error' });
-  }
+    // Simple response - just return the scheduled verse
+    if (scheduledVerse) {
+      return res.json({ success: true, verse: scheduledVerse });
+    } else {
+      return res.json({ success: false, message: 'No verse found for this date' });
+    }
+  });
 });
 
 // Heart a verse
