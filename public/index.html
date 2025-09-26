@@ -2,7 +2,7 @@
 <html lang="en" class="h-full">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
   <meta name="theme-color" content="#0ea5e9">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -50,7 +50,7 @@
   <!-- Main App -->
   <div id="app" class="hidden min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
     <!-- Header -->
-    <header class="glass-effect sticky top-0 z-40 px-4 py-3 border-b border-white/20">
+    <header class="glass-effect sticky z-40 px-4 py-3 border-b border-white/20" style="top: 44px;">
       <div class="flex items-center justify-between max-w-lg mx-auto">
         <!-- Logo/Title -->
         <div class="flex items-center space-x-2">
@@ -58,17 +58,43 @@
           <h1 class="text-lg font-semibold text-gray-800 dark:text-white">Church Tap</h1>
         </div>
 
-        <!-- Menu Toggle -->
-        <button id="menuToggle" class="p-2 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-          </svg>
-        </button>
+        <!-- Right Controls -->
+        <div class="flex items-center space-x-2">
+          <!-- Calendar Button -->
+          <button id="calendarBtn" class="relative p-3 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Open calendar">
+            <span class="text-base">📅</span>
+            <span id="calendarIndicator" class="hidden absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white dark:ring-gray-700"></span>
+          </button>
+
+          <!-- Organization Links Button -->
+          <button id="linksBtn" class="relative p-3 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Quick Links" aria-expanded="false" style="display: none;">
+            <span class="text-base">🔗</span>
+          </button>
+
+          <!-- Menu Toggle -->
+          <button id="menuToggle" class="p-3 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Open menu" aria-expanded="false">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+        </div>
       </div>
     </header>
 
+    <!-- Organization Links Menu -->
+    <div id="quickLinksMenu" class="hidden fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 min-w-48" style="top: 104px; right: 110px;">
+      <div class="p-2">
+        <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-2">
+          Quick Links
+        </div>
+        <div id="quickLinksList">
+          <!-- Organization links will be loaded here -->
+        </div>
+      </div>
+    </div>
+
     <!-- Quick Menu -->
-    <div id="quickMenu" class="hidden fixed top-16 right-4 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 min-w-48">
+    <div id="quickMenu" class="hidden fixed right-4 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 min-w-48" style="top: 104px;">
       <div class="p-4 space-y-3">
         <button id="favoritesBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
           ❤️ My Favorites
@@ -115,15 +141,6 @@
           </div>
         </div>
         
-        <!-- Organization Links -->
-        <div id="organizationLinksMenu" class="border-t border-gray-200 dark:border-gray-600 pt-3">
-          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-3">
-            Quick Links
-          </div>
-          <div id="organizationLinksList">
-            <!-- Organization links will be loaded here -->
-          </div>
-        </div>
         
         <!-- User-specific menu items -->
         <div id="userMenuItems" class="hidden border-t border-gray-200 dark:border-gray-600 pt-3">
@@ -183,8 +200,8 @@
       <!-- Date Navigation -->
       <div class="px-4 py-3">
         <div class="flex items-center justify-between max-w-lg mx-auto">
-          <button id="prevDay" class="p-3 rounded-full bg-white dark:bg-gray-800 shadow-md text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors touch-manipulation">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button id="prevDay" class="p-3 rounded-full bg-white dark:bg-gray-800 shadow-md text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Previous day">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
             </svg>
           </button>
@@ -194,8 +211,8 @@
             <div class="text-sm text-gray-500 dark:text-gray-400" id="dateDescription">Today's Verse</div>
           </div>
           
-          <button id="nextDay" class="p-3 rounded-full bg-white dark:bg-gray-800 shadow-md text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors touch-manipulation">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button id="nextDay" class="p-3 rounded-full bg-white dark:bg-gray-800 shadow-md text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Next day">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
             </svg>
           </button>
@@ -311,33 +328,33 @@
 
       <!-- Engagement Actions -->
       <div id="engagementActions" class="px-4 mt-6 hidden">
-        <div class="flex items-center justify-center space-x-6 max-w-lg mx-auto">
+        <div class="flex items-center justify-center space-x-4 max-w-lg mx-auto">
           <!-- Heart Button -->
-          <button id="heartBtn" class="flex flex-col items-center space-y-1 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation">
-            <svg class="w-6 h-6 heart-btn" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button id="heartBtn" class="flex flex-col items-center space-y-1 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation min-w-[60px] min-h-[60px]" aria-label="Like this verse">
+            <svg class="w-6 h-6 heart-btn" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
             </svg>
-            <span id="heartCount" class="text-xs text-gray-600 dark:text-gray-400">0</span>
+            <span id="heartCount" class="text-xs text-gray-600 dark:text-gray-400" aria-live="polite">0</span>
           </button>
 
           <!-- Favorite Button -->
-          <button id="favoriteBtn" class="flex flex-col items-center space-y-1 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation">
-            <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button id="favoriteBtn" class="flex flex-col items-center space-y-1 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation min-w-[60px] min-h-[60px]" aria-label="Save to favorites">
+            <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
             </svg>
             <span class="text-xs text-gray-600 dark:text-gray-400">Save</span>
           </button>
 
           <!-- QR Code Button -->
-          <button id="qrBtn" class="flex flex-col items-center space-y-1 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation">
-            <svg class="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button id="qrBtn" class="flex flex-col items-center space-y-1 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation min-w-[60px] min-h-[60px]" aria-label="Generate QR code">
+            <svg class="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1-1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
             </svg>
             <span class="text-xs text-gray-600 dark:text-gray-400">QR</span>
           </button>
           <!-- Random Verse Button -->
-          <button id="randomVerseBtn" class="flex flex-col items-center space-y-1 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation">
-            <svg class="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button id="randomVerseBtn" class="flex flex-col items-center space-y-1 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation min-w-[60px] min-h-[60px]" aria-label="Get random verse">
+            <svg class="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h16v16H4V4zM8 8h.01M16 8h.01M8 16h.01M16 16h.01M12 12h.01"></path>
             </svg>
             <span class="text-xs text-gray-600 dark:text-gray-400">Random</span>
@@ -458,9 +475,39 @@
     </nav>
   </div>
 
+  <!-- Calendar Modal -->
+  <div id="calendarModal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg mx-4">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+        <button id="prevMonthBtn" class="px-3 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">◀</button>
+        <div id="calendarMonthLabel" class="text-sm font-semibold text-gray-800 dark:text-gray-200"></div>
+        <button id="nextMonthBtn" class="px-3 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">▶</button>
+      </div>
+      <div class="px-4 pt-3 pb-1 grid grid-cols-7 gap-1 text-xs text-gray-500 dark:text-gray-400">
+        <div class="text-center">Sun</div><div class="text-center">Mon</div><div class="text-center">Tue</div><div class="text-center">Wed</div><div class="text-center">Thu</div><div class="text-center">Fri</div><div class="text-center">Sat</div>
+      </div>
+      <div id="calendarGrid" class="px-3 pb-2 grid grid-cols-7 gap-1"></div>
+      <div id="calendarEventList" class="px-4 pt-2 pb-4 border-t border-gray-200 dark:border-gray-700 max-h-56 overflow-auto"></div>
+      <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+        <button id="closeCalendarBtn" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modals and Overlays will be added by JavaScript -->
+
+  <!-- CTA Crawl (above bottom nav) -->
+  <div id="ctaCrawl" class="hidden fixed top-0 left-0 right-0 z-50 px-0">
+    <div id="ctaCrawlInner" class="relative w-full mx-auto px-3 py-2 overflow-hidden flex items-center space-x-2" style="background-color:#0ea5e9;color:#ffffff; cursor:pointer;">
+      <span id="ctaCrawlIcon">📣</span>
+      <div class="relative overflow-hidden" style="width: calc(100% - 60px);">
+        <div id="ctaCrawlText" class="whitespace-nowrap"></div>
+      </div>
+    </div>
+  </div>
   
   <!-- Scripts -->
+  <script src="/js/sessionManager.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

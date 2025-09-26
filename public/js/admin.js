@@ -19,6 +19,19 @@ class AdminDashboard {
     this.applySavedBrandTheme();
   }
 
+  // ===== Utilities: local datetime handling for datetime-local inputs =====
+  formatDateTimeLocalValue(dateInput) {
+    if (!dateInput) return '';
+    const d = (dateInput instanceof Date) ? dateInput : new Date(dateInput);
+    if (Number.isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${y}-${m}-${day}T${hh}:${mm}`; // local time, no timezone suffix
+  }
+
   setupEventListeners() {
     // Login form
     document.getElementById('loginForm').addEventListener('submit', (e) => {
@@ -90,14 +103,35 @@ class AdminDashboard {
       e.preventDefault();
       this.showTab('users');
     });
+    document.getElementById('braceletRequestsNav').addEventListener('click', (e) => {
+      e.preventDefault();
+      this.showTab('braceletRequests');
+    });
     document.getElementById('linksNav').addEventListener('click', (e) => {
       e.preventDefault();
       this.showTab('links');
     });
-    document.getElementById('verseImportNav').addEventListener('click', (e) => {
-      e.preventDefault();
-      this.showTab('verseImport');
-    });
+    const eventsNav = document.getElementById('eventsNav');
+    if (eventsNav) {
+      eventsNav.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showTab('events');
+      });
+    }
+    const ctaNav = document.getElementById('ctaNav');
+    if (ctaNav) {
+      ctaNav.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showTab('cta');
+      });
+    }
+    const verseImportNav = document.getElementById('verseImportNav');
+    if (verseImportNav) {
+      verseImportNav.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showTab('verseImport');
+      });
+    }
     document.getElementById('settingsNav').addEventListener('click', (e) => {
       e.preventDefault();
       this.showTab('settings');
@@ -107,6 +141,16 @@ class AdminDashboard {
     document.getElementById('addVerseBtn').addEventListener('click', () => {
       this.showVerseModal();
     });
+
+    // Admin: Events & CTA buttons
+    const addEventBtn = document.getElementById('addEventBtn');
+    if (addEventBtn) addEventBtn.addEventListener('click', () => this.showEventModal());
+    const addFirstEventBtn = document.getElementById('addFirstEventBtn');
+    if (addFirstEventBtn) addFirstEventBtn.addEventListener('click', () => this.showEventModal());
+    const addCtaBtn = document.getElementById('addCtaBtn');
+    if (addCtaBtn) addCtaBtn.addEventListener('click', () => this.showCtaModal());
+    const addFirstCtaBtn = document.getElementById('addFirstCtaBtn');
+    if (addFirstCtaBtn) addFirstCtaBtn.addEventListener('click', () => this.showCtaModal());
 
     // Modal events
     document.getElementById('cancelModal').addEventListener('click', () => {
@@ -143,6 +187,22 @@ class AdminDashboard {
     if (communityFilter) {
       communityFilter.addEventListener('change', () => {
         this.loadCommunityData();
+      });
+    }
+
+    // Bracelet requests refresh button
+    const refreshBraceletRequestsBtn = document.getElementById('refreshBraceletRequestsBtn');
+    if (refreshBraceletRequestsBtn) {
+      refreshBraceletRequestsBtn.addEventListener('click', () => {
+        this.loadBraceletRequests();
+      });
+    }
+
+    // Bracelet requests status filter
+    const braceletStatusFilter = document.getElementById('braceletStatusFilter');
+    if (braceletStatusFilter) {
+      braceletStatusFilter.addEventListener('change', () => {
+        this.loadBraceletRequests();
       });
     }
 
@@ -525,8 +585,8 @@ class AdminDashboard {
       }
     }
     
-    // Show default tab (verses)
-    this.showTab('verses');
+    // Show default tab (dashboard)
+    this.showTab('dashboard');
   }
 
   showTab(tabName) {
@@ -550,6 +610,7 @@ class AdminDashboard {
       'analytics': 'Analytics Dashboard', 
       'community': 'Community Management',
       'users': 'User Management',
+      'braceletRequests': 'Bracelet Requests',
       'links': 'Organization Links',
       'verseImport': 'Verse Import',
       'settings': 'Settings'
@@ -557,14 +618,24 @@ class AdminDashboard {
     document.getElementById('pageTitle').textContent = titleMap[tabName] || 'Dashboard';
 
     // Load data for specific tabs
-    if (tabName === 'analytics') {
+    if (tabName === 'dashboard') {
+      this.loadDashboard();
+    } else if (tabName === 'analytics') {
       this.loadAnalytics();
     } else if (tabName === 'community') {
       this.loadCommunityData();
+    } else if (tabName === 'users') {
+      this.loadUsers();
+    } else if (tabName === 'braceletRequests') {
+      this.loadBraceletRequests();
     } else if (tabName === 'links') {
       this.loadOrganizationLinks();
     } else if (tabName === 'verseImport') {
       this.loadVerseImportSettings();
+    } else if (tabName === 'events') {
+      this.loadEvents();
+    } else if (tabName === 'cta') {
+      this.loadCtas();
     }
   }
 
@@ -746,6 +817,277 @@ class AdminDashboard {
     `).join('');
   }
 
+  // ===== Events Admin =====
+  async loadEvents() {
+    const noMsg = document.getElementById('noEventsMessage');
+    const table = document.getElementById('eventsTableContainer');
+    try {
+      const res = await fetch('/api/admin/organization/events');
+      const data = await res.json();
+      const events = data?.events || [];
+      if (events.length === 0) {
+        noMsg.classList.remove('hidden');
+        table.classList.add('hidden');
+        return;
+      }
+      this.renderEventsTable(events);
+      noMsg.classList.add('hidden');
+      table.classList.remove('hidden');
+    } catch (e) {
+      console.error('Error loading events', e);
+      noMsg.classList.remove('hidden');
+      table.classList.add('hidden');
+    }
+  }
+
+  renderEventsTable(events) {
+    const tbody = document.getElementById('eventsTableBody');
+    tbody.innerHTML = events.map(ev => `
+      <tr class="hover:bg-gray-50">
+        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${ev.title}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${new Date(ev.start_at).toLocaleString()}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${ev.location || ''}</td>
+        <td class="px-6 py-4 whitespace-nowrap">${ev.is_active ? '<span class="status-badge status-published">Active</span>' : '<span class="status-badge status-draft">Inactive</span>'}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+          <div class="flex items-center space-x-2">
+            <button class="text-primary-600 hover:text-primary-900 font-medium" onclick="adminDashboard.showEventModal(${ev.id})">Edit</button>
+            <button class="text-red-600 hover:text-red-900 font-medium" onclick="adminDashboard.deleteEvent(${ev.id})">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  async showEventModal(id) {
+    const creating = !id;
+    const ev = creating ? null : (await (await fetch('/api/admin/organization/events')).json()).events.find(e => e.id === id);
+    const wrapper = document.createElement('div');
+    wrapper.className = 'fixed inset-0 z-50 bg-black/40 flex items-center justify-center';
+    wrapper.innerHTML = `
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4 p-5">
+        <h3 class="text-lg font-semibold mb-3">${creating ? 'Add Event' : 'Edit Event'}</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="text-sm">Title</label>
+            <input id="ev_title" class="w-full px-3 py-2 border rounded-md" value="${ev?.title || ''}">
+          </div>
+          <div>
+            <label class="text-sm">All Day</label>
+            <input id="ev_all_day" type="checkbox" ${ev?.all_day ? 'checked' : ''}>
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-sm">Description</label>
+            <textarea id="ev_description" class="w-full px-3 py-2 border rounded-md">${ev?.description || ''}</textarea>
+          </div>
+          <div>
+            <label class="text-sm">Location (name)</label>
+            <input id="ev_location" class="w-full px-3 py-2 border rounded-md" value="${ev?.location || ''}">
+          </div>
+          <div>
+            <label class="text-sm">Address</label>
+            <input id="ev_address" class="w-full px-3 py-2 border rounded-md" value="${ev?.address || ''}">
+          </div>
+          <div>
+            <label class="text-sm">Start</label>
+            <input id="ev_start" type="datetime-local" class="w-full px-3 py-2 border rounded-md" value="${ev ? this.formatDateTimeLocalValue(ev.start_at) : ''}">
+          </div>
+          <div>
+            <label class="text-sm">End</label>
+            <input id="ev_end" type="datetime-local" class="w-full px-3 py-2 border rounded-md" value="${ev?.end_at ? this.formatDateTimeLocalValue(ev.end_at) : ''}">
+          </div>
+          <div>
+            <label class="text-sm">Notify lead (min)</label>
+            <input id="ev_notify" type="number" class="w-full px-3 py-2 border rounded-md" value="${ev?.notify_lead_minutes ?? 120}">
+          </div>
+          <div>
+            <label class="text-sm">Details URL</label>
+            <input id="ev_link" class="w-full px-3 py-2 border rounded-md" value="${ev?.link || ''}">
+          </div>
+          <div>
+            <label class="text-sm">Active</label>
+            <input id="ev_active" type="checkbox" ${ev?.is_active !== false ? 'checked' : ''}>
+          </div>
+        </div>
+        <div class="mt-4 flex justify-end space-x-2">
+          <button id="ev_cancel" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">Cancel</button>
+          <button id="ev_save" class="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white">Save</button>
+        </div>
+      </div>`;
+    wrapper.addEventListener('click', (e) => { if (e.target === wrapper) wrapper.remove(); });
+    document.body.appendChild(wrapper);
+    document.getElementById('ev_cancel').onclick = () => wrapper.remove();
+    document.getElementById('ev_save').onclick = async () => {
+      const payload = {
+        title: document.getElementById('ev_title').value,
+        description: document.getElementById('ev_description').value,
+        location: document.getElementById('ev_location').value,
+        address: document.getElementById('ev_address').value,
+        start_at: document.getElementById('ev_start').value,
+        end_at: document.getElementById('ev_end').value || null,
+        all_day: document.getElementById('ev_all_day').checked,
+        link: document.getElementById('ev_link').value,
+        is_active: document.getElementById('ev_active').checked,
+        notify_lead_minutes: parseInt(document.getElementById('ev_notify').value || '120', 10)
+      };
+      const method = id ? 'PUT' : 'POST';
+      const url = id ? `/api/admin/organization/events/${id}` : '/api/admin/organization/events';
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (data.success) {
+        wrapper.remove();
+        this.loadEvents();
+        this.showToast('Event saved!');
+      } else {
+        this.showToast(data.error || 'Failed to save event', 'error');
+      }
+    };
+  }
+
+  async deleteEvent(id) {
+    if (!confirm('Delete this event?')) return;
+    const res = await fetch(`/api/admin/organization/events/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      this.loadEvents();
+      this.showToast('Event deleted');
+    } else {
+      this.showToast(data.error || 'Failed to delete event', 'error');
+    }
+  }
+
+  // ===== CTA Admin =====
+  async loadCtas() {
+    const noMsg = document.getElementById('noCtasMessage');
+    const table = document.getElementById('ctasTableContainer');
+    try {
+      const res = await fetch('/api/admin/organization/ctas');
+      const data = await res.json();
+      const ctas = data?.ctas || [];
+      if (ctas.length === 0) {
+        noMsg.classList.remove('hidden');
+        table.classList.add('hidden');
+        return;
+      }
+      this.renderCtasTable(ctas);
+      noMsg.classList.add('hidden');
+      table.classList.remove('hidden');
+    } catch (e) {
+      console.error('Error loading CTAs', e);
+      noMsg.classList.remove('hidden');
+      table.classList.add('hidden');
+    }
+  }
+
+  renderCtasTable(ctas) {
+    const tbody = document.getElementById('ctasTableBody');
+    tbody.innerHTML = ctas.map(cta => `
+      <tr class="hover:bg-gray-50">
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 truncate max-w-xs">${cta.text}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><a href="${cta.url}" target="_blank" class="text-primary-600 underline">${cta.url}</a></td>
+        <td class="px-6 py-4 whitespace-nowrap">${cta.is_active ? '<span class="status-badge status-published">Active</span>' : '<span class="status-badge status-draft">Inactive</span>'}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+          <div class="flex items-center space-x-2">
+            <button class="text-primary-600 hover:text-primary-900 font-medium" onclick="adminDashboard.showCtaModal(${cta.id})">Edit</button>
+            <button class="text-red-600 hover:text-red-900 font-medium" onclick="adminDashboard.deleteCta(${cta.id})">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  async showCtaModal(id) {
+    const creating = !id;
+    const cta = creating ? null : (await (await fetch('/api/admin/organization/ctas')).json()).ctas.find(c => c.id === id);
+    const wrapper = document.createElement('div');
+    wrapper.className = 'fixed inset-0 z-50 bg-black/40 flex items-center justify-center';
+    wrapper.innerHTML = `
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4 p-5">
+        <h3 class="text-lg font-semibold mb-3">${creating ? 'Add CTA' : 'Edit CTA'}</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="md:col-span-2">
+            <label class="text-sm">Text</label>
+            <textarea id="cta_text" class="w-full px-3 py-2 border rounded-md">${cta?.text || ''}</textarea>
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-sm">URL</label>
+            <input id="cta_url" class="w-full px-3 py-2 border rounded-md" value="${cta?.url || ''}">
+          </div>
+          <div>
+            <label class="text-sm">Icon</label>
+            <input id="cta_icon" class="w-full px-3 py-2 border rounded-md" value="${cta?.icon || '📣'}">
+          </div>
+          <div>
+            <label class="text-sm">BG Color</label>
+            <input id="cta_bg" class="w-full px-3 py-2 border rounded-md" value="${cta?.bg_color || '#0ea5e9'}">
+          </div>
+          <div>
+            <label class="text-sm">Text Color</label>
+            <input id="cta_text_color" class="w-full px-3 py-2 border rounded-md" value="${cta?.text_color || '#ffffff'}">
+          </div>
+          <div>
+            <label class="text-sm">Start</label>
+            <input id="cta_start" type="datetime-local" class="w-full px-3 py-2 border rounded-md" value="${cta?.start_at ? this.formatDateTimeLocalValue(cta.start_at) : ''}">
+          </div>
+          <div>
+            <label class="text-sm">End</label>
+            <input id="cta_end" type="datetime-local" class="w-full px-3 py-2 border rounded-md" value="${cta?.end_at ? this.formatDateTimeLocalValue(cta.end_at) : ''}">
+          </div>
+          <div>
+            <label class="text-sm">Active</label>
+            <input id="cta_active" type="checkbox" ${cta?.is_active !== false ? 'checked' : ''}>
+          </div>
+        </div>
+        <div class="mt-4 flex justify-end space-x-2">
+          <button id="cta_cancel" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">Cancel</button>
+          <button id="cta_save" class="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white">Save</button>
+        </div>
+      </div>`;
+    wrapper.addEventListener('click', (e) => { if (e.target === wrapper) wrapper.remove(); });
+    document.body.appendChild(wrapper);
+    document.getElementById('cta_cancel').onclick = () => wrapper.remove();
+    document.getElementById('cta_save').onclick = async () => {
+      const text = document.getElementById('cta_text').value.trim();
+      if (!text) {
+        this.showToast('Text is required', 'error');
+        return;
+      }
+      
+      const payload = {
+        text: text,
+        url: document.getElementById('cta_url').value.trim() || null,
+        icon: document.getElementById('cta_icon').value,
+        bg_color: document.getElementById('cta_bg').value,
+        text_color: document.getElementById('cta_text_color').value,
+        start_at: document.getElementById('cta_start').value || null,
+        end_at: document.getElementById('cta_end').value || null,
+        is_active: document.getElementById('cta_active').checked
+      };
+      const method = id ? 'PUT' : 'POST';
+      const url = id ? `/api/admin/organization/ctas/${id}` : '/api/admin/organization/ctas';
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (data.success) {
+        wrapper.remove();
+        this.loadCtas();
+        this.showToast('CTA saved!');
+      } else {
+        this.showToast(data.error || 'Failed to save CTA', 'error');
+      }
+    };
+  }
+
+  async deleteCta(id) {
+    if (!confirm('Delete this CTA?')) return;
+    const res = await fetch(`/api/admin/organization/ctas/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      this.loadCtas();
+      this.showToast('CTA deleted');
+    } else {
+      this.showToast(data.error || 'Failed to delete CTA', 'error');
+    }
+  }
+
   getFilteredVerses() {
     let result = [...this.verses];
     const { search, type, status } = this.filters;
@@ -894,6 +1236,224 @@ class AdminDashboard {
     }
   }
 
+  async loadDashboard() {
+    try {
+      console.log('Loading dashboard data...');
+      const response = await fetch('/api/admin/dashboard');
+      const data = await response.json();
+      console.log('Dashboard response:', data);
+
+      if (data.success) {
+        this.renderDashboard(data.stats);
+      } else {
+        console.error('Dashboard API error:', data.error);
+      }
+    } catch (error) {
+      console.error('Error loading dashboard:', error);
+    }
+  }
+
+  renderDashboard(stats) {
+    console.log('Rendering dashboard with stats:', stats);
+    // Update dashboard statistics cards
+    const dashboardContent = document.getElementById('dashboardContent');
+    if (dashboardContent) {
+      const statsCards = dashboardContent.querySelectorAll('dd');
+      console.log('Found', statsCards.length, 'stat cards');
+      
+      if (statsCards.length >= 3) {
+        statsCards[0].textContent = (stats.total_verses || 0).toLocaleString();
+        statsCards[1].textContent = (stats.active_users || 0).toLocaleString();
+        statsCards[2].textContent = (stats.total_hearts || 0).toLocaleString();
+        console.log('Updated dashboard cards with:', {
+          verses: stats.total_verses,
+          users: stats.active_users,
+          hearts: stats.total_hearts
+        });
+      }
+    } else {
+      console.error('Dashboard content element not found');
+    }
+  }
+
+  async loadBraceletRequests() {
+    const loadingEl = document.getElementById('loadingBraceletRequests');
+    const tableContainer = document.getElementById('braceletRequestsTableContainer');
+    const noRequestsMessage = document.getElementById('noBraceletRequestsMessage');
+    const statusFilter = document.getElementById('braceletStatusFilter');
+
+    try {
+      if (loadingEl) loadingEl.classList.remove('hidden');
+      if (tableContainer) tableContainer.classList.add('hidden');
+      if (noRequestsMessage) noRequestsMessage.classList.add('hidden');
+
+      const status = statusFilter?.value || '';
+      const url = status ? `/api/admin/organization/bracelet-requests?status=${status}` : '/api/admin/organization/bracelet-requests';
+      
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (response.ok && data.success && data.requests.length > 0) {
+        this.renderBraceletRequestsTable(data.requests);
+        if (tableContainer) tableContainer.classList.remove('hidden');
+        
+        // Update badge count for pending requests
+        const pendingCount = data.requests.filter(r => r.status === 'pending').length;
+        const badge = document.getElementById('pendingBraceletBadge');
+        if (badge) {
+          if (pendingCount > 0) {
+            badge.textContent = pendingCount;
+            badge.classList.remove('hidden');
+          } else {
+            badge.classList.add('hidden');
+          }
+        }
+      } else {
+        if (noRequestsMessage) noRequestsMessage.classList.remove('hidden');
+      }
+    } catch (error) {
+      console.error('Error loading bracelet requests:', error);
+      this.showToast('Failed to load bracelet requests', 'error');
+      if (noRequestsMessage) noRequestsMessage.classList.remove('hidden');
+    } finally {
+      if (loadingEl) loadingEl.classList.add('hidden');
+    }
+  }
+
+  renderBraceletRequestsTable(requests) {
+    const tbody = document.getElementById('braceletRequestsTableBody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = requests.map(request => {
+      const requestedDate = new Date(request.requested_at).toLocaleDateString();
+      const lastActivity = request.last_scanned_at ? new Date(request.last_scanned_at).toLocaleDateString() : 'Never';
+      const statusBadge = this.getStatusBadge(request.status);
+      
+      return `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+            ${request.bracelet_uid}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            ${statusBadge}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            ${requestedDate}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            ${lastActivity}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <div class="flex items-center space-x-2">
+              ${request.status === 'pending' ? `
+                <button onclick="adminDashboard.approveBraceletRequest(${request.id})" 
+                        class="text-green-600 hover:text-green-900 font-medium">Approve</button>
+                <button onclick="adminDashboard.denyBraceletRequest(${request.id})" 
+                        class="text-red-600 hover:text-red-900 font-medium">Deny</button>
+              ` : ''}
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  getStatusBadge(status) {
+    const badges = {
+      'pending': '<span class="status-badge status-draft">Pending</span>',
+      'approved': '<span class="status-badge status-published">Approved</span>',
+      'denied': '<span class="status-badge" style="background-color: #fee2e2; color: #dc2626;">Denied</span>'
+    };
+    return badges[status] || status;
+  }
+
+  async approveBraceletRequest(requestId) {
+    if (!confirm('Are you sure you want to approve this bracelet request?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/organization/bracelet-requests/${requestId}/approve`, {
+        method: 'POST'
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.loadBraceletRequests();
+        this.showToast('Bracelet request approved successfully!');
+      } else {
+        this.showToast(data.error || 'Failed to approve request', 'error');
+      }
+    } catch (error) {
+      console.error('Error approving bracelet request:', error);
+      this.showToast('Connection error', 'error');
+    }
+  }
+
+  async denyBraceletRequest(requestId) {
+    const reason = prompt('Please provide a reason for denying this request (optional):');
+    if (reason === null) return; // User cancelled
+    
+    try {
+      const response = await fetch(`/api/admin/organization/bracelet-requests/${requestId}/deny`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reason })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.loadBraceletRequests();
+        this.showToast('Bracelet request denied successfully!');
+      } else {
+        this.showToast(data.error || 'Failed to deny request', 'error');
+      }
+    } catch (error) {
+      console.error('Error denying bracelet request:', error);
+      this.showToast('Connection error', 'error');
+    }
+  }
+
+  async loadUsers() {
+    try {
+      // Reuse analytics data for user statistics
+      const response = await fetch('/api/admin/analytics?days=30');
+      const data = await response.json();
+
+      if (data.success) {
+        this.renderUserStats(data.analytics);
+      }
+    } catch (error) {
+      console.error('Error loading user stats:', error);
+    }
+  }
+
+  renderUserStats(analytics) {
+    // Update user statistics
+    const totalVisitorsEl = document.getElementById('totalVisitors');
+    const activeUsersEl = document.getElementById('activeUsersCount');
+    const returnRateEl = document.getElementById('returnRate');
+
+    if (totalVisitorsEl && analytics.visitor_retention) {
+      totalVisitorsEl.textContent = (analytics.visitor_retention.unique_visitors || 0).toLocaleString();
+    }
+
+    if (activeUsersEl && analytics.tag_stats) {
+      activeUsersEl.textContent = (analytics.tag_stats.unique_visitors || 0).toLocaleString();
+    }
+
+    if (returnRateEl && analytics.visitor_retention) {
+      const visitors = analytics.visitor_retention.unique_visitors || 0;
+      const returnVisitors = analytics.visitor_retention.return_visitors_7d || 0;
+      const rate = visitors > 0 ? ((returnVisitors / visitors) * 100).toFixed(1) : 0;
+      returnRateEl.textContent = `${rate}%`;
+    }
+  }
+
   async loadAnalytics() {
     try {
       const response = await fetch('/api/admin/analytics?days=7');
@@ -908,17 +1468,19 @@ class AdminDashboard {
   }
 
   renderAnalytics(analytics) {
-    // Calculate totals
-    const totalViews = analytics.daily_stats.reduce((sum, day) => sum + day.views, 0);
-    const totalVisitors = analytics.daily_stats.reduce((sum, day) => sum + day.unique_visitors, 0);
-    
-    // Calculate total hearts from verses
-    const totalHearts = this.verses.reduce((sum, verse) => sum + (verse.hearts || 0), 0);
+    // Update tag/NFC stats cards
+    document.getElementById('totalScans').textContent = (analytics.tag_stats.total_scans || 0).toLocaleString();
+    document.getElementById('uniqueSessions').textContent = (analytics.tag_stats.unique_sessions || 0).toLocaleString();
+    document.getElementById('activeTags').textContent = (analytics.tag_stats.active_tags || 0).toLocaleString();
+    document.getElementById('avgEngagement').textContent = `${analytics.tag_stats.avg_interactions_per_session || 0}x`;
 
-    // Update stats cards
-    document.getElementById('totalViews').textContent = totalViews.toLocaleString();
-    document.getElementById('uniqueVisitors').textContent = totalVisitors.toLocaleString();
-    document.getElementById('totalHearts').textContent = totalHearts.toLocaleString();
+    // Render all analytics components
+    this.renderTopTags(analytics.top_tags || []);
+    this.renderDailyScanChart(analytics.daily_scans || []);
+    this.renderGeoMap(analytics.geo_locations || []);
+    this.renderHourlyChart(analytics.hourly_patterns || []);
+    this.renderEngagementFunnel(analytics.engagement_funnel || []);
+    this.renderVisitorRetention(analytics.visitor_retention || {});
 
     // Render top verses
     const topVersesList = document.getElementById('topVersesList');
@@ -951,11 +1513,290 @@ class AdminDashboard {
             }
           </div>
           <div class="flex-shrink-0 text-right">
-            <p class="text-sm font-medium text-gray-900">${verse.views} views</p>
+            <p class="text-sm font-medium text-gray-900">${verse.total_views} views</p>
+            <div class="text-xs text-gray-500">
+              ❤️ ${verse.hearts} 🌟 ${verse.favorites} 📤 ${verse.shares}
+            </div>
           </div>
         </div>
       </li>
     `).join('');
+  }
+
+  renderTopTags(topTags) {
+    const topTagsList = document.getElementById('topTagsList');
+    
+    if (topTags.length === 0) {
+      topTagsList.innerHTML = `
+        <li class="px-4 py-4 text-center text-gray-500">
+          No tag activity in the last 7 days
+        </li>
+      `;
+      return;
+    }
+
+    topTagsList.innerHTML = topTags.map((tag, index) => {
+      const lastScan = new Date(tag.last_scan);
+      const timeAgo = this.getTimeAgo(lastScan);
+      
+      return `
+        <li class="px-4 py-4">
+          <div class="flex items-center space-x-3">
+            <div class="flex-shrink-0">
+              <span class="w-8 h-8 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-sm font-medium">
+                ${index + 1}
+              </span>
+            </div>
+            <div class="flex-1">
+              <div class="flex items-center space-x-2">
+                <p class="text-sm font-medium text-gray-900 font-mono">${tag.tag_id}</p>
+                ${tag.scans_24h > 0 ? `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Active</span>` : ''}
+              </div>
+              <p class="text-xs text-gray-500 mt-1">Last scan: ${timeAgo}</p>
+            </div>
+            <div class="flex-shrink-0 text-right">
+              <p class="text-sm font-medium text-gray-900">${tag.total_scans} scans</p>
+              <p class="text-xs text-gray-500">${tag.unique_sessions} sessions</p>
+            </div>
+          </div>
+        </li>
+      `;
+    }).join('');
+  }
+
+  renderDailyScanChart(dailyScans) {
+    const chartContainer = document.getElementById('dailyScanChart');
+    
+    if (dailyScans.length === 0) {
+      chartContainer.innerHTML = `
+        <p class="text-center text-gray-500">No scan data available for the last 7 days</p>
+      `;
+      return;
+    }
+
+    // Create a simple bar chart
+    const maxScans = Math.max(...dailyScans.map(day => parseInt(day.scans)));
+    console.log('Daily chart data:', dailyScans.map(d => `${d.date.split('T')[0]}:${d.scans}`).join(','));
+    console.log('Max scans for daily chart:', maxScans);
+    
+    chartContainer.innerHTML = `
+      <div class="space-y-3">
+        ${dailyScans.map(day => {
+          const date = new Date(day.date);
+          const scans = parseInt(day.scans);
+          const sessions = parseInt(day.sessions);
+          const percentage = maxScans > 0 ? Math.max(5, (scans / maxScans) * 100) : 5; // Minimum 5% width for visibility
+          
+          return `
+            <div class="flex items-center space-x-3">
+              <div class="w-16 text-xs text-gray-500">
+                ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </div>
+              <div class="flex-1">
+                <div class="bg-gray-200 rounded-full h-4 relative">
+                  <div class="bg-gradient-to-r from-blue-500 to-blue-600 h-4 rounded-full transition-all duration-500 shadow-sm" 
+                       style="width: ${percentage}%"></div>
+                  <span class="absolute inset-0 flex items-center justify-center text-xs font-medium text-white mix-blend-difference">
+                    ${scans} scans
+                  </span>
+                </div>
+              </div>
+              <div class="w-16 text-xs text-gray-500 text-right">
+                ${sessions} sessions
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+      <div class="text-xs text-gray-400 text-center mt-3">
+        Total: ${dailyScans.reduce((sum, d) => sum + parseInt(d.scans), 0)} scans over ${dailyScans.length} days
+      </div>
+    `;
+  }
+
+  getTimeAgo(date) {
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) {
+      return `${diffMins}m ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours}h ago`;
+    } else {
+      return `${diffDays}d ago`;
+    }
+  }
+
+  renderGeoMap(geoLocations) {
+    const mapContainer = document.getElementById('geoMap');
+    
+    if (geoLocations.length === 0) {
+      mapContainer.innerHTML = `<p class="text-center text-gray-500">No geographic data available</p>`;
+      return;
+    }
+
+    // Simple list view of locations with scan counts
+    mapContainer.innerHTML = `
+      <div class="space-y-2 max-h-64 overflow-y-auto">
+        ${geoLocations.map(location => `
+          <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
+            <div>
+              <p class="text-sm font-medium text-gray-900">${location.city || 'Unknown'}, ${location.country || 'Unknown'}</p>
+              <p class="text-xs text-gray-500">${location.unique_sessions} sessions, ${location.unique_visitors} visitors</p>
+            </div>
+            <div class="text-right">
+              <p class="text-sm font-medium text-blue-600">${location.total_scans} scans</p>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  renderHourlyChart(hourlyPatterns) {
+    const chartContainer = document.getElementById('hourlyChart');
+    
+    if (hourlyPatterns.length === 0) {
+      chartContainer.innerHTML = `<p class="text-center text-gray-500">No hourly data available</p>`;
+      return;
+    }
+
+    // Create 24-hour array and fill with data
+    const hourlyData = Array(24).fill().map((_, i) => {
+      const hourData = hourlyPatterns.find(h => parseInt(h.hour) === i);
+      return {
+        hour: i,
+        scans: hourData ? parseInt(hourData.total_scans) : 0,
+        sessions: hourData ? parseInt(hourData.unique_sessions) : 0
+      };
+    });
+
+    const maxScans = Math.max(...hourlyData.map(h => h.scans));
+    console.log('Hourly chart data:', hourlyData.map(h => `${h.hour}:${h.scans}`).join(','));
+    console.log('Max scans for hourly chart:', maxScans);
+    
+    chartContainer.innerHTML = `
+      <div class="relative h-32 mb-8">
+        <div class="flex items-end justify-between h-full space-x-1">
+          ${hourlyData.map(data => {
+            const heightPx = maxScans > 0 ? Math.max(4, (data.scans / maxScans) * 120) : 4; // Use pixels instead of percentage
+            const hour12 = data.hour === 0 ? '12a' : data.hour === 12 ? '12p' : data.hour > 12 ? `${data.hour - 12}p` : `${data.hour}a`;
+            
+            return `
+              <div class="flex flex-col items-center flex-1">
+                <div class="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-sm transition-all duration-300 relative group shadow-sm hover:from-blue-700 hover:to-blue-500" 
+                     style="height: ${heightPx}px; min-height: 4px; max-width: 20px;" 
+                     title="${hour12}: ${data.scans} scans, ${data.sessions} sessions">
+                  <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-20 shadow-lg">
+                    ${hour12}: ${data.scans} scans
+                  </div>
+                </div>
+                <span class="text-xs text-gray-500 mt-1 text-center" style="font-size: 10px;">${hour12}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+      <div class="text-xs text-gray-400 text-center mt-2">
+        Peak: ${maxScans} scans at ${hourlyData.find(h => h.scans === maxScans)?.hour || 'N/A'}:00 • Total: ${hourlyData.reduce((sum, h) => sum + h.scans, 0)} scans
+      </div>
+    `;
+  }
+
+  renderEngagementFunnel(engagementFunnel) {
+    const funnelContainer = document.getElementById('engagementFunnel');
+    
+    if (engagementFunnel.length === 0) {
+      funnelContainer.innerHTML = `<p class="text-center text-gray-500">No engagement data available</p>`;
+      return;
+    }
+
+    // Sort funnel stages in logical order
+    const stageOrder = ['scan', 'verse_view', 'heart', 'community_action'];
+    const sortedFunnel = stageOrder.map(stage => 
+      engagementFunnel.find(f => f.stage === stage) || { stage, sessions: 0, total_actions: 0 }
+    );
+
+    const maxSessions = Math.max(...sortedFunnel.map(f => parseInt(f.sessions) || 0));
+    
+    funnelContainer.innerHTML = `
+      <div class="space-y-3">
+        ${sortedFunnel.map((stage, index) => {
+          const sessions = parseInt(stage.sessions) || 0;
+          const actions = parseInt(stage.total_actions) || 0;
+          const width = maxSessions > 0 ? (sessions / maxSessions) * 100 : 0;
+          const stageName = stage.stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+          
+          // Calculate conversion rate from previous stage
+          let conversionRate = '';
+          if (index > 0) {
+            const prevSessions = parseInt(sortedFunnel[index - 1].sessions) || 0;
+            if (prevSessions > 0) {
+              const rate = ((sessions / prevSessions) * 100).toFixed(1);
+              conversionRate = ` (${rate}%)`;
+            }
+          }
+          
+          return `
+            <div class="flex items-center space-x-3">
+              <div class="w-20 text-sm text-gray-600">${stageName}</div>
+              <div class="flex-1">
+                <div class="bg-gray-200 rounded-full h-6 relative">
+                  <div class="bg-gradient-to-r from-blue-500 to-purple-600 h-6 rounded-full transition-all duration-500" 
+                       style="width: ${width}%"></div>
+                  <span class="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">
+                    ${sessions} sessions${conversionRate}
+                  </span>
+                </div>
+              </div>
+              <div class="w-16 text-xs text-gray-500 text-right">${actions} actions</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  renderVisitorRetention(retention) {
+    const retentionContainer = document.getElementById('visitorRetention');
+    
+    const uniqueVisitors = parseInt(retention.unique_visitors) || 0;
+    const totalSessions = parseInt(retention.total_sessions) || 0;
+    const avgSessions = parseFloat(retention.avg_sessions_per_visitor) || 0;
+    const multiTagVisitors = parseInt(retention.multi_tag_visitors) || 0;
+    const returnVisitors = parseInt(retention.return_visitors_7d) || 0;
+    
+    const returnRate = uniqueVisitors > 0 ? ((returnVisitors / uniqueVisitors) * 100).toFixed(1) : 0;
+    const multiTagRate = uniqueVisitors > 0 ? ((multiTagVisitors / uniqueVisitors) * 100).toFixed(1) : 0;
+    
+    retentionContainer.innerHTML = `
+      <div class="grid grid-cols-2 gap-4">
+        <div class="text-center p-3 bg-blue-50 rounded-lg">
+          <div class="text-2xl font-bold text-blue-600">${avgSessions}</div>
+          <div class="text-sm text-gray-600">Avg Sessions/Visitor</div>
+        </div>
+        <div class="text-center p-3 bg-green-50 rounded-lg">
+          <div class="text-2xl font-bold text-green-600">${returnRate}%</div>
+          <div class="text-sm text-gray-600">Return Rate</div>
+        </div>
+        <div class="text-center p-3 bg-purple-50 rounded-lg">
+          <div class="text-2xl font-bold text-purple-600">${multiTagVisitors}</div>
+          <div class="text-sm text-gray-600">Multi-Tag Users</div>
+        </div>
+        <div class="text-center p-3 bg-yellow-50 rounded-lg">
+          <div class="text-2xl font-bold text-yellow-600">${multiTagRate}%</div>
+          <div class="text-sm text-gray-600">Cross-Tag Rate</div>
+        </div>
+      </div>
+      <div class="mt-4 text-center">
+        <p class="text-sm text-gray-600">
+          ${returnVisitors} of ${uniqueVisitors} visitors returned within 7 days
+        </p>
+      </div>
+    `;
   }
 
   showToast(message, type = 'success') {
@@ -1340,6 +2181,176 @@ class AdminDashboard {
       }
     } catch (error) {
       console.error('Error deleting verse insight:', error);
+      this.showToast('Connection error', 'error');
+    }
+  }
+
+  // ===========================
+  // BRACELET REQUESTS METHODS
+  // ===========================
+  
+  async loadBraceletRequests() {
+    const loadingEl = document.getElementById('loadingBraceletRequests');
+    const tableContainer = document.getElementById('braceletRequestsTableContainer');
+    const noRequestsMessage = document.getElementById('noBraceletRequestsMessage');
+    
+    try {
+      loadingEl.classList.remove('hidden');
+      tableContainer.classList.add('hidden');
+      noRequestsMessage.classList.add('hidden');
+      
+      const status = document.getElementById('braceletStatusFilter')?.value || '';
+      const url = status ? `/api/admin/bracelet-requests?status=${status}` : '/api/admin/bracelet-requests';
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.success) {
+        this.displayBraceletRequests(data.requests);
+        this.updatePendingBraceletBadge(data.requests);
+      } else {
+        this.showToast(data.error || 'Failed to load bracelet requests', 'error');
+      }
+    } catch (error) {
+      console.error('Error loading bracelet requests:', error);
+      this.showToast('Connection error', 'error');
+    } finally {
+      loadingEl.classList.add('hidden');
+    }
+  }
+  
+  displayBraceletRequests(requests) {
+    const tableContainer = document.getElementById('braceletRequestsTableContainer');
+    const noRequestsMessage = document.getElementById('noBraceletRequestsMessage');
+    const tableBody = document.getElementById('braceletRequestsTableBody');
+    
+    if (requests.length === 0) {
+      tableContainer.classList.add('hidden');
+      noRequestsMessage.classList.remove('hidden');
+      return;
+    }
+    
+    tableContainer.classList.remove('hidden');
+    noRequestsMessage.classList.add('hidden');
+    
+    tableBody.innerHTML = requests.map(request => `
+      <tr class="hover:bg-gray-50">
+        <td class="px-6 py-4 whitespace-nowrap">
+          <div class="text-sm font-medium text-gray-900">${request.bracelet_uid}</div>
+          ${request.scan_count ? `<div class="text-xs text-gray-500">Scans: ${request.scan_count}</div>` : ''}
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          ${this.getBraceletStatusBadge(request.status)}
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+          ${new Date(request.requested_at).toLocaleDateString()}
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+          ${request.last_scanned_at ? new Date(request.last_scanned_at).toLocaleDateString() : 'Never'}
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+          ${request.status === 'pending' ? `
+            <div class="flex justify-end space-x-2">
+              <button onclick="adminDashboard.approveBraceletRequest(${request.id})" 
+                      class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                ✅ Approve
+              </button>
+              <button onclick="adminDashboard.denyBraceletRequest(${request.id})" 
+                      class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700">
+                ❌ Deny
+              </button>
+            </div>
+          ` : `
+            <span class="text-gray-500">
+              ${request.status === 'approved' ? '✅ Approved' : '❌ Denied'}
+              ${request.approved_by_username ? ` by ${request.approved_by_username}` : ''}
+            </span>
+          `}
+        </td>
+      </tr>
+    `).join('');
+  }
+  
+  getBraceletStatusBadge(status) {
+    const statusConfig = {
+      'pending': { color: 'yellow', text: 'Pending' },
+      'approved': { color: 'green', text: 'Approved' },
+      'denied': { color: 'red', text: 'Denied' }
+    };
+    
+    const config = statusConfig[status] || { color: 'gray', text: status };
+    
+    return `
+      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${config.color}-100 text-${config.color}-800">
+        ${config.text}
+      </span>
+    `;
+  }
+  
+  updatePendingBraceletBadge(requests) {
+    const badge = document.getElementById('pendingBraceletBadge');
+    const pendingCount = requests.filter(r => r.status === 'pending').length;
+    
+    if (badge) {
+      if (pendingCount > 0) {
+        badge.textContent = pendingCount;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+  }
+  
+  async approveBraceletRequest(requestId) {
+    if (!confirm('Are you sure you want to approve this bracelet request?')) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/admin/bracelet-requests/${requestId}/approve`, {
+        method: 'POST'
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.loadBraceletRequests();
+        this.showToast('Bracelet request approved successfully!');
+      } else {
+        this.showToast(data.error || 'Failed to approve request', 'error');
+      }
+    } catch (error) {
+      console.error('Error approving bracelet request:', error);
+      this.showToast('Connection error', 'error');
+    }
+  }
+  
+  async denyBraceletRequest(requestId) {
+    const reason = prompt('Optional: Enter a reason for denial:');
+    
+    if (!confirm('Are you sure you want to deny this bracelet request?')) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/admin/bracelet-requests/${requestId}/deny`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reason })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.loadBraceletRequests();
+        this.showToast('Bracelet request denied successfully!');
+      } else {
+        this.showToast(data.error || 'Failed to deny request', 'error');
+      }
+    } catch (error) {
+      console.error('Error denying bracelet request:', error);
       this.showToast('Connection error', 'error');
     }
   }

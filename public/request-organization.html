@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="theme-color" content="#0ea5e9">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Church Tap">
+
+  <title>Request a Group - Church Tap</title>
+  <meta name="description" content="Request to add your church or ministry group to Church Tap.">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Apple Touch Icons -->
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-192x192.png">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link href="/css/style.css" rel="stylesheet">
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(registration => console.log('SW registered'))
+          .catch(error => console.log('SW registration failed'));
+      });
+    }
+  </script>
+</head>
+<body class="h-full overflow-x-hidden">
+  <!-- Splash Screen -->
+  <div id="splash" class="splash-screen">
+    <div class="text-center">
+      <div class="splash-logo">✞</div>
+      <div class="text-white text-lg mt-4">Church Tap</div>
+      <div class="text-white/80 text-sm mt-2">Request a Group</div>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app" class="hidden min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <!-- Header -->
+    <header class="glass-effect sticky z-40 px-4 py-3 border-b border-white/20" style="top: 44px;">
+      <div class="flex items-center justify-between max-w-lg mx-auto">
+        <!-- Logo/Title -->
+        <div class="flex items-center space-x-2">
+          <span class="text-2xl">📝</span>
+          <div>
+            <h1 class="text-lg font-semibold text-gray-800 dark:text-white">Request a Group</h1>
+            <p class="text-xs text-gray-600 dark:text-gray-400">Add your organization</p>
+          </div>
+        </div>
+
+        <!-- Right Controls -->
+        <div class="flex items-center space-x-2">
+          <!-- Back Button -->
+          <button onclick="history.back()" class="p-3 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Go back">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="pb-8 pt-6">
+      <div class="px-4">
+        <div class="max-w-lg mx-auto">
+
+          <!-- Success State -->
+          <div id="successState" class="hidden text-center py-12">
+            <div class="text-6xl mb-4">✅</div>
+            <h3 class="text-lg font-semibold text-green-800 dark:text-green-300 mb-2">Request Submitted!</h3>
+            <p class="text-green-600 dark:text-green-400 mb-6">Your organization request has been submitted. We'll review it and get back to you soon.</p>
+            <button onclick="window.location.href = '/choose-organization?uid=' + getTagIdFromUrl()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+              ← Back to Groups
+            </button>
+          </div>
+
+          <!-- Request Form -->
+          <div id="requestForm" class="space-y-6">
+
+            <!-- Introduction -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+              <div class="text-center mb-4">
+                <div class="text-4xl mb-2">⛪</div>
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Request Your Organization</h2>
+                <p class="text-gray-600 dark:text-gray-400">Help us add your church, ministry, or group to Church Tap so others can connect with you.</p>
+              </div>
+            </div>
+
+            <!-- Form Fields -->
+            <form id="organizationRequestForm" class="space-y-4">
+
+              <!-- Organization Name -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <label for="orgName" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Organization Name *
+                </label>
+                <input
+                  type="text"
+                  id="orgName"
+                  name="orgName"
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., New Life Church, Youth Ministry, Bible Study Group"
+                >
+              </div>
+
+              <!-- Organization Type -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Organization Type *
+                </label>
+                <div class="space-y-2">
+                  <label class="flex items-center">
+                    <input type="radio" name="orgType" value="church" class="mr-3" required>
+                    <span class="text-gray-700 dark:text-gray-300">⛪ Church</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input type="radio" name="orgType" value="ministry" class="mr-3">
+                    <span class="text-gray-700 dark:text-gray-300">🤲 Ministry</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input type="radio" name="orgType" value="small_group" class="mr-3">
+                    <span class="text-gray-700 dark:text-gray-300">👥 Small Group</span>
+                  </label>
+                  <label class="flex items-center">
+                    <input type="radio" name="orgType" value="bible_study" class="mr-3">
+                    <span class="text-gray-700 dark:text-gray-300">📖 Bible Study</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Address -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Address *</h3>
+                <div class="space-y-3">
+                  <div>
+                    <label for="streetAddress" class="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                      Street Address
+                    </label>
+                    <input
+                      type="text"
+                      id="streetAddress"
+                      name="streetAddress"
+                      required
+                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="123 Main Street"
+                    >
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label for="city" class="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        City
+                      </label>
+                      <input
+                        type="text"
+                        id="city"
+                        name="city"
+                        required
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Springfield"
+                      >
+                    </div>
+                    <div>
+                      <label for="state" class="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        State
+                      </label>
+                      <input
+                        type="text"
+                        id="state"
+                        name="state"
+                        required
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="IL"
+                      >
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label for="zipCode" class="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        ZIP Code
+                      </label>
+                      <input
+                        type="text"
+                        id="zipCode"
+                        name="zipCode"
+                        required
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="62701"
+                      >
+                    </div>
+                    <div>
+                      <label for="country" class="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        Country
+                      </label>
+                      <input
+                        type="text"
+                        id="country"
+                        name="country"
+                        value="United States"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Contact Information -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Contact Information *</h3>
+                <div class="space-y-3">
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label for="firstName" class="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        First Name
+                      </label>
+                      <input
+                        type="text"
+                        id="firstName"
+                        name="firstName"
+                        required
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="John"
+                      >
+                    </div>
+                    <div>
+                      <label for="lastName" class="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        Last Name
+                      </label>
+                      <input
+                        type="text"
+                        id="lastName"
+                        name="lastName"
+                        required
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Smith"
+                      >
+                    </div>
+                  </div>
+                  <div>
+                    <label for="contactEmail" class="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      id="contactEmail"
+                      name="contactEmail"
+                      required
+                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="john.smith@email.com"
+                    >
+                  </div>
+                </div>
+              </div>
+
+              <!-- Phone Number -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <label for="phone" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  id="phone"
+                  name="phone"
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="(555) 123-4567"
+                >
+              </div>
+
+              <!-- Website -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <label for="website" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Website
+                </label>
+                <input
+                  type="url"
+                  id="website"
+                  name="website"
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://yourchurch.com"
+                >
+              </div>
+
+              <!-- Description -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <label for="description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Tell us about your organization
+                </label>
+                <textarea
+                  id="description"
+                  name="description"
+                  rows="3"
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Brief description of your organization, mission, and what makes you unique..."
+                ></textarea>
+              </div>
+
+              <!-- Submit Button -->
+              <div class="pt-4">
+                <button
+                  type="submit"
+                  id="submitBtn"
+                  class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  Submit Request
+                </button>
+              </div>
+
+              <!-- Loading State -->
+              <div id="loadingState" class="hidden text-center py-4">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p class="mt-2 text-gray-600 dark:text-gray-400">Submitting your request...</p>
+              </div>
+
+            </form>
+
+            <!-- Help Section -->
+            <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+              <h3 class="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">What happens next?</h3>
+              <ul class="text-sm text-blue-700 dark:text-blue-400 space-y-1">
+                <li>• We'll review your request within 1-2 business days</li>
+                <li>• You'll receive an email with setup instructions</li>
+                <li>• Once approved, people can find and join your group</li>
+                <li>• You'll get admin access to manage your group's content</li>
+              </ul>
+            </div>
+
+          </div>
+
+          <!-- Error State -->
+          <div id="errorState" class="hidden text-center py-12">
+            <div class="text-6xl mb-4">⚠️</div>
+            <h3 class="text-lg font-semibold text-red-800 dark:text-red-300 mb-2">Submission Failed</h3>
+            <p class="text-red-600 dark:text-red-400 mb-6" id="errorMessage">Unable to submit your request. Please try again.</p>
+            <button onclick="showRequestForm()" class="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg">
+              🔄 Try Again
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    class OrganizationRequester {
+      constructor() {
+        this.tagId = this.getTagIdFromUrl();
+
+        if (!this.tagId) {
+          this.showError('No bracelet ID provided. Please scan your bracelet again.');
+          return;
+        }
+
+        this.initializeUI();
+        this.setupEventListeners();
+      }
+
+      getTagIdFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('uid');
+      }
+
+      initializeUI() {
+        // Hide splash screen after a brief moment
+        setTimeout(() => {
+          document.getElementById('splash').style.display = 'none';
+          document.getElementById('app').classList.remove('hidden');
+        }, 800);
+      }
+
+      setupEventListeners() {
+        const form = document.getElementById('organizationRequestForm');
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          this.submitRequest();
+        });
+      }
+
+      async submitRequest() {
+        const form = document.getElementById('organizationRequestForm');
+        const formData = new FormData(form);
+
+        // Validate required fields
+        const requiredFields = ['orgName', 'orgType', 'streetAddress', 'city', 'state', 'zipCode', 'firstName', 'lastName', 'contactEmail'];
+        for (const field of requiredFields) {
+          if (!formData.get(field)) {
+            this.showError(`Please fill in the required field: ${field.replace(/([A-Z])/g, ' $1').toLowerCase()}`);
+            return;
+          }
+        }
+
+        this.showLoading();
+
+        try {
+          const requestData = {
+            tag_id: this.tagId,
+            organization_name: formData.get('orgName'),
+            organization_type: formData.get('orgType'),
+            street_address: formData.get('streetAddress'),
+            city: formData.get('city'),
+            state: formData.get('state'),
+            zip_code: formData.get('zipCode'),
+            country: formData.get('country') || 'United States',
+            first_name: formData.get('firstName'),
+            last_name: formData.get('lastName'),
+            contact_email: formData.get('contactEmail'),
+            phone: formData.get('phone'),
+            website: formData.get('website'),
+            description: formData.get('description')
+          };
+
+          const response = await fetch('/api/organization/request', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+          });
+
+          this.hideLoading();
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to submit request');
+          }
+
+          this.showSuccess();
+
+        } catch (error) {
+          console.error('Error submitting organization request:', error);
+          this.hideLoading();
+          this.showError(error.message || 'Failed to submit request. Please try again.');
+        }
+      }
+
+      showLoading() {
+        document.getElementById('requestForm').classList.add('hidden');
+        document.getElementById('loadingState').classList.remove('hidden');
+        document.getElementById('submitBtn').disabled = true;
+      }
+
+      hideLoading() {
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('submitBtn').disabled = false;
+      }
+
+      showSuccess() {
+        document.getElementById('requestForm').classList.add('hidden');
+        document.getElementById('errorState').classList.add('hidden');
+        document.getElementById('successState').classList.remove('hidden');
+      }
+
+      showError(message) {
+        document.getElementById('requestForm').classList.add('hidden');
+        document.getElementById('successState').classList.add('hidden');
+        document.getElementById('errorMessage').textContent = message;
+        document.getElementById('errorState').classList.remove('hidden');
+      }
+    }
+
+    // Global functions for buttons
+    function getTagIdFromUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('uid');
+    }
+
+    function showRequestForm() {
+      document.getElementById('errorState').classList.add('hidden');
+      document.getElementById('successState').classList.add('hidden');
+      document.getElementById('requestForm').classList.remove('hidden');
+    }
+
+    // Initialize when page loads
+    let organizationRequester;
+    document.addEventListener('DOMContentLoaded', () => {
+      organizationRequester = new OrganizationRequester();
+    });
+  </script>
+
+</body>
+</html>

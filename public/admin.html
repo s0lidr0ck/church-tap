@@ -123,11 +123,33 @@
                 Users
               </a>
               
+              <a href="#" id="braceletRequestsNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-md">
+                <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                </svg>
+                Bracelet Requests
+                <span id="pendingBraceletBadge" class="hidden ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full"></span>
+              </a>
+              
               <a href="#" id="linksNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-md">
                 <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
                 </svg>
                 Links
+              </a>
+
+              <a href="#" id="eventsNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-md">
+                <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                Events
+              </a>
+
+              <a href="#" id="ctaNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-md">
+                <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5l-7 7 7 7M19 5l-7 7 7 7"></path>
+                </svg>
+                CTA
               </a>
               
               <a href="#" id="settingsNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-md">
@@ -447,23 +469,22 @@
       <div id="analyticsContent" class="tab-content hidden">
         <h1 class="sr-only">Analytics Dashboard</h1>
         
-        <!-- Stats Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <!-- NFC & Tag Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div class="bg-white overflow-hidden shadow rounded-lg">
             <div class="p-5">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
-                  <div class="w-8 h-8 bg-primary-500 rounded-md flex items-center justify-center">
+                  <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
                     <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                     </svg>
                   </div>
                 </div>
                 <div class="ml-5 w-0 flex-1">
                   <dl>
-                    <dt class="text-sm font-medium text-gray-500 truncate">Total Views (7 days)</dt>
-                    <dd id="totalViews" class="text-lg font-medium text-gray-900">--</dd>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Total NFC Scans</dt>
+                    <dd id="totalScans" class="text-lg font-medium text-gray-900">--</dd>
                   </dl>
                 </div>
               </div>
@@ -482,8 +503,28 @@
                 </div>
                 <div class="ml-5 w-0 flex-1">
                   <dl>
-                    <dt class="text-sm font-medium text-gray-500 truncate">Unique Visitors</dt>
-                    <dd id="uniqueVisitors" class="text-lg font-medium text-gray-900">--</dd>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Unique Sessions</dt>
+                    <dd id="uniqueSessions" class="text-lg font-medium text-gray-900">--</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Active Tags</dt>
+                    <dd id="activeTags" class="text-lg font-medium text-gray-900">--</dd>
                   </dl>
                 </div>
               </div>
@@ -502,11 +543,74 @@
                 </div>
                 <div class="ml-5 w-0 flex-1">
                   <dl>
-                    <dt class="text-sm font-medium text-gray-500 truncate">Total Hearts</dt>
-                    <dd id="totalHearts" class="text-lg font-medium text-gray-900">--</dd>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Avg Engagement</dt>
+                    <dd id="avgEngagement" class="text-lg font-medium text-gray-900">--</dd>
                   </dl>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analytics Grid - Row 1 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <div class="bg-white shadow overflow-hidden sm:rounded-md">
+            <div class="px-4 py-5 sm:px-6">
+              <h3 class="text-lg leading-6 font-medium text-gray-900">Top Performing Tags (Last 7 Days)</h3>
+            </div>
+            <ul id="topTagsList" class="divide-y divide-gray-200">
+              <!-- Top tags will be loaded here -->
+            </ul>
+          </div>
+
+          <div class="bg-white shadow overflow-hidden sm:rounded-md">
+            <div class="px-4 py-5 sm:px-6">
+              <h3 class="text-lg leading-6 font-medium text-gray-900">Geographic Distribution</h3>
+            </div>
+            <div class="px-4 py-5" id="geoMap">
+              <!-- Geographic map will be loaded here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Analytics Grid - Row 2 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <div class="bg-white shadow overflow-hidden sm:rounded-md">
+            <div class="px-4 py-5 sm:px-6">
+              <h3 class="text-lg leading-6 font-medium text-gray-900">Daily Scan Activity</h3>
+            </div>
+            <div class="px-4 py-5" id="dailyScanChart">
+              <!-- Daily scan chart will be loaded here -->
+            </div>
+          </div>
+
+          <div class="bg-white shadow overflow-hidden sm:rounded-md">
+            <div class="px-4 py-5 sm:px-6">
+              <h3 class="text-lg leading-6 font-medium text-gray-900">Hourly Activity Pattern</h3>
+            </div>
+            <div class="px-4 py-5" id="hourlyChart">
+              <!-- Hourly activity chart will be loaded here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Analytics Grid - Row 3 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <div class="bg-white shadow overflow-hidden sm:rounded-md">
+            <div class="px-4 py-5 sm:px-6">
+              <h3 class="text-lg leading-6 font-medium text-gray-900">Engagement Funnel</h3>
+            </div>
+            <div class="px-4 py-5" id="engagementFunnel">
+              <!-- Engagement funnel will be loaded here -->
+            </div>
+          </div>
+
+          <div class="bg-white shadow overflow-hidden sm:rounded-md">
+            <div class="px-4 py-5 sm:px-6">
+              <h3 class="text-lg leading-6 font-medium text-gray-900">Visitor Retention</h3>
+            </div>
+            <div class="px-4 py-5" id="visitorRetention">
+              <!-- Visitor retention metrics will be loaded here -->
             </div>
           </div>
         </div>
@@ -629,8 +733,140 @@
       <!-- Users Tab -->
       <div id="usersContent" class="tab-content hidden">
         <h1 class="sr-only">User Management</h1>
+        
+        <!-- User Statistics -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m3 5.197a4 4 0 11-6.708-3.23"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Total Visitors</dt>
+                    <dd id="totalVisitors" class="text-lg font-medium text-gray-900">--</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Active Users (30 days)</dt>
+                    <dd id="activeUsersCount" class="text-lg font-medium text-gray-900">--</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Return Rate</dt>
+                    <dd id="returnRate" class="text-lg font-medium text-gray-900">--</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="bg-white shadow sm:rounded-lg p-6">
-          <p class="text-gray-600">User management panel coming soon...</p>
+          <h3 class="text-lg font-medium text-gray-900 mb-4">📊 User Analytics</h3>
+          <p class="text-gray-600 mb-4">
+            User management features are coming soon. For now, you can view user engagement data in the Analytics tab.
+          </p>
+          <div class="flex space-x-3">
+            <button onclick="adminDashboard.showTab('analytics')" class="btn-primary-modern">
+              View Analytics
+            </button>
+            <button onclick="adminDashboard.showTab('community')" class="btn-secondary-modern">
+              View Community
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bracelet Requests Tab -->
+      <div id="braceletRequestsContent" class="tab-content hidden">
+        <h1 class="sr-only">Bracelet Requests</h1>
+        <div class="mb-6 flex justify-between items-center">
+          <div>
+            <h2 class="text-2xl font-bold text-gray-900">🏷️ Bracelet Requests</h2>
+            <p class="text-gray-600">Review and approve bracelet membership requests for your organization</p>
+          </div>
+          <div class="flex items-center space-x-3">
+            <select id="braceletStatusFilter" class="form-select text-sm border-gray-300 rounded-lg">
+              <option value="">All Requests</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="denied">Denied</option>
+            </select>
+            <button id="refreshBraceletRequestsBtn" class="btn-secondary text-sm">
+              🔄 Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingBraceletRequests" class="text-center py-12 hidden">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <p class="mt-4 text-gray-600">Loading bracelet requests...</p>
+        </div>
+
+        <!-- No Requests Message -->
+        <div id="noBraceletRequestsMessage" class="modern-card text-center py-12 hidden">
+          <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span class="text-2xl">🏷️</span>
+          </div>
+          <h3 class="text-lg font-medium text-gray-900 mb-2">No bracelet requests</h3>
+          <p class="text-gray-500">When users request to join your organization with their bracelets, they'll appear here for approval.</p>
+        </div>
+
+        <!-- Requests Table -->
+        <div id="braceletRequestsTableContainer" class="modern-card overflow-hidden hidden">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 admin-table">
+              <thead>
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bracelet ID</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requested</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Activity</th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="braceletRequestsTableBody" class="bg-white divide-y divide-gray-200">
+                <!-- Requests will be loaded here -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -684,6 +920,73 @@
               <tbody id="linksTableBody" class="bg-white divide-y divide-gray-200">
                 <!-- Links will be loaded here -->
               </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Events Tab -->
+      <div id="eventsContent" class="tab-content hidden">
+        <h1 class="sr-only">Events</h1>
+        <div class="mb-4 flex justify-between items-center">
+          <h2 class="text-2xl font-bold text-gray-900">Events</h2>
+          <button id="addEventBtn" class="btn-primary-modern">Add Event</button>
+        </div>
+        <div id="noEventsMessage" class="modern-card text-center py-12 hidden">
+          <div class="text-5xl mb-4">📅</div>
+          <h3 class="text-lg font-medium text-gray-900 mb-2">No events yet</h3>
+          <p class="text-gray-500 mb-6">Create an event to appear in the app calendar</p>
+          <button id="addFirstEventBtn" class="btn-primary-modern">Create your first event</button>
+        </div>
+        <div id="eventsTableContainer" class="modern-card overflow-hidden hidden">
+          <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">Manage Events</h3>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active</th>
+                  <th class="px-6 py-3" />
+                </tr>
+              </thead>
+              <tbody id="eventsTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- CTA Tab -->
+      <div id="ctaContent" class="tab-content hidden">
+        <h1 class="sr-only">CTA</h1>
+        <div class="mb-4 flex justify-between items-center">
+          <h2 class="text-2xl font-bold text-gray-900">CTA</h2>
+          <button id="addCtaBtn" class="btn-primary-modern">Add CTA</button>
+        </div>
+        <div id="noCtasMessage" class="modern-card text-center py-12 hidden">
+          <div class="text-5xl mb-4">📣</div>
+          <h3 class="text-lg font-medium text-gray-900 mb-2">No CTAs yet</h3>
+          <p class="text-gray-500 mb-6">Create a CTA to show the crawl bar in the app</p>
+          <button id="addFirstCtaBtn" class="btn-primary-modern">Create your first CTA</button>
+        </div>
+        <div id="ctasTableContainer" class="modern-card overflow-hidden hidden">
+          <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">Manage CTAs</h3>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Text</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active</th>
+                  <th class="px-6 py-3" />
+                </tr>
+              </thead>
+              <tbody id="ctasTableBody" class="bg-white divide-y divide-gray-200"></tbody>
             </table>
           </div>
         </div>

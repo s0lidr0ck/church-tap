@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="theme-color" content="#0ea5e9">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Church Tap">
+
+  <title>Setup Your Organization - Church Tap</title>
+  <meta name="description" content="Complete your organization setup by creating your admin account.">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Apple Touch Icons -->
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-192x192.png">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link href="/css/style.css" rel="stylesheet">
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(registration => console.log('SW registered'))
+          .catch(error => console.log('SW registration failed'));
+      });
+    }
+  </script>
+</head>
+<body class="h-full overflow-x-hidden">
+  <!-- Splash Screen -->
+  <div id="splash" class="splash-screen">
+    <div class="text-center">
+      <div class="splash-logo">✞</div>
+      <div class="text-white text-lg mt-4">Church Tap</div>
+      <div class="text-white/80 text-sm mt-2">Organization Setup</div>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app" class="hidden min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <!-- Header -->
+    <header class="glass-effect sticky z-40 px-4 py-3 border-b border-white/20" style="top: 44px;">
+      <div class="flex items-center justify-between max-w-lg mx-auto">
+        <!-- Logo/Title -->
+        <div class="flex items-center space-x-2">
+          <span class="text-2xl">🚀</span>
+          <div>
+            <h1 class="text-lg font-semibold text-gray-800 dark:text-white">Organization Setup</h1>
+            <p class="text-xs text-gray-600 dark:text-gray-400">Create your admin account</p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="pb-8 pt-6">
+      <div class="px-4">
+        <div class="max-w-lg mx-auto">
+
+          <!-- Loading State -->
+          <div id="loadingState" class="text-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p class="text-gray-600 dark:text-gray-400">Validating setup link...</p>
+          </div>
+
+          <!-- Invalid Token State -->
+          <div id="invalidTokenState" class="hidden text-center py-12">
+            <div class="text-6xl mb-4">⚠️</div>
+            <h3 class="text-lg font-semibold text-red-800 dark:text-red-300 mb-2">Invalid Setup Link</h3>
+            <p class="text-red-600 dark:text-red-400 mb-6">This setup link is invalid or has expired. Please contact support for assistance.</p>
+          </div>
+
+          <!-- Setup Form -->
+          <div id="setupForm" class="hidden space-y-6">
+
+            <!-- Organization Info -->
+            <div id="organizationInfo" class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+              <div class="text-center mb-4">
+                <div class="text-4xl mb-2">🎉</div>
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Congratulations!</h2>
+                <p class="text-gray-600 dark:text-gray-400">Your organization <strong id="orgName"></strong> has been approved!</p>
+                <p class="text-sm text-gray-500 dark:text-gray-500 mt-2">Complete your setup by creating your admin account below.</p>
+              </div>
+            </div>
+
+            <!-- Admin Account Form -->
+            <form id="adminSetupForm" class="space-y-4">
+
+              <!-- Username -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <label for="username" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Admin Username *
+                </label>
+                <input
+                  type="text"
+                  id="username"
+                  name="username"
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="admin"
+                >
+                <p class="text-xs text-gray-500 mt-1">This will be your login username</p>
+              </div>
+
+              <!-- Email -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="admin@yourorganization.com"
+                >
+              </div>
+
+              <!-- Password -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Password *
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  name="password"
+                  required
+                  minlength="8"
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter a strong password"
+                >
+                <p class="text-xs text-gray-500 mt-1">Minimum 8 characters</p>
+              </div>
+
+              <!-- Confirm Password -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <label for="confirmPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Confirm Password *
+                </label>
+                <input
+                  type="password"
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  required
+                  minlength="8"
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Confirm your password"
+                >
+              </div>
+
+              <!-- Submit Button -->
+              <div class="pt-4">
+                <button
+                  type="submit"
+                  id="submitBtn"
+                  class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  Create Admin Account & Complete Setup
+                </button>
+              </div>
+
+            </form>
+
+          </div>
+
+          <!-- Success State -->
+          <div id="successState" class="hidden text-center py-12">
+            <div class="text-6xl mb-4">✅</div>
+            <h3 class="text-lg font-semibold text-green-800 dark:text-green-300 mb-2">Setup Complete!</h3>
+            <p class="text-green-600 dark:text-green-400 mb-6">Your admin account has been created successfully.</p>
+            <a href="/admin" class="inline-block px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+              Go to Admin Dashboard
+            </a>
+          </div>
+
+          <!-- Error State -->
+          <div id="errorState" class="hidden text-center py-12">
+            <div class="text-6xl mb-4">⚠️</div>
+            <h3 class="text-lg font-semibold text-red-800 dark:text-red-300 mb-2">Setup Failed</h3>
+            <p class="text-red-600 dark:text-red-400 mb-6" id="errorMessage">Unable to complete setup. Please try again.</p>
+            <button onclick="showSetupForm()" class="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg">
+              🔄 Try Again
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    class OrganizationSetup {
+      constructor() {
+        this.setupToken = this.getSetupTokenFromUrl();
+        this.organizationData = null;
+
+        if (!this.setupToken) {
+          this.showInvalidToken();
+          return;
+        }
+
+        this.initializeUI();
+        this.validateSetupToken();
+        this.setupEventListeners();
+      }
+
+      getSetupTokenFromUrl() {
+        const pathParts = window.location.pathname.split('/');
+        return pathParts[pathParts.length - 1];
+      }
+
+      initializeUI() {
+        // Hide splash screen after a brief moment
+        setTimeout(() => {
+          document.getElementById('splash').style.display = 'none';
+          document.getElementById('app').classList.remove('hidden');
+        }, 800);
+      }
+
+      async validateSetupToken() {
+        try {
+          const response = await fetch(`/setup/validate/${this.setupToken}`);
+          const data = await response.json();
+
+          if (data.success && data.organization) {
+            this.organizationData = data.organization;
+            this.showSetupForm();
+          } else {
+            this.showInvalidToken();
+          }
+        } catch (error) {
+          console.error('Error validating setup token:', error);
+          this.showInvalidToken();
+        }
+      }
+
+      showSetupForm() {
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('invalidTokenState').classList.add('hidden');
+        document.getElementById('errorState').classList.add('hidden');
+        document.getElementById('successState').classList.add('hidden');
+        document.getElementById('setupForm').classList.remove('hidden');
+
+        if (this.organizationData) {
+          document.getElementById('orgName').textContent = this.organizationData.org_name;
+          // Pre-fill email if available
+          if (this.organizationData.contact_email) {
+            document.getElementById('email').value = this.organizationData.contact_email;
+          }
+        }
+      }
+
+      showInvalidToken() {
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('setupForm').classList.add('hidden');
+        document.getElementById('errorState').classList.add('hidden');
+        document.getElementById('successState').classList.add('hidden');
+        document.getElementById('invalidTokenState').classList.remove('hidden');
+      }
+
+      setupEventListeners() {
+        const form = document.getElementById('adminSetupForm');
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          this.submitSetup();
+        });
+
+        // Password confirmation validation
+        const password = document.getElementById('password');
+        const confirmPassword = document.getElementById('confirmPassword');
+        confirmPassword.addEventListener('input', () => {
+          if (password.value !== confirmPassword.value) {
+            confirmPassword.setCustomValidity('Passwords do not match');
+          } else {
+            confirmPassword.setCustomValidity('');
+          }
+        });
+      }
+
+      async submitSetup() {
+        const form = document.getElementById('adminSetupForm');
+        const formData = new FormData(form);
+
+        // Validate passwords match
+        if (formData.get('password') !== formData.get('confirmPassword')) {
+          this.showError('Passwords do not match');
+          return;
+        }
+
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating Account...';
+
+        try {
+          const setupData = {
+            username: formData.get('username'),
+            email: formData.get('email'),
+            password: formData.get('password'),
+            setup_token: this.setupToken
+          };
+
+          const response = await fetch('/setup/complete', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(setupData)
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            this.showSuccess();
+          } else {
+            this.showError(data.error || 'Failed to create admin account');
+          }
+
+        } catch (error) {
+          console.error('Error completing setup:', error);
+          this.showError('Network error. Please try again.');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Create Admin Account & Complete Setup';
+        }
+      }
+
+      showSuccess() {
+        document.getElementById('setupForm').classList.add('hidden');
+        document.getElementById('errorState').classList.add('hidden');
+        document.getElementById('successState').classList.remove('hidden');
+      }
+
+      showError(message) {
+        document.getElementById('setupForm').classList.add('hidden');
+        document.getElementById('successState').classList.add('hidden');
+        document.getElementById('errorMessage').textContent = message;
+        document.getElementById('errorState').classList.remove('hidden');
+      }
+    }
+
+    // Global functions for buttons
+    function showSetupForm() {
+      if (window.organizationSetup) {
+        window.organizationSetup.showSetupForm();
+      }
+    }
+
+    // Initialize when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+      window.organizationSetup = new OrganizationSetup();
+    });
+  </script>
+
+</body>
+</html>
