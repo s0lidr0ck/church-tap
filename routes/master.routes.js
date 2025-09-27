@@ -406,18 +406,18 @@ router.delete('/organizations/:id', requireMasterAuth, (req, res) => {
   }
   
   // Get organization info for logging
-  db.query(`SELECT name, subdomain FROM CT_organizations WHERE id = $1`, [id], (err, result) => {
+  db.query(`SELECT name, subdomain FROM ct_organizations WHERE id = $1`, [id], (err, result) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
-    
+
     const org = result.rows[0];
     if (!org) {
       return res.status(404).json({ success: false, error: 'Organization not found' });
     }
-    
+
     // Delete organization (this will cascade delete related data)
-    db.query(`DELETE FROM CT_organizations WHERE id = $1`, [id], (err, result) => {
+    db.query(`DELETE FROM ct_organizations WHERE id = $1`, [id], (err, result) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Failed to delete organization' });
       }
