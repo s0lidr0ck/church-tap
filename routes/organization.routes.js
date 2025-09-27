@@ -15,20 +15,20 @@ router.post('/links', requireOrgAuth, (req, res) => {
     return res.status(400).json({ success: false, error: 'Title and URL are required' });
   }
   
-  dbQuery.run(
-    `INSERT INTO ct_organization_links (organization_id, title, url, icon, sort_order) 
-     VALUES (?, ?, ?, ?, ?)`,
+  db.query(
+    `INSERT INTO ct_organization_links (organization_id, title, url, icon, sort_order)
+     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
     [req.organizationId, title, url, icon || 'website', sort_order || 0],
-    function(err) {
+    (err, result) => {
       if (err) {
         console.error('Error creating organization link:', err);
         return res.status(500).json({ success: false, error: 'Failed to create link' });
       }
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         link: {
-          id: this.lastID,
+          id: result.rows[0].id,
           organization_id: req.organizationId,
           title,
           url,
@@ -50,21 +50,21 @@ router.put('/links/:id', requireOrgAuth, (req, res) => {
     return res.status(400).json({ success: false, error: 'Title and URL are required' });
   }
   
-  dbQuery.run(
-    `UPDATE ct_organization_links 
+  db.query(
+    `UPDATE ct_organization_links
      SET title = $1, url = $2, icon = $3, sort_order = $4, is_active = $5
      WHERE id = $6 AND organization_id = $7`,
     [title, url, icon || 'website', sort_order || 0, is_active !== undefined ? is_active : true, id, req.organizationId],
-    function(err) {
+    (err, result) => {
       if (err) {
         console.error('Error updating organization link:', err);
         return res.status(500).json({ success: false, error: 'Failed to update link' });
       }
-      
-      if (this.changes === 0) {
+
+      if (result.rowCount === 0) {
         return res.status(404).json({ success: false, error: 'Link not found' });
       }
-      
+
       res.json({ success: true });
     }
   );
@@ -74,20 +74,20 @@ router.put('/links/:id', requireOrgAuth, (req, res) => {
 router.delete('/links/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   
-  dbQuery.run(
-    `DELETE FROM ct_organization_links 
+  db.query(
+    `DELETE FROM ct_organization_links
      WHERE id = $1 AND organization_id = $2`,
     [id, req.organizationId],
-    function(err) {
+    (err, result) => {
       if (err) {
         console.error('Error deleting organization link:', err);
         return res.status(500).json({ success: false, error: 'Failed to delete link' });
       }
-      
-      if (this.changes === 0) {
+
+      if (result.rowCount === 0) {
         return res.status(404).json({ success: false, error: 'Link not found' });
       }
-      
+
       res.json({ success: true });
     }
   );
@@ -101,20 +101,20 @@ router.get('/links', (req, res) => {
   console.log('Organization from middleware:', req.organization);
   console.log('Organization ID resolved:', orgId);
   
-  dbQuery.all(
-    `SELECT id, title, url, icon, sort_order 
-     FROM ct_organization_links 
-     WHERE organization_id = $1 AND is_active = true 
+  db.query(
+    `SELECT id, title, url, icon, sort_order
+     FROM ct_organization_links
+     WHERE organization_id = $1 AND is_active = true
      ORDER BY sort_order ASC, title ASC`,
     [orgId],
-    (err, rows) => {
+    (err, result) => {
       if (err) {
         console.error('Error fetching organization links:', err);
         return res.status(500).json({ success: false, error: 'Failed to fetch links' });
       }
-      console.log('Found', rows.length, 'active organization links for org', orgId);
-      console.log('Links found:', rows);
-      res.json(rows);
+      console.log('Found', result.rows.length, 'active organization links for org', orgId);
+      console.log('Links found:', result.rows);
+      res.json(result.rows);
     }
   );
 });
@@ -127,7 +127,7 @@ router.get('/calendar/daily', (req, res) => {
     return res.status(400).json({ success: false, error: 'date required (YYYY-MM-DD)' });
   }
 
-  dbQuery.all(
+  db.query(
     `SELECT id, title, description, location, address, start_at, end_at, all_day, link, notify_lead_minutes
      FROM CT_events
      WHERE organization_id = $1
@@ -135,12 +135,12 @@ router.get('/calendar/daily', (req, res) => {
        AND DATE(start_at) = $2
      ORDER BY start_at ASC`,
     [orgId, date],
-    (err, rows) => {
+    (err, result) => {
       if (err) {
         console.error('Error fetching daily events:', err);
         return res.status(500).json({ success: false, error: 'Failed to fetch daily events' });
       }
-      res.json({ success: true, events: rows || [] });
+      res.json({ success: true, events: result.rows || [] });
     }
   );
 });
@@ -153,7 +153,7 @@ router.get('/calendar/month', (req, res) => {
     return res.status(400).json({ success: false, error: 'ym required (YYYY-MM)' });
   }
 
-  dbQuery.all(
+  db.query(
     `WITH bounds AS (
        SELECT DATE_TRUNC('month', $2::date) AS month_start,
               (DATE_TRUNC('month', $2::date) + INTERVAL '1 month') AS next_month
@@ -166,12 +166,12 @@ router.get('/calendar/month', (req, res) => {
        AND COALESCE(e.end_at, e.start_at) >= b.month_start
      ORDER BY e.start_at ASC`,
     [orgId, ym + '-01'],
-    (err, rows) => {
+    (err, result) => {
       if (err) {
         console.error('Error fetching month events:', err);
         return res.status(500).json({ success: false, error: 'Failed to fetch month events' });
       }
-      res.json({ success: true, events: rows || [] });
+      res.json({ success: true, events: result.rows || [] });
     }
   );
 });
@@ -179,7 +179,7 @@ router.get('/calendar/month', (req, res) => {
 // Active CTA for organization
 router.get('/cta', (req, res) => {
   const orgId = req.organization?.id || 1;
-  dbQuery.get(
+  db.query(
     `SELECT id, text, url, icon, bg_color, text_color, start_at, end_at
      FROM CT_organization_cta
      WHERE organization_id = $1
@@ -189,12 +189,12 @@ router.get('/cta', (req, res) => {
      ORDER BY COALESCE(start_at, NOW()) DESC
      LIMIT 1`,
     [orgId],
-    (err, row) => {
+    (err, result) => {
       if (err) {
         console.error('Error fetching CTA:', err);
         return res.status(500).json({ success: false, error: 'Failed to fetch CTA' });
       }
-      res.json({ success: true, cta: row || null });
+      res.json({ success: true, cta: result.rows[0] || null });
     }
   );
 });

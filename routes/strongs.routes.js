@@ -36,7 +36,7 @@ router.get('/definition/:number', async (req, res) => {
   
   // First check if we have it cached
   dbQuery.get(`
-    SELECT * FROM ct_strongs_references WHERE strongs_number = ?
+    SELECT * FROM ct_strongs_references WHERE strongs_number = $1
   `, [number], async (err, row) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });

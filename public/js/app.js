@@ -2440,6 +2440,20 @@ class ChurchTapApp {
     }
   }
 
+  async logTagScan(tagId) {
+    try {
+      console.log(`🏷️ Logging tag scan: ${tagId}`);
+      await fetch('/api/nfc/scan/' + tagId, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (error) {
+      console.error('Tag scan logging error:', error);
+    }
+  }
+
   checkNotificationPermission() {
     if ('Notification' in window && 'serviceWorker' in navigator) {
       if (Notification.permission === 'default') {
@@ -2606,6 +2620,11 @@ class ChurchTapApp {
 
     localStorage.setItem('nfc_tag_session', JSON.stringify(sessionData));
     console.log(`📊 Tag session tracked: ${this.currentTagId} (${sessionData.pageViews} views)`);
+
+    // If this is a new tag session (not returning to existing), log the scan
+    if (!existingSession || existingSession.tagId !== this.currentTagId) {
+      this.logTagScan(this.currentTagId);
+    }
   }
 
   getTagSession() {

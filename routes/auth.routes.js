@@ -46,8 +46,8 @@ router.post('/register', validateInput.email, validateInput.password, validateIn
       const verificationToken = crypto.randomBytes(32).toString('hex');
 
       // Create user
-      dbQuery.run(`INSERT INTO ct_users (email, password_hash, first_name, last_name, display_name, verification_token) 
-              VALUES (?, ?, ?, ?, ?, ?)`,
+      dbQuery.run(`INSERT INTO ct_users (email, password_hash, first_name, last_name, display_name, verification_token)
+              VALUES ($1, $2, $3, $4, $5, $6)`,
         [email.toLowerCase(), passwordHash, firstName, lastName, displayName, verificationToken],
         function(err) {
           if (err) {
@@ -57,7 +57,7 @@ router.post('/register', validateInput.email, validateInput.password, validateIn
           const userId = this.lastID;
 
           // Create default user preferences
-          dbQuery.run(`INSERT INTO ct_user_preferences (user_id) VALUES (?)`, [userId], (err) => {
+          dbQuery.run(`INSERT INTO ct_user_preferences (user_id) VALUES ($1)`, [userId], (err) => {
             if (err) {
               console.error('Error creating user preferences:', err);
             }

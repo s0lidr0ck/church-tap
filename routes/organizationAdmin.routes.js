@@ -8,17 +8,17 @@ const router = express.Router();
 
 // Admin: Get all organization links
 router.get('/links', requireOrgAuth, (req, res) => {
-  dbQuery.all(
-    `SELECT * FROM ct_organization_links 
-     WHERE organization_id = $1 
+  db.query(
+    `SELECT * FROM ct_organization_links
+     WHERE organization_id = $1
      ORDER BY sort_order ASC, title ASC`,
     [req.organizationId],
-    (err, rows) => {
+    (err, result) => {
       if (err) {
         console.error('Error fetching organization links:', err);
         return res.status(500).json({ success: false, error: 'Failed to fetch links' });
       }
-      res.json(rows);
+      res.json(result.rows || []);
     }
   );
 });
@@ -32,8 +32,8 @@ router.post('/links', requireOrgAuth, (req, res) => {
   }
   
   dbQuery.run(
-    `INSERT INTO ct_organization_links (organization_id, title, url, icon, sort_order) 
-     VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO ct_organization_links (organization_id, title, url, icon, sort_order)
+     VALUES ($1, $2, $3, $4, $5)`,
     [req.organizationId, title, url, icon || 'website', sort_order || 0],
     function(err) {
       if (err) {
@@ -278,7 +278,7 @@ router.post('/ctas', requireOrgAuth, (req, res) => {
   }
   dbQuery.run(`
     INSERT INTO CT_organization_cta (organization_id, text, url, icon, bg_color, text_color, start_at, end_at, is_active)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
   `, [req.organizationId, text, url || null, icon || '📣', bg_color || '#0ea5e9', text_color || '#ffffff', start_at || null, end_at || null, is_active !== false], function(err) {
     if (err) {
       console.error('Error creating CTA:', err);
@@ -298,7 +298,7 @@ router.put('/ctas/:id', requireOrgAuth, (req, res) => {
     UPDATE CT_organization_cta
     SET text = $1, url = $2, icon = $3, bg_color = $4, text_color = $5, start_at = $6, end_at = $7, is_active = $8
     WHERE id = $9 AND organization_id = $10
-  `, [text, url || null, icon || '📣', bg_color || '#0ea5e9', text_color || '#ffffff', start_at || null, end_at || null, is_active !== false, id, req.organizationId], function(err) {
+  `, [text, url || null, icon || '📣', bg_color || '#0ea5e9', text_color || '#ffffff', start_at || null, end_at || null, is_active !== false, id, req.organizationId], (err, result) => {
     if (err) {
       console.error('Error updating CTA:', err);
       return res.status(500).json({ success: false, error: 'Failed to update CTA' });

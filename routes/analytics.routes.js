@@ -29,7 +29,7 @@ router.post('/', (req, res) => {
   };
   
   tryResolveAttribution(() => {
-    console.log(`Analytics tracking - action: ${action}, verse_id: ${verse_id}, taggedSession: ${taggedSessionId}, originatingTag: ${originatingTagId}, sessionId: ${sessionIdCookie}`);
+    console.log(`Analytics tracking - action: ${action}, verse_id: ${verse_id}, taggedSession: ${taggedSessionId}, originatingTag: ${originatingTagId}, sessionId: ${sessionIdCookie}, orgId: ${orgId}`);
 
     // Only track analytics if we have a valid organization
     if (!orgId) {
@@ -39,7 +39,7 @@ router.post('/', (req, res) => {
 
     dbQuery.run(`INSERT INTO ct_analytics
       (verse_id, action, ip_address, user_agent, organization_id, tagged_session_id, originating_tag_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [verse_id, action, ip, userAgent, orgId, taggedSessionId, originatingTagId], (err) => {
       if (err) {
         console.error('Analytics error:', err);
@@ -47,13 +47,15 @@ router.post('/', (req, res) => {
       }
       
       // Also mirror to tag_interactions so session analytics reflect the event immediately
+      console.log(`Tag interactions check - sessionIdCookie: ${sessionIdCookie}, originatingTagId: ${originatingTagId}, orgId: ${orgId}`);
       if (sessionIdCookie && originatingTagId && orgId) {
+        console.log('Writing to tag_interactions table');
         const interactionData = { action, verse_id };
         dbQuery.run(`
           INSERT INTO tag_interactions (
             session_id, tag_id, interaction_type, page_url, referrer,
             user_agent, ip_address, organization_id, interaction_data, tagged_session_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         `, [
           sessionIdCookie,
           originatingTagId,
@@ -65,12 +67,17 @@ router.post('/', (req, res) => {
           orgId,
           JSON.stringify(interactionData),
           taggedSessionId || null
-        ], () => {});
+        ], (err) => {
+          if (err) console.error('Tag interactions insert error:', err);
+          else console.log('Tag interactions insert successful');
+        });
+      } else {
+        console.log('Skipping tag_interactions insert - missing required data');
       }
 
       // Update session activity timestamp if we have a tagged session
       if (taggedSessionId) {
-        dbQuery.run(`UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE tagged_session_id = ?`, [taggedSessionId]);
+        dbQuery.run(`UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE tagged_session_id = $1`, [taggedSessionId]);
       }
       
       res.json({ success: true });
@@ -104,9 +111,9 @@ router.post('/sync', (req, res) => {
       }
       
       const ev = events[index];
-      dbQuery.run(`INSERT INTO ct_analytics 
-        (verse_id, action, ip_address, user_agent, organization_id, tagged_session_id, originating_tag_id) 
-        VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      dbQuery.run(`INSERT INTO ct_analytics
+        (verse_id, action, ip_address, user_agent, organization_id, tagged_session_id, originating_tag_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [ev.verse_id || null, ev.action || 'bg_event', ip, userAgent, orgId, taggedSessionId, originatingTagId],
         (err) => {
           if (err) {
@@ -122,9 +129,9 @@ router.post('/sync', (req, res) => {
     processEvent(0);
   } else {
     dbQuery.run(
-      `INSERT INTO ct_analytics 
-        (verse_id, action, ip_address, user_agent, organization_id, tagged_session_id, originating_tag_id) 
-        VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO ct_analytics
+        (verse_id, action, ip_address, user_agent, organization_id, tagged_session_id, originating_tag_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [null, 'background-sync', ip, userAgent, orgId, taggedSessionId, originatingTagId],
       (err) => {
         if (err) {
@@ -134,7 +141,7 @@ router.post('/sync', (req, res) => {
         
         // Update session activity timestamp if we have a tagged session
         if (taggedSessionId) {
-          dbQuery.run(`UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE tagged_session_id = ?`, [taggedSessionId]);
+          dbQuery.run(`UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE tagged_session_id = $1`, [taggedSessionId]);
         }
         
         return res.json({ success: true });

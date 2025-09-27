@@ -28,8 +28,8 @@ router.get('/map-data', requireMasterAuth, (req, res) => {
   let orgFilter = organization_id ? 'AND organization_id = $1' : '';
   let params = organization_id ? [organization_id] : [];
 
-  dbQuery.all(`
-    SELECT 
+  db.query(`
+    SELECT
       country,
       city,
       latitude,
@@ -37,18 +37,18 @@ router.get('/map-data', requireMasterAuth, (req, res) => {
       COUNT(*) as session_count,
       SUM(total_interactions) as total_interactions,
       COUNT(DISTINCT ip_address) as unique_ips
-    FROM anonymous_sessions 
+    FROM anonymous_sessions
     WHERE latitude IS NOT NULL AND longitude IS NOT NULL
     ${timeFilter} ${orgFilter}
     GROUP BY country, city, latitude, longitude
     ORDER BY session_count DESC
-  `, params, (err, rows) => {
+  `, params, (err, result) => {
     if (err) {
       console.error('Map data error:', err);
       return res.status(500).json({ success: false, error: 'Failed to get map data' });
     }
-    
-    res.json({ success: true, locations: rows || [] });
+
+    res.json({ success: true, locations: result.rows || [] });
   });
 });
 
@@ -237,8 +237,8 @@ router.get('/tag-activities', requireMasterAuth, (req, res) => {
   params.push(parseInt(limit));
   params.push(parseInt(offset));
 
-  dbQuery.all(`
-    SELECT 
+  db.query(`
+    SELECT
       t.id,
       t.session_id,
       t.tag_id,
@@ -255,45 +255,45 @@ router.get('/tag-activities', requireMasterAuth, (req, res) => {
       o.subdomain,
       -- Count ALL follow-up activities directly linked to this tag session
       COALESCE((
-        SELECT COUNT(*) 
-        FROM ct_prayer_requests pr 
+        SELECT COUNT(*)
+        FROM ct_prayer_requests pr
         WHERE pr.originating_tag_id = t.tag_id
         AND pr.created_at >= t.created_at
         AND pr.created_at <= t.created_at + INTERVAL '30 minutes'
-      ), 0) + 
+      ), 0) +
       COALESCE((
-        SELECT COUNT(*) 
-        FROM ct_prayer_interactions pi 
+        SELECT COUNT(*)
+        FROM ct_prayer_interactions pi
         WHERE pi.originating_tag_id = t.tag_id
         AND pi.created_at >= t.created_at
         AND pi.created_at <= t.created_at + INTERVAL '30 minutes'
       ), 0) as prayer_count,
-      
+
       COALESCE((
-        SELECT COUNT(*) 
-        FROM ct_praise_reports pr2 
+        SELECT COUNT(*)
+        FROM ct_praise_reports pr2
         WHERE pr2.originating_tag_id = t.tag_id
         AND pr2.created_at >= t.created_at
         AND pr2.created_at <= t.created_at + INTERVAL '30 minutes'
-      ), 0) + 
+      ), 0) +
       COALESCE((
-        SELECT COUNT(*) 
-        FROM ct_celebration_interactions ci 
+        SELECT COUNT(*)
+        FROM ct_celebration_interactions ci
         WHERE ci.originating_tag_id = t.tag_id
         AND ci.created_at >= t.created_at
         AND ci.created_at <= t.created_at + INTERVAL '30 minutes'
       ), 0) as praise_count,
-      
+
       COALESCE((
-        SELECT COUNT(*) 
-        FROM ct_verse_community_posts vcp 
+        SELECT COUNT(*)
+        FROM ct_verse_community_posts vcp
         WHERE vcp.originating_tag_id = t.tag_id
         AND vcp.created_at >= t.created_at
         AND vcp.created_at <= t.created_at + INTERVAL '30 minutes'
-      ), 0) + 
+      ), 0) +
       COALESCE((
-        SELECT COUNT(*) 
-        FROM ct_analytics a 
+        SELECT COUNT(*)
+        FROM ct_analytics a
         WHERE a.originating_tag_id = t.tag_id
         AND a.timestamp >= t.created_at
         AND a.timestamp <= t.created_at + INTERVAL '30 minutes'
@@ -305,11 +305,13 @@ router.get('/tag-activities', requireMasterAuth, (req, res) => {
     WHERE 1=1 ${timeFilter} ${orgFilter} ${tagFilter}
     ORDER BY t.created_at DESC
     LIMIT ${limitParam} OFFSET ${offsetParam}
-  `, params, (err, rows) => {
+  `, params, (err, result) => {
     if (err) {
       console.error('Tag activities error:', err);
       return res.status(500).json({ success: false, error: 'Failed to get tag activities' });
     }
+
+    const rows = result.rows;
     
     // Get total count for pagination
     let countParams = [];
@@ -329,7 +331,7 @@ router.get('/tag-activities', requireMasterAuth, (req, res) => {
       countParamIndex++;
     }
 
-    dbQuery.get(`
+    db.query(`
       SELECT COUNT(*) as total
       FROM tag_interactions t
       WHERE 1=1 ${timeFilter} ${countOrgFilter} ${countTagFilter}
@@ -338,15 +340,15 @@ router.get('/tag-activities', requireMasterAuth, (req, res) => {
         console.error('Tag activities count error:', countErr);
         return res.status(500).json({ success: false, error: 'Failed to get count' });
       }
-      
-      res.json({ 
-        success: true, 
-        activities: rows || [], 
-        total: countResult?.total || 0,
+
+      res.json({
+        success: true,
+        activities: rows || [],
+        total: countResult.rows[0]?.total || 0,
         pagination: {
           limit: parseInt(limit),
           offset: parseInt(offset),
-          hasMore: (parseInt(offset) + parseInt(limit)) < (countResult?.total || 0)
+          hasMore: (parseInt(offset) + parseInt(limit)) < (countResult.rows[0]?.total || 0)
         }
       });
     });
@@ -857,8 +859,8 @@ router.get('/ip-details/:ip', requireMasterAuth, (req, res) => {
       break;
   }
 
-  dbQuery.all(`
-    SELECT 
+  db.query(`
+    SELECT
       t.*,
       s.country,
       s.city,
@@ -870,13 +872,13 @@ router.get('/ip-details/:ip', requireMasterAuth, (req, res) => {
     LEFT JOIN ct_organizations o ON t.organization_id = o.id
     WHERE (s.ip_address = $1 OR t.ip_address = $1) ${timeFilter}
     ORDER BY t.created_at DESC
-  `, [ip], (err, rows) => {
+  `, [ip], (err, result) => {
     if (err) {
       console.error('IP details error:', err);
       return res.status(500).json({ success: false, error: 'Failed to get IP details' });
     }
-    
-    res.json({ success: true, sessions: rows || [] });
+
+    res.json({ success: true, sessions: result.rows || [] });
   });
 });
 
@@ -954,8 +956,8 @@ router.get('/tag-details/:tagId', requireMasterAuth, (req, res) => {
 // Debug endpoint to check activity data
 router.get('/debug-activities', requireMasterAuth, (req, res) => {
   // Get recent tag interactions
-  dbQuery.all(`
-    SELECT 
+  db.query(`
+    SELECT
       t.id,
       t.session_id,
       t.tag_id,
@@ -968,48 +970,56 @@ router.get('/debug-activities', requireMasterAuth, (req, res) => {
     WHERE t.created_at >= NOW() - INTERVAL '7 days'
     ORDER BY t.created_at DESC
     LIMIT 5
-  `, [], (err, tagRows) => {
+  `, [], (err, tagResult) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
+
+    const tagRows = tagResult.rows;
     
     // Get recent prayer requests
-    dbQuery.all(`
+    db.query(`
       SELECT id, ip_address, created_at, organization_id, content
-      FROM ct_prayer_requests 
+      FROM ct_prayer_requests
       WHERE created_at >= NOW() - INTERVAL '7 days'
       ORDER BY created_at DESC
       LIMIT 5
-    `, [], (err, prayerRows) => {
+    `, [], (err, prayerResult) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
+
+      const prayerRows = prayerResult.rows;
       
       // Get recent praise reports
-      dbQuery.all(`
+      db.query(`
         SELECT id, ip_address, created_at, organization_id, content
-        FROM ct_praise_reports 
+        FROM ct_praise_reports
         WHERE created_at >= NOW() - INTERVAL '7 days'
         ORDER BY created_at DESC
         LIMIT 5
-      `, [], (err, praiseRows) => {
+      `, [], (err, praiseResult) => {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
+
+        const praiseRows = praiseResult.rows;
         
         // Get recent analytics events
-        dbQuery.all(`
+        db.query(`
           SELECT action, verse_id, ip_address, timestamp as created_at, tagged_session_id, originating_tag_id
-          FROM CT_analytics 
+          FROM CT_analytics
           WHERE timestamp >= NOW() - INTERVAL '7 days'
           ORDER BY timestamp DESC
           LIMIT 10
-        `, [], (err, analyticsRows) => {
+        `, [], (err, analyticsResult) => {
           if (err) {
             console.error('Analytics query error:', err);
             return res.status(500).json({ success: false, error: 'Database error', details: err.message });
           }
-          
+
+          const analyticsRows = analyticsResult.rows;
+
           res.json({
             success: true,
             debug: {

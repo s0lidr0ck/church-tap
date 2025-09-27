@@ -25,9 +25,9 @@ router.post('/', validateInput.communityContent, validateInput.sanitizeHtml, (re
     return res.status(400).json({ success: false, error: 'Prayer request too long (max 500 characters)' });
   }
   
-  dbQuery.run(`INSERT INTO ct_prayer_requests 
-    (date, content, user_token, ip_address, organization_id, is_approved, tagged_session_id, originating_tag_id) 
-    VALUES (?, ?, ?, ?, ?, TRUE, ?, ?)`,
+  dbQuery.run(`INSERT INTO ct_prayer_requests
+    (date, content, user_token, ip_address, organization_id, is_approved, tagged_session_id, originating_tag_id)
+    VALUES ($1, $2, $3, $4, $5, TRUE, $6, $7)`,
     [today, content.trim(), user_token, ip, orgId, taggedSessionId, originatingTagId], function(err) {
       if (err) {
         console.error('Error submitting prayer request:', err);
@@ -36,7 +36,7 @@ router.post('/', validateInput.communityContent, validateInput.sanitizeHtml, (re
       
       // Update session activity timestamp if we have a tagged session
       if (taggedSessionId) {
-        dbQuery.run(`UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE tagged_session_id = ?`, [taggedSessionId]);
+        dbQuery.run(`UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE tagged_session_id = $1`, [taggedSessionId]);
         console.log(`🙏 Prayer request linked to tag session: ${originatingTagId}`);
       }
       
@@ -60,20 +60,20 @@ router.post('/pray', (req, res) => {
   }
   
   // Check if user already prayed for this request
-  dbQuery.get(`SELECT id FROM ct_prayer_interactions WHERE prayer_request_id = $1 AND user_token = $2`,
-    [prayer_request_id, user_token], (err, row) => {
+  db.query(`SELECT id FROM ct_prayer_interactions WHERE prayer_request_id = $1 AND user_token = $2`,
+    [prayer_request_id, user_token], (err, result) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
-      
-      if (row) {
+
+      if (result.rows && result.rows.length > 0) {
         return res.status(400).json({ success: false, error: 'You already prayed for this request' });
       }
       
       // Add prayer interaction with session attribution
-      dbQuery.run(`INSERT INTO ct_prayer_interactions 
-        (prayer_request_id, user_token, ip_address, tagged_session_id, originating_tag_id) 
-        VALUES (?, ?, ?, ?, ?)`,
+      dbQuery.run(`INSERT INTO ct_prayer_interactions
+        (prayer_request_id, user_token, ip_address, tagged_session_id, originating_tag_id)
+        VALUES ($1, $2, $3, $4, $5)`,
         [prayer_request_id, user_token, ip, taggedSessionId, originatingTagId], function(err) {
           if (err) {
             return res.status(500).json({ success: false, error: 'Database error' });
@@ -81,7 +81,7 @@ router.post('/pray', (req, res) => {
           
           // Update session activity timestamp if we have a tagged session
           if (taggedSessionId) {
-            dbQuery.run(`UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE tagged_session_id = ?`, [taggedSessionId]);
+            dbQuery.run(`UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE tagged_session_id = $1`, [taggedSessionId]);
             console.log(`🙏 Prayer interaction linked to tag session: ${originatingTagId}`);
           }
           
@@ -93,13 +93,13 @@ router.post('/pray', (req, res) => {
               }
               
               // Get updated count
-              dbQuery.get(`SELECT prayer_count FROM ct_prayer_requests WHERE id = $1`, 
-                [prayer_request_id], (err, row) => {
+              db.query(`SELECT prayer_count FROM ct_prayer_requests WHERE id = $1`,
+                [prayer_request_id], (err, result) => {
                   if (err) {
                     return res.status(500).json({ success: false, error: 'Database error' });
                   }
-                  
-                  res.json({ success: true, prayer_count: row ? row.prayer_count : 0 });
+
+                  res.json({ success: true, prayer_count: result.rows && result.rows.length > 0 ? result.rows[0].prayer_count : 0 });
                 });
             });
         });

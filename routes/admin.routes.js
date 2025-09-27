@@ -20,10 +20,11 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Username and password required' });
   }
   
-  dbQuery.get(`SELECT au.*, o.name as organization_name, o.subdomain as organization_subdomain 
-           FROM ct_admin_users au 
-           LEFT JOIN ct_organizations o ON au.organization_id = o.id 
-           WHERE au.username = $1 AND au.is_active = TRUE`, [username], async (err, user) => {
+  db.query(`SELECT au.*, o.name as organization_name, o.subdomain as organization_subdomain
+           FROM ct_admin_users au
+           LEFT JOIN ct_organizations o ON au.organization_id = o.id
+           WHERE au.username = $1 AND au.is_active = TRUE`, [username], async (err, result) => {
+    const user = result.rows[0];
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -67,10 +68,11 @@ router.post('/logout', (req, res) => {
 // Check admin session status
 router.get('/check-session', (req, res) => {
   if (req.session.adminId) {
-    dbQuery.get(`SELECT au.*, o.name as organization_name, o.subdomain as organization_subdomain 
-            FROM ct_admin_users au 
-            LEFT JOIN ct_organizations o ON au.organization_id = o.id 
-            WHERE au.id = $1 AND au.is_active = TRUE`, [req.session.adminId], (err, admin) => {
+    db.query(`SELECT au.*, o.name as organization_name, o.subdomain as organization_subdomain
+            FROM ct_admin_users au
+            LEFT JOIN ct_organizations o ON au.organization_id = o.id
+            WHERE au.id = $1 AND au.is_active = TRUE`, [req.session.adminId], (err, result) => {
+      const admin = result.rows[0];
       if (err) {
         console.error('Error checking admin session:', err);
         return res.json({ success: false, authenticated: false });
@@ -146,15 +148,15 @@ router.post('/verses', requireOrgAuth, upload.single('image'), async (req, res) 
       image_path = s3Result.path;
     }
     
-    dbQuery.run(`INSERT INTO ct_verses (date, content_type, verse_text, image_path, bible_reference, context, tags, published, organization_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    db.query(`INSERT INTO ct_verses (date, content_type, verse_text, image_path, bible_reference, context, tags, published, organization_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
       [date, content_type, verse_text, image_path, bible_reference, context, tags, published || 0, req.organizationId],
-      function(err) {
+      (err, result) => {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
-        
-        res.json({ success: true, verse_id: this.lastID });
+
+        res.json({ success: true, verse_id: result.rows[0].id });
       });
   } catch (error) {
     console.error('Error creating verse:', error);
@@ -234,12 +236,12 @@ router.post('/verses/bulk', requireOrgAuth, (req, res) => {
     return res.status(400).json({ success: false, error: 'Invalid bulk operation data' });
   }
   
-  const placeholders = verse_ids.map(() => '?').join(',');
+  const placeholders = verse_ids.map((_, index) => `$${index + 1}`).join(',');
   const params = [...verse_ids, req.organizationId];
   
   switch (operation) {
     case 'delete':
-      db.query(`DELETE FROM ct_verses WHERE id IN (${placeholders}) AND organization_id = $${params.length}`, params, (err, result) => {
+      db.query(`DELETE FROM ct_verses WHERE id IN (${placeholders}) AND organization_id = $${verse_ids.length + 1}`, params, (err, result) => {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
@@ -248,7 +250,7 @@ router.post('/verses/bulk', requireOrgAuth, (req, res) => {
       break;
       
     case 'publish':
-      db.query(`UPDATE ct_verses SET published = TRUE WHERE id IN (${placeholders}) AND organization_id = $${params.length}`, params, (err, result) => {
+      db.query(`UPDATE ct_verses SET published = TRUE WHERE id IN (${placeholders}) AND organization_id = $${verse_ids.length + 1}`, params, (err, result) => {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
@@ -257,7 +259,7 @@ router.post('/verses/bulk', requireOrgAuth, (req, res) => {
       break;
       
     case 'unpublish':
-      db.query(`UPDATE ct_verses SET published = FALSE WHERE id IN (${placeholders}) AND organization_id = $${params.length}`, params, (err, result) => {
+      db.query(`UPDATE ct_verses SET published = FALSE WHERE id IN (${placeholders}) AND organization_id = $${verse_ids.length + 1}`, params, (err, result) => {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
@@ -348,10 +350,10 @@ router.post('/verses/import', requireOrgAuth, upload.single('csv'), (req, res) =
           return;
         }
         
-        dbQuery.run(`INSERT INTO ct_verses (date, content_type, verse_text, bible_reference, context, tags, published, organization_id)
+        db.query(`INSERT INTO ct_verses (date, content_type, verse_text, bible_reference, context, tags, published, organization_id)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [date, content_type, verse_text || '', bible_reference || '', context || '', tags || '', published === 'true' ? 1 : 0, req.organizationId],
-          function(err) {
+          (err, result) => {
             if (err) {
               errors.push(`Row ${index + 1}: ${err.message}`);
             } else {
@@ -408,12 +410,13 @@ router.get('/verses/export', requireOrgAuth, (req, res) => {
 router.get('/verse-import/settings', requireOrgAuth, (req, res) => {
   const organizationId = req.organizationId;
   
-  dbQuery.get(
-    `SELECT enabled, bible_version, import_time, fallback_versions 
-     FROM CT_verse_import_settings 
+  db.query(
+    `SELECT enabled, bible_version, import_time, fallback_versions
+     FROM CT_verse_import_settings
      WHERE organization_id = $1`,
     [organizationId],
-    (err, row) => {
+    (err, result) => {
+      const row = result.rows[0];
       if (err) {
         console.error('Error fetching verse import settings:', err);
         return res.status(500).json({ success: false, error: 'Database error' });
@@ -427,12 +430,12 @@ router.get('/verse-import/settings', requireOrgAuth, (req, res) => {
           fallbackVersions: ['NIV', 'NLT', 'KJV']
         };
         
-        dbQuery.run(
+        db.query(
           `INSERT INTO CT_verse_import_settings (organization_id, enabled, bible_version, import_time, fallback_versions)
            VALUES ($1, $2, $3, $4, $5)`,
           [organizationId, defaultSettings.enabled, defaultSettings.bibleVersion,
            defaultSettings.importTime, JSON.stringify(defaultSettings.fallbackVersions)],
-          (insertErr) => {
+          (insertErr, insertResult) => {
             if (insertErr) {
               console.error('Error creating default verse import settings:', insertErr);
             }
@@ -470,21 +473,21 @@ router.put('/verse-import/settings', requireOrgAuth, (req, res) => {
   const { enabled, bibleVersion, importTime, fallbackVersions } = req.body;
   const organizationId = req.organizationId;
   
-  dbQuery.run(
-    `UPDATE CT_verse_import_settings 
+  db.query(
+    `UPDATE CT_verse_import_settings
      SET enabled = $1, bible_version = $2, import_time = $3, fallback_versions = $4
      WHERE organization_id = $5`,
     [enabled, bibleVersion, importTime, JSON.stringify(fallbackVersions), organizationId],
-    function(err) {
+    (err, result) => {
       if (err) {
         console.error('Error updating verse import settings:', err);
         return res.status(500).json({ success: false, error: 'Database error' });
       }
-      
+
       if (result.rowCount === 0) {
         return res.status(404).json({ success: false, error: 'Settings not found' });
       }
-      
+
       res.json({ success: true });
     }
   );
@@ -552,25 +555,25 @@ router.get('/dashboard', requireOrgAuth, (req, res) => {
     
     // Active users (unique visitors in last 30 days)
     new Promise((resolve, reject) => {
-      dbQuery.all(`
+      db.query(`
         SELECT COUNT(DISTINCT ip_address) as active_users
-        FROM ct_analytics 
+        FROM ct_analytics
         WHERE organization_id = $1 AND timestamp >= NOW() - INTERVAL '30 days'
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows[0]?.active_users || 0);
+        else resolve(result.rows[0]?.active_users || 0);
       });
     }),
     
     // Total hearts
     new Promise((resolve, reject) => {
-      dbQuery.all(`
+      db.query(`
         SELECT COUNT(*) as total_hearts
-        FROM ct_analytics 
+        FROM ct_analytics
         WHERE organization_id = $1 AND action = 'heart'
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows[0]?.total_hearts || 0);
+        else resolve(result.rows[0]?.total_hearts || 0);
       });
     })
   ])
@@ -604,46 +607,46 @@ router.get('/analytics', requireOrgAuth, (req, res) => {
   Promise.all([
     // Daily verse views
     new Promise((resolve, reject) => {
-      dbQuery.all(`
-        SELECT 
+      db.query(`
+        SELECT
           DATE(timestamp) as date,
           COUNT(*) as views,
           COUNT(DISTINCT verse_id) as unique_verses,
           COUNT(DISTINCT ip_address) as unique_visitors
-        FROM ct_analytics 
-        WHERE organization_id = $1 AND action IN ('verse_view', 'view') 
+        FROM ct_analytics
+        WHERE organization_id = $1 AND action IN ('verse_view', 'view')
         ${timeFilter}
         GROUP BY DATE(timestamp)
         ORDER BY date DESC
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     }),
     
     // Engagement actions (heart, favorite, share, download)
     new Promise((resolve, reject) => {
-      dbQuery.all(`
-        SELECT 
+      db.query(`
+        SELECT
           action,
           COUNT(*) as count,
           COUNT(DISTINCT verse_id) as unique_verses,
           COUNT(DISTINCT ip_address) as unique_users
-        FROM ct_analytics 
+        FROM ct_analytics
         WHERE organization_id = $1 AND action IN ('heart', 'favorite', 'share', 'download')
         ${timeFilter}
         GROUP BY action
         ORDER BY count DESC
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     }),
     
     // Top verses
     new Promise((resolve, reject) => {
-      dbQuery.all(`
-        SELECT 
+      db.query(`
+        SELECT
           v.id,
           v.bible_reference,
           v.verse_text,
@@ -658,27 +661,27 @@ router.get('/analytics', requireOrgAuth, (req, res) => {
         GROUP BY v.id, v.bible_reference, v.verse_text, v.date
         ORDER BY total_views DESC, v.date DESC
         LIMIT 10
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     }),
     
     // Enhanced tag interaction stats
     new Promise((resolve, reject) => {
-      dbQuery.all(`
-        SELECT 
+      db.query(`
+        SELECT
           COUNT(*) as total_scans,
           COUNT(DISTINCT session_id) as unique_sessions,
           COUNT(DISTINCT tag_id) as active_tags,
           COUNT(DISTINCT ip_address) as unique_visitors
-        FROM tag_interactions 
-        WHERE organization_id = $1 
+        FROM tag_interactions
+        WHERE organization_id = $1
         AND created_at >= NOW() - INTERVAL '${parseInt(days)} days'
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
         else {
-          const stats = rows[0] || { total_scans: 0, unique_sessions: 0, active_tags: 0, unique_visitors: 0 };
+          const stats = result.rows[0] || { total_scans: 0, unique_sessions: 0, active_tags: 0, unique_visitors: 0 };
           // Calculate average interactions per session separately if we have data
           if (stats.unique_sessions > 0) {
             stats.avg_interactions_per_session = (stats.total_scans / stats.unique_sessions).toFixed(1);
@@ -692,28 +695,28 @@ router.get('/analytics', requireOrgAuth, (req, res) => {
     
     // Daily tag scan trends
     new Promise((resolve, reject) => {
-      dbQuery.all(`
-        SELECT 
+      db.query(`
+        SELECT
           DATE(created_at) as date,
           COUNT(*) as scans,
           COUNT(DISTINCT session_id) as sessions,
           COUNT(DISTINCT tag_id) as unique_tags,
           COUNT(DISTINCT ip_address) as unique_visitors
-        FROM tag_interactions 
-        WHERE organization_id = $1 
+        FROM tag_interactions
+        WHERE organization_id = $1
         AND created_at >= NOW() - INTERVAL '${parseInt(days)} days'
         GROUP BY DATE(created_at)
         ORDER BY date DESC
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     }),
     
     // Top performing tags
     new Promise((resolve, reject) => {
-      dbQuery.all(`
-        SELECT 
+      db.query(`
+        SELECT
           t.tag_id,
           COUNT(*) as total_scans,
           COUNT(DISTINCT t.session_id) as unique_sessions,
@@ -721,21 +724,21 @@ router.get('/analytics', requireOrgAuth, (req, res) => {
           MAX(t.created_at) as last_scan,
           COUNT(CASE WHEN t.created_at >= NOW() - INTERVAL '24 hours' THEN 1 END) as scans_24h
         FROM tag_interactions t
-        WHERE t.organization_id = $1 
+        WHERE t.organization_id = $1
         AND t.created_at >= NOW() - INTERVAL '${parseInt(days)} days'
         GROUP BY t.tag_id
         ORDER BY total_scans DESC, last_scan DESC
         LIMIT 10
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     }),
     
     // Geographic analytics (simplified fallback)
     new Promise((resolve, reject) => {
-      dbQuery.all(`
-        SELECT 
+      db.query(`
+        SELECT
           s.country,
           s.city,
           s.region,
@@ -744,76 +747,76 @@ router.get('/analytics', requireOrgAuth, (req, res) => {
           COUNT(DISTINCT t.ip_address) as unique_visitors
         FROM tag_interactions t
         JOIN anonymous_sessions s ON t.session_id = s.session_id
-        WHERE t.organization_id = $1 
+        WHERE t.organization_id = $1
         AND t.created_at >= NOW() - INTERVAL '${parseInt(days)} days'
         AND (s.country IS NOT NULL OR s.city IS NOT NULL)
         GROUP BY s.country, s.city, s.region
         ORDER BY total_scans DESC
         LIMIT 50
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) {
           console.error('Geographic analytics error:', err);
           // Fallback: try to get any geographic data at all
-          dbQuery.all(`
+          db.query(`
             SELECT DISTINCT country, city, region
-            FROM anonymous_sessions 
+            FROM anonymous_sessions
             WHERE (country IS NOT NULL OR city IS NOT NULL)
             LIMIT 10
-          `, [], (err2, fallbackRows) => {
+          `, [], (err2, fallbackResult) => {
             if (err2) {
               console.error('Geographic fallback error:', err2);
               resolve([]);
             } else {
-              console.log('Geographic fallback data:', fallbackRows);
-              resolve(fallbackRows?.map(row => ({
-                ...row, 
-                total_scans: 0, 
-                unique_sessions: 0, 
+              console.log('Geographic fallback data:', fallbackResult.rows);
+              resolve(fallbackResult.rows?.map(row => ({
+                ...row,
+                total_scans: 0,
+                unique_sessions: 0,
                 unique_visitors: 0
               })) || []);
             }
           });
         } else {
-          console.log('Geographic data found:', rows?.length || 0, 'locations');
-          resolve(rows || []);
+          console.log('Geographic data found:', result.rows?.length || 0, 'locations');
+          resolve(result.rows || []);
         }
       });
     }),
     
     // Time-based patterns (hourly)
     new Promise((resolve, reject) => {
-      dbQuery.all(`
-        SELECT 
+      db.query(`
+        SELECT
           EXTRACT(HOUR FROM t.created_at) as hour,
           COUNT(*) as total_scans,
           COUNT(DISTINCT t.session_id) as unique_sessions
         FROM tag_interactions t
-        WHERE t.organization_id = $1 
+        WHERE t.organization_id = $1
         AND t.created_at >= NOW() - INTERVAL '${parseInt(days)} days'
         GROUP BY EXTRACT(HOUR FROM t.created_at)
         ORDER BY hour
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     }),
     
     // Day-of-week patterns
     new Promise((resolve, reject) => {
-      dbQuery.all(`
-        SELECT 
+      db.query(`
+        SELECT
           EXTRACT(DOW FROM t.created_at) as day_of_week,
           COUNT(*) as total_scans,
           COUNT(DISTINCT t.session_id) as unique_sessions,
           COUNT(DISTINCT DATE(t.created_at)) as active_days
         FROM tag_interactions t
-        WHERE t.organization_id = $1 
+        WHERE t.organization_id = $1
         AND t.created_at >= NOW() - INTERVAL '${parseInt(days)} days'
         GROUP BY EXTRACT(DOW FROM t.created_at)
         ORDER BY day_of_week
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     }),
     
@@ -822,44 +825,44 @@ router.get('/analytics', requireOrgAuth, (req, res) => {
       Promise.all([
         // Scans
         new Promise((resolve, reject) => {
-          dbQuery.all(`
+          db.query(`
             SELECT COUNT(DISTINCT session_id) as sessions, COUNT(*) as total_actions
-            FROM tag_interactions 
+            FROM tag_interactions
             WHERE organization_id = $1 AND created_at >= NOW() - INTERVAL '${parseInt(days)} days'
-          `, [organizationId], (err, rows) => {
+          `, [organizationId], (err, result) => {
             if (err) reject(err);
-            else resolve({ stage: 'scan', ...rows[0] });
+            else resolve({ stage: 'scan', ...result.rows[0] });
           });
         }),
         // Hearts
         new Promise((resolve, reject) => {
-          dbQuery.all(`
+          db.query(`
             SELECT COUNT(DISTINCT tagged_session_id) as sessions, COUNT(*) as total_actions
-            FROM CT_analytics 
-            WHERE organization_id = $1 AND action = 'heart' 
+            FROM CT_analytics
+            WHERE organization_id = $1 AND action = 'heart'
             AND timestamp >= NOW() - INTERVAL '${parseInt(days)} days'
-          `, [organizationId], (err, rows) => {
+          `, [organizationId], (err, result) => {
             if (err) {
               console.error('Hearts analytics error:', err);
               resolve({ stage: 'heart', sessions: 0, total_actions: 0 });
             } else {
-              resolve({ stage: 'heart', ...rows[0] });
+              resolve({ stage: 'heart', ...result.rows[0] });
             }
           });
         }),
         // Community actions
         new Promise((resolve, reject) => {
-          dbQuery.all(`
+          db.query(`
             SELECT COUNT(DISTINCT originating_tag_id) as sessions, COUNT(*) as total_actions
-            FROM CT_prayer_requests 
+            FROM CT_prayer_requests
             WHERE organization_id = $1 AND created_at >= NOW() - INTERVAL '${parseInt(days)} days'
             AND originating_tag_id IS NOT NULL
-          `, [organizationId], (err, rows) => {
+          `, [organizationId], (err, result) => {
             if (err) {
               console.error('Community analytics error:', err);
               resolve({ stage: 'community_action', sessions: 0, total_actions: 0 });
             } else {
-              resolve({ stage: 'community_action', ...rows[0] });
+              resolve({ stage: 'community_action', ...result.rows[0] });
             }
           });
         })
@@ -868,28 +871,28 @@ router.get('/analytics', requireOrgAuth, (req, res) => {
     
     // Return visitor analysis
     new Promise((resolve, reject) => {
-      dbQuery.all(`
-        SELECT 
+      db.query(`
+        SELECT
           visitor_sessions.unique_visitors,
           visitor_sessions.total_sessions,
           visitor_sessions.avg_sessions_per_visitor,
           multi_tag_users.multi_tag_visitors,
           recent_returns.return_visitors_7d
         FROM (
-          SELECT 
+          SELECT
             COUNT(DISTINCT ip_address) as unique_visitors,
             COUNT(DISTINCT session_id) as total_sessions,
             ROUND(COUNT(DISTINCT session_id)::numeric / COUNT(DISTINCT ip_address), 2) as avg_sessions_per_visitor
-          FROM tag_interactions 
-          WHERE organization_id = $1 
+          FROM tag_interactions
+          WHERE organization_id = $1
           AND created_at >= NOW() - INTERVAL '${parseInt(days)} days'
         ) visitor_sessions
         CROSS JOIN (
           SELECT COUNT(*) as multi_tag_visitors
           FROM (
             SELECT ip_address
-            FROM tag_interactions 
-            WHERE organization_id = $1 
+            FROM tag_interactions
+            WHERE organization_id = $1
             AND created_at >= NOW() - INTERVAL '${parseInt(days)} days'
             GROUP BY ip_address
             HAVING COUNT(DISTINCT tag_id) > 1
@@ -899,16 +902,16 @@ router.get('/analytics', requireOrgAuth, (req, res) => {
           SELECT COUNT(*) as return_visitors_7d
           FROM (
             SELECT ip_address
-            FROM tag_interactions 
-            WHERE organization_id = $1 
+            FROM tag_interactions
+            WHERE organization_id = $1
             AND created_at >= NOW() - INTERVAL '${parseInt(days)} days'
             GROUP BY ip_address
             HAVING COUNT(DISTINCT DATE(created_at)) > 1
           ) returning_users
         ) recent_returns
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows[0] || { unique_visitors: 0, total_sessions: 0, avg_sessions_per_visitor: 0, multi_tag_visitors: 0, return_visitors_7d: 0 });
+        else resolve(result.rows[0] || { unique_visitors: 0, total_sessions: 0, avg_sessions_per_visitor: 0, multi_tag_visitors: 0, return_visitors_7d: 0 });
       });
     })
   ])
@@ -946,78 +949,78 @@ router.get('/community', requireOrgAuth, (req, res) => {
   Promise.all([
     // Prayer requests
     new Promise((resolve, reject) => {
-      dbQuery.all(`
+      db.query(`
         SELECT COUNT(*) as count, DATE(created_at) as date
-        FROM ct_prayer_requests 
+        FROM ct_prayer_requests
         WHERE organization_id = $1 AND created_at >= NOW() - INTERVAL '${days} days'
         GROUP BY DATE(created_at)
         ORDER BY date DESC
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     }),
     
     // Praise reports
     new Promise((resolve, reject) => {
-      dbQuery.all(`
+      db.query(`
         SELECT COUNT(*) as count, DATE(created_at) as date
-        FROM ct_praise_reports 
+        FROM ct_praise_reports
         WHERE organization_id = $1 AND created_at >= NOW() - INTERVAL '${days} days'
         GROUP BY DATE(created_at)
         ORDER BY date DESC
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     }),
     
     // Recent prayer requests
     new Promise((resolve, reject) => {
-      dbQuery.all(`
+      db.query(`
         SELECT id, content, prayer_count, created_at, is_hidden
-        FROM ct_prayer_requests 
-        WHERE organization_id = $1 
-        ORDER BY created_at DESC 
+        FROM ct_prayer_requests
+        WHERE organization_id = $1
+        ORDER BY created_at DESC
         LIMIT 20
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     }),
     
     // Recent praise reports
     new Promise((resolve, reject) => {
-      dbQuery.all(`
+      db.query(`
         SELECT id, content, celebration_count, created_at, is_hidden
-        FROM ct_praise_reports 
-        WHERE organization_id = $1 
-        ORDER BY created_at DESC 
+        FROM ct_praise_reports
+        WHERE organization_id = $1
+        ORDER BY created_at DESC
         LIMIT 20
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     }),
     
     // Recent verse insights
     new Promise((resolve, reject) => {
-      dbQuery.all(`
-        SELECT 
-          p.id, 
-          p.content, 
-          COUNT(i.id) as heart_count, 
-          p.created_at, 
+      db.query(`
+        SELECT
+          p.id,
+          p.content,
+          COUNT(i.id) as heart_count,
+          p.created_at,
           p.is_hidden
         FROM ct_verse_community_posts p
         LEFT JOIN ct_verse_community_interactions i ON p.id = i.post_id
-        WHERE p.organization_id = $1 
+        WHERE p.organization_id = $1
         GROUP BY p.id, p.content, p.created_at, p.is_hidden
-        ORDER BY p.created_at DESC 
+        ORDER BY p.created_at DESC
         LIMIT 20
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     })
   ])
@@ -1044,24 +1047,24 @@ router.get('/community', requireOrgAuth, (req, res) => {
 router.get('/bracelet-requests', requireOrgAuth, (req, res) => {
   const organizationId = req.organizationId;
   
-  dbQuery.all(`
-    SELECT br.*, u.email, u.first_name, u.last_name 
+  db.query(`
+    SELECT br.*, u.email, u.first_name, u.last_name
     FROM ct_bracelet_requests br
     LEFT JOIN ct_users u ON br.user_id = u.id
-    WHERE br.organization_id = $1 
+    WHERE br.organization_id = $1
     ORDER BY br.created_at DESC
-  `, [organizationId], (err, rows) => {
+  `, [organizationId], (err, result) => {
     if (err) {
       console.error('Bracelet requests error:', err);
       return res.status(500).json({ success: false, error: 'Database error' });
     }
-    
-    const requests = rows.map(request => ({
+
+    const requests = result.rows.map(request => ({
       ...request,
       created_at: request.created_at ? new Date(request.created_at).toLocaleString() : null,
       updated_at: request.updated_at ? new Date(request.updated_at).toLocaleString() : null
     }));
-    
+
     res.json({ success: true, requests });
   });
 });
@@ -1072,16 +1075,16 @@ router.put('/bracelet-requests/:id', requireOrgAuth, (req, res) => {
   const { status, admin_notes } = req.body;
   const organizationId = req.organizationId;
   
-  dbQuery.run(`
-    UPDATE ct_bracelet_requests 
+  db.query(`
+    UPDATE ct_bracelet_requests
     SET status = $1, admin_notes = $2, updated_at = NOW()
     WHERE id = $3 AND organization_id = $4
-  `, [status, admin_notes, id, organizationId], function(err) {
+  `, [status, admin_notes, id, organizationId], (err, result) => {
     if (err) {
       console.error('Update bracelet request error:', err);
       return res.status(500).json({ success: false, error: 'Database error' });
     }
-    
+
     res.json({ success: true });
   });
 });
@@ -1093,11 +1096,11 @@ router.put('/prayer-request/:id', requireOrgAuth, (req, res) => {
   const organizationId = req.organizationId;
   
   if (action === 'hide') {
-    dbQuery.run(`
-      UPDATE ct_prayer_requests 
-      SET is_hidden = true 
+    db.query(`
+      UPDATE ct_prayer_requests
+      SET is_hidden = true
       WHERE id = $1 AND organization_id = $2
-    `, [id, organizationId], function(err) {
+    `, [id, organizationId], (err, result) => {
       if (err) {
         console.error('Error hiding prayer request:', err);
         return res.status(500).json({ success: false, error: 'Failed to hide prayer request' });
@@ -1105,11 +1108,11 @@ router.put('/prayer-request/:id', requireOrgAuth, (req, res) => {
       res.json({ success: true, message: 'Prayer request hidden' });
     });
   } else if (action === 'unhide') {
-    dbQuery.run(`
-      UPDATE ct_prayer_requests 
-      SET is_hidden = false 
+    db.query(`
+      UPDATE ct_prayer_requests
+      SET is_hidden = false
       WHERE id = $1 AND organization_id = $2
-    `, [id, organizationId], function(err) {
+    `, [id, organizationId], (err, result) => {
       if (err) {
         console.error('Error unhiding prayer request:', err);
         return res.status(500).json({ success: false, error: 'Failed to unhide prayer request' });
@@ -1128,11 +1131,11 @@ router.put('/praise-report/:id', requireOrgAuth, (req, res) => {
   const organizationId = req.organizationId;
   
   if (action === 'hide') {
-    dbQuery.run(`
-      UPDATE ct_praise_reports 
-      SET is_hidden = true 
+    db.query(`
+      UPDATE ct_praise_reports
+      SET is_hidden = true
       WHERE id = $1 AND organization_id = $2
-    `, [id, organizationId], function(err) {
+    `, [id, organizationId], (err, result) => {
       if (err) {
         console.error('Error hiding praise report:', err);
         return res.status(500).json({ success: false, error: 'Failed to hide praise report' });
@@ -1140,11 +1143,11 @@ router.put('/praise-report/:id', requireOrgAuth, (req, res) => {
       res.json({ success: true, message: 'Praise report hidden' });
     });
   } else if (action === 'unhide') {
-    dbQuery.run(`
-      UPDATE ct_praise_reports 
-      SET is_hidden = false 
+    db.query(`
+      UPDATE ct_praise_reports
+      SET is_hidden = false
       WHERE id = $1 AND organization_id = $2
-    `, [id, organizationId], function(err) {
+    `, [id, organizationId], (err, result) => {
       if (err) {
         console.error('Error unhiding praise report:', err);
         return res.status(500).json({ success: false, error: 'Failed to unhide praise report' });
@@ -1163,11 +1166,11 @@ router.put('/verse-insight/:id', requireOrgAuth, (req, res) => {
   const organizationId = req.organizationId;
 
   if (action === 'hide') {
-    dbQuery.run(`
+    db.query(`
       UPDATE ct_verse_community_posts
       SET is_hidden = true
       WHERE id = $1 AND organization_id = $2
-    `, [id, organizationId], function(err) {
+    `, [id, organizationId], (err, result) => {
       if (err) {
         console.error('Error hiding verse insight:', err);
         return res.status(500).json({ success: false, error: 'Failed to hide verse insight' });
@@ -1175,11 +1178,11 @@ router.put('/verse-insight/:id', requireOrgAuth, (req, res) => {
       res.json({ success: true, message: 'Verse insight hidden' });
     });
   } else if (action === 'unhide') {
-    dbQuery.run(`
+    db.query(`
       UPDATE ct_verse_community_posts
       SET is_hidden = false
       WHERE id = $1 AND organization_id = $2
-    `, [id, organizationId], function(err) {
+    `, [id, organizationId], (err, result) => {
       if (err) {
         console.error('Error unhiding verse insight:', err);
         return res.status(500).json({ success: false, error: 'Failed to unhide verse insight' });
@@ -1198,7 +1201,7 @@ router.get('/users', requireOrgAuth, (req, res) => {
   Promise.all([
     // Get all tag IDs that have interacted with this organization
     new Promise((resolve, reject) => {
-      dbQuery.all(`
+      db.query(`
         SELECT DISTINCT
           ti.tag_id,
           ti.ip_address,
@@ -1210,15 +1213,15 @@ router.get('/users', requireOrgAuth, (req, res) => {
         WHERE ti.organization_id = $1
         GROUP BY ti.tag_id, ti.ip_address
         ORDER BY last_activity DESC
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     }),
 
     // Get community post counts by tag
     new Promise((resolve, reject) => {
-      dbQuery.all(`
+      db.query(`
         SELECT
           originating_tag_id as tag_id,
           COUNT(CASE WHEN table_name = 'prayer_requests' THEN 1 END) as prayer_count,
@@ -1244,9 +1247,9 @@ router.get('/users', requireOrgAuth, (req, res) => {
         ) combined_posts
         WHERE originating_tag_id IS NOT NULL
         GROUP BY originating_tag_id
-      `, [organizationId], (err, rows) => {
+      `, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     })
   ])
@@ -1291,33 +1294,33 @@ router.get('/users/:tagId/posts', requireOrgAuth, (req, res) => {
   Promise.all([
     // Prayer requests
     new Promise((resolve, reject) => {
-      dbQuery.all(`
+      db.query(`
         SELECT id, content, prayer_count, created_at, is_hidden, 'prayer_request' as type
         FROM ct_prayer_requests
         WHERE organization_id = $1 AND originating_tag_id = $2
         ORDER BY created_at DESC
-      `, [organizationId, tagId], (err, rows) => {
+      `, [organizationId, tagId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     }),
 
     // Praise reports
     new Promise((resolve, reject) => {
-      dbQuery.all(`
+      db.query(`
         SELECT id, content, celebration_count as prayer_count, created_at, is_hidden, 'praise_report' as type
         FROM ct_praise_reports
         WHERE organization_id = $1 AND originating_tag_id = $2
         ORDER BY created_at DESC
-      `, [organizationId, tagId], (err, rows) => {
+      `, [organizationId, tagId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     }),
 
     // Verse insights
     new Promise((resolve, reject) => {
-      dbQuery.all(`
+      db.query(`
         SELECT
           p.id,
           p.content,
@@ -1330,9 +1333,9 @@ router.get('/users/:tagId/posts', requireOrgAuth, (req, res) => {
         WHERE p.organization_id = $1 AND p.originating_tag_id = $2
         GROUP BY p.id, p.content, p.created_at, p.is_hidden
         ORDER BY p.created_at DESC
-      `, [organizationId, tagId], (err, rows) => {
+      `, [organizationId, tagId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
     })
   ])

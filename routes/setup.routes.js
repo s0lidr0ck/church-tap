@@ -179,7 +179,7 @@ router.post('/admin', async (req, res) => {
     try {
       const passwordHash = await bcrypt.hash(password, 12);
       dbQuery.run(
-        `INSERT INTO ct_admin_users (username, password_hash, email, role, organization_id, is_active) VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ct_admin_users (username, password_hash, email, role, organization_id, is_active) VALUES ($1, $2, $3, $4, $5, $6)`,
         [username, passwordHash, email, 'admin', 1, true],
         function(insertErr) {
           if (insertErr) {

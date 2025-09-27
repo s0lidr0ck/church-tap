@@ -239,21 +239,26 @@ router.post('/scan/:custom_id', (req, res) => {
   const { custom_id } = req.params;
   
   db.query(`
-    UPDATE ct_nfc_tags SET 
+    UPDATE ct_nfc_tags SET
       last_scanned_at = CURRENT_TIMESTAMP,
       scan_count = scan_count + 1,
       updated_at = CURRENT_TIMESTAMP
     WHERE custom_id = $1
-  `, [custom_id], 
+  `, [custom_id],
   (err, result) => {
     if (err) {
       console.error('Error recording NFC scan:', err);
       return res.status(500).json({ success: false, error: 'Failed to record scan' });
     }
-    
+
     if (result.rowCount === 0) {
       return res.status(404).json({ success: false, error: 'NFC tag not found' });
     }
+
+    // Also record this as a tag interaction for analytics
+    const sessionId = req.cookies?.trackingSession || `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const ip = req.ip || req.connection.remoteAddress;
+    const userAgent = req.get('User-Agent');
     
     // Get tag info including organization details
     db.query(`
@@ -265,8 +270,35 @@ router.post('/scan/:custom_id', (req, res) => {
       if (err || tagResult.rows.length === 0) {
         return res.json({ success: true }); // Still record the scan even if we can't get details
       }
-      
+
       const tag = tagResult.rows[0];
+
+      // Record tag interaction for analytics dashboard
+      if (tag.organization_id) {
+        db.query(`
+          INSERT INTO tag_interactions (
+            session_id, tag_id, interaction_type, page_url, referrer,
+            user_agent, ip_address, organization_id, interaction_data, tagged_session_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `, [
+          sessionId,
+          custom_id,
+          'scan',
+          req.originalUrl || `/api/nfc/scan/${custom_id}`,
+          req.get('Referrer'),
+          userAgent,
+          ip,
+          tag.organization_id,
+          JSON.stringify({ action: 'scan', custom_id }),
+          null // tagged_session_id
+        ], (interactionErr) => {
+          if (interactionErr) {
+            console.error('Error recording tag interaction:', interactionErr);
+          } else {
+            console.log(`📊 Tag scan recorded: ${custom_id} for org ${tag.organization_id}`);
+          }
+        });
+      }
       // Return redirect information if assigned to an organization
       if (tag.organization_id && tag.subdomain) {
         // For development, stay on the same host

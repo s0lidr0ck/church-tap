@@ -12,7 +12,7 @@ router.post('/', (req, res) => {
   }
   
   // Store feedback in analytics table
-  dbQuery.run(`INSERT INTO ct_analytics (action, ip_address, user_agent) VALUES (?, ?, ?)`,
+  dbQuery.run(`INSERT INTO ct_analytics (action, ip_address, user_agent) VALUES ($1, $2, $3)`,
     [`feedback: ${feedback}`, req.ip, req.get('User-Agent')], (err) => {
     if (err) {
       console.error('Feedback error:', err);

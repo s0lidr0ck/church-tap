@@ -3149,6 +3149,35 @@ class AdminDashboard {
       alert('Failed to install CT Admin PWA. Please try again.');
     }
   }
+
+  // Utility methods for loading states and element visibility
+  showLoading(elementId) {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.style.display = 'block';
+    }
+  }
+
+  hideLoading(elementId) {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.style.display = 'none';
+    }
+  }
+
+  showElement(elementId) {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.style.display = 'block';
+    }
+  }
+
+  hideElement(elementId) {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.style.display = 'none';
+    }
+  }
 }
 
 // Initialize admin dashboard
