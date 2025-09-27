@@ -146,8 +146,8 @@ router.post('/verses', requireOrgAuth, upload.single('image'), async (req, res) 
       image_path = s3Result.path;
     }
     
-    dbQuery.run(`INSERT INTO ct_verses (date, content_type, verse_text, image_path, bible_reference, context, tags, published, organization_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    dbQuery.run(`INSERT INTO ct_verses (date, content_type, verse_text, image_path, bible_reference, context, tags, published, organization_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [date, content_type, verse_text, image_path, bible_reference, context, tags, published || 0, req.organizationId],
       function(err) {
         if (err) {
@@ -347,8 +347,8 @@ router.post('/verses/import', requireOrgAuth, upload.single('csv'), (req, res) =
           return;
         }
         
-        dbQuery.run(`INSERT INTO ct_verses (date, content_type, verse_text, bible_reference, context, tags, published, organization_id) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        dbQuery.run(`INSERT INTO ct_verses (date, content_type, verse_text, bible_reference, context, tags, published, organization_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [date, content_type, verse_text || '', bible_reference || '', context || '', tags || '', published === 'true' ? 1 : 0, req.organizationId],
           function(err) {
             if (err) {
@@ -428,8 +428,8 @@ router.get('/verse-import/settings', requireOrgAuth, (req, res) => {
         
         dbQuery.run(
           `INSERT INTO CT_verse_import_settings (organization_id, enabled, bible_version, import_time, fallback_versions)
-           VALUES (?, ?, ?, ?, ?)`,
-          [organizationId, defaultSettings.enabled, defaultSettings.bibleVersion, 
+           VALUES ($1, $2, $3, $4, $5)`,
+          [organizationId, defaultSettings.enabled, defaultSettings.bibleVersion,
            defaultSettings.importTime, JSON.stringify(defaultSettings.fallbackVersions)],
           (insertErr) => {
             if (insertErr) {
