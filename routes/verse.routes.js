@@ -1,11 +1,12 @@
 const express = require('express');
 const { dbQuery, db } = require('../config/database');
+const { optionalAuth } = require('../config/middleware');
 
 const router = express.Router();
 
 // Get random verse
-router.get('/random', (req, res) => {
-  const orgId = req.organizationId || 1;
+router.get('/random', optionalAuth, (req, res) => {
+  const orgId = req.organization?.id || 1;
 
   db.query(`SELECT * FROM ct_verses WHERE published = TRUE AND organization_id = $1 ORDER BY RANDOM() LIMIT 1`, [orgId], (err, result) => {
     if (err) {
@@ -22,9 +23,9 @@ router.get('/random', (req, res) => {
 });
 
 // Get verse by date
-router.get('/:date', (req, res) => {
+router.get('/:date', optionalAuth, (req, res) => {
   const { date } = req.params;
-  const orgId = req.organizationId || 1;
+  const orgId = req.organization?.id || 1;
 
   db.query(`SELECT * FROM ct_verses WHERE date = $1 AND published = TRUE AND organization_id = $2`, [date, orgId], (err, result) => {
     if (err) {
