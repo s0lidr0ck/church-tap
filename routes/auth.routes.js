@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { dbQuery } = require('../config/database');
+const { dbQuery, db } = require('../config/database');
 const { JWT_SECRET } = require('../config/constants');
 const { validateInput } = require('../middleware/validation');
 
@@ -31,7 +31,8 @@ router.post('/register', validateInput.email, validateInput.password, validateIn
     const { email, password, firstName, lastName, displayName } = req.body;
 
     // Check if user already exists
-    dbQuery.get(`SELECT id FROM ct_users WHERE email = $1`, [email.toLowerCase()], async (err, existingUser) => {
+    db.query(`SELECT id FROM ct_users WHERE email = $1`, [email.toLowerCase()], async (err, result) => {
+      const existingUser = result.rows[0];
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -107,7 +108,8 @@ router.post('/login', validateInput.email, validateInput.password, async (req, r
     }
 
     // Find user
-    dbQuery.get(`SELECT * FROM ct_users WHERE email = $1`, [email.toLowerCase()], async (err, user) => {
+    db.query(`SELECT * FROM ct_users WHERE email = $1`, [email.toLowerCase()], async (err, result) => {
+      const user = result.rows[0];
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -123,7 +125,7 @@ router.post('/login', validateInput.email, validateInput.password, async (req, r
       }
 
       // Update last login
-      dbQuery.run(`UPDATE ct_users SET last_login = CURRENT_TIMESTAMP WHERE id = $1`, [user.id]);
+      db.query(`UPDATE ct_users SET last_login = CURRENT_TIMESTAMP WHERE id = $1`, [user.id]);
 
       // Generate JWT token
       const token = jwt.sign(
@@ -140,7 +142,8 @@ router.post('/login', validateInput.email, validateInput.password, async (req, r
       });
 
       // Check if user has completed onboarding
-      dbQuery.get(`SELECT * FROM ct_user_preferences WHERE user_id = $1`, [user.id], (err, prefs) => {
+      db.query(`SELECT * FROM ct_user_preferences WHERE user_id = $1`, [user.id], (err, result) => {
+        const prefs = result.rows[0];
         const requiresOnboarding = !prefs || (!prefs.interests && !prefs.life_stage);
 
         res.json({

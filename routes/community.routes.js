@@ -1,5 +1,5 @@
 const express = require('express');
-const { dbQuery } = require('../config/database');
+const { dbQuery, db } = require('../config/database');
 
 const router = express.Router();
 
@@ -10,28 +10,28 @@ router.get('/:date', (req, res) => {
   
   // Get prayer requests for the date
   const getPrayerRequests = new Promise((resolve, reject) => {
-  dbQuery.all(`SELECT * FROM ct_prayer_requests WHERE date = $1 AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = $2 ORDER BY created_at ASC`, 
-      [date, orgId], (err, rows) => {
+  db.query(`SELECT * FROM ct_prayer_requests WHERE date = $1 AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = $2 ORDER BY created_at ASC`,
+      [date, orgId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
   });
   
   // Get praise reports for the date
   const getPraiseReports = new Promise((resolve, reject) => {
-  dbQuery.all(`SELECT * FROM ct_praise_reports WHERE date = $1 AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = $2 ORDER BY created_at ASC`, 
-      [date, orgId], (err, rows) => {
+  db.query(`SELECT * FROM ct_praise_reports WHERE date = $1 AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = $2 ORDER BY created_at ASC`,
+      [date, orgId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
   });
   
   // Get verse insights for the date
   const getVerseInsights = new Promise((resolve, reject) => {
-  dbQuery.all(`SELECT * FROM ct_verse_community_posts WHERE date = $1 AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = $2 ORDER BY created_at ASC`, 
-      [date, orgId], (err, rows) => {
+  db.query(`SELECT * FROM ct_verse_community_posts WHERE date = $1 AND is_approved = TRUE AND is_hidden = FALSE AND organization_id = $2 ORDER BY created_at ASC`,
+      [date, orgId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(result.rows || []);
       });
   });
   

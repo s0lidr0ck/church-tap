@@ -303,19 +303,19 @@ router.put('/ctas/:id', requireOrgAuth, (req, res) => {
       console.error('Error updating CTA:', err);
       return res.status(500).json({ success: false, error: 'Failed to update CTA' });
     }
-    if (this.changes === 0) return res.status(404).json({ success: false, error: 'CTA not found' });
+    if (result.rowCount === 0) return res.status(404).json({ success: false, error: 'CTA not found' });
     res.json({ success: true });
   });
 });
 
 router.delete('/ctas/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
-  dbQuery.run(`DELETE FROM CT_organization_cta WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], function(err) {
+  db.query(`DELETE FROM ct_organization_cta WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], (err, result) => {
     if (err) {
       console.error('Error deleting CTA:', err);
       return res.status(500).json({ success: false, error: 'Failed to delete CTA' });
     }
-    if (this.changes === 0) return res.status(404).json({ success: false, error: 'CTA not found' });
+    if (result.rowCount === 0) return res.status(404).json({ success: false, error: 'CTA not found' });
     res.json({ success: true });
   });
 });
