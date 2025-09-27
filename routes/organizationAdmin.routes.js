@@ -115,53 +115,99 @@ module.exports = router;
 // Events (CT_events) - Admin
 // ===========================
 router.get('/events', requireOrgAuth, (req, res) => {
+  // First check if recurring columns exist
   db.query(`
-    SELECT id, title, description, location, address, start_at, end_at, all_day, link, is_active, notify_lead_minutes,
-           is_recurring, recurrence_type, recurrence_interval, recurrence_days, recurrence_end_date,
-           parent_event_id, instance_date, is_instance
-    FROM CT_events
-    WHERE organization_id = $1
-    ORDER BY start_at DESC
-  `, [req.organizationId], (err, result) => {
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_name = 'ct_events' AND column_name = 'is_recurring'
+  `, [], (err, columnCheck) => {
     if (err) {
-      console.error('Error fetching events:', err);
-      return res.status(500).json({ success: false, error: 'Failed to fetch events' });
+      console.error('Error checking columns:', err);
+      return res.status(500).json({ success: false, error: 'Database error' });
     }
-    res.json({ success: true, events: result.rows || [] });
+
+    const hasRecurringColumns = columnCheck.rows.length > 0;
+
+    // Use appropriate query based on whether recurring columns exist
+    const query = hasRecurringColumns ? `
+      SELECT id, title, description, location, address, start_at, end_at, all_day, link, is_active, notify_lead_minutes,
+             is_recurring, recurrence_type, recurrence_interval, recurrence_days, recurrence_end_date,
+             parent_event_id, instance_date, is_instance
+      FROM CT_events
+      WHERE organization_id = $1
+      ORDER BY start_at DESC
+    ` : `
+      SELECT id, title, description, location, address, start_at, end_at, all_day, link, is_active, notify_lead_minutes,
+             FALSE as is_recurring, NULL as recurrence_type, 1 as recurrence_interval, NULL as recurrence_days, NULL as recurrence_end_date,
+             NULL as parent_event_id, NULL as instance_date, FALSE as is_instance
+      FROM CT_events
+      WHERE organization_id = $1
+      ORDER BY start_at DESC
+    `;
+
+    db.query(query, [req.organizationId], (err, result) => {
+      if (err) {
+        console.error('Error fetching events:', err);
+        return res.status(500).json({ success: false, error: 'Failed to fetch events' });
+      }
+      res.json({ success: true, events: result.rows || [] });
+    });
   });
 });
 
 router.post('/events', requireOrgAuth, async (req, res) => {
-  const { 
+  const {
     title, description, location, address, start_at, end_at, all_day, link, is_active, notify_lead_minutes,
     is_recurring, recurrence_type, recurrence_interval, recurrence_days, recurrence_end_date
   } = req.body || {};
-  
+
   if (!title || !start_at) {
     return res.status(400).json({ success: false, error: 'Title and start_at are required' });
   }
 
   try {
-    const result = await db.query(`
+    // Check if recurring columns exist
+    const columnCheck = await db.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'ct_events' AND column_name = 'is_recurring'
+    `, []);
+
+    const hasRecurringColumns = columnCheck.rows.length > 0;
+
+    // Use appropriate query based on whether recurring columns exist
+    const query = hasRecurringColumns ? `
       INSERT INTO CT_events (
         organization_id, title, description, location, address, start_at, end_at, all_day, link, is_active, notify_lead_minutes,
         is_recurring, recurrence_type, recurrence_interval, recurrence_days, recurrence_end_date
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING id
-    `, [
-      req.organizationId, title, description || null, location || null, address || null, 
+    ` : `
+      INSERT INTO CT_events (
+        organization_id, title, description, location, address, start_at, end_at, all_day, link, is_active, notify_lead_minutes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING id
+    `;
+
+    const params = hasRecurringColumns ? [
+      req.organizationId, title, description || null, location || null, address || null,
       start_at, end_at || null, !!all_day, link || null, is_active !== false, notify_lead_minutes || 120,
-      !!is_recurring, recurrence_type || null, recurrence_interval || 1, 
+      !!is_recurring, recurrence_type || null, recurrence_interval || 1,
       recurrence_days ? JSON.stringify(recurrence_days) : null, recurrence_end_date || null
-    ]);
+    ] : [
+      req.organizationId, title, description || null, location || null, address || null,
+      start_at, end_at || null, !!all_day, link || null, is_active !== false, notify_lead_minutes || 120
+    ];
+
+    const result = await db.query(query, params);
 
     const eventId = result.rows[0].id;
 
-    // If it's a recurring event, generate instances
-    if (is_recurring) {
-      const event = { 
-        id: eventId, 
-        ...req.body, 
+    // If it's a recurring event and recurring columns exist, generate instances
+    if (hasRecurringColumns && is_recurring) {
+      const event = {
+        id: eventId,
+        ...req.body,
         organization_id: req.organizationId,
         is_recurring: true
       };
