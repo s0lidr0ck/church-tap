@@ -4327,17 +4327,11 @@ class ChurchTapApp {
       console.log(`[CTA] Adjusted header to top: ${topPosition} (CTA: ${hasCTA ? 'present' : 'hidden'})`);
     }
 
-    // Adjust main content positioning - add padding-top when CTA is present
+    // Remove any custom padding - let natural flow handle positioning
     const mainContent = document.querySelector('main');
     if (mainContent) {
-      if (hasCTA) {
-        // With CTA: need extra padding to account for both CTA (44px) and header (~50px)
-        mainContent.style.paddingTop = '94px'; // 44px CTA + ~50px header
-      } else {
-        // Without CTA: just account for header height
-        mainContent.style.paddingTop = '50px'; // Just header height
-      }
-      console.log(`[CTA] Adjusted main content padding-top for CTA: ${hasCTA ? 'present' : 'hidden'}`);
+      mainContent.style.paddingTop = ''; // Reset to default
+      console.log(`[CTA] Reset main content padding to natural flow (CTA: ${hasCTA ? 'present' : 'hidden'})`);
     }
 
     // Hide CTA element if no CTA
