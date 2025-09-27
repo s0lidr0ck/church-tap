@@ -50,7 +50,7 @@ const resolveOrganization = async (req, res, next) => {
     // Look up organization if we have a slug
     if (orgSlug) {
       const orgResult = await db.query(
-        'SELECT * FROM organizations WHERE subdomain = $1 AND is_active = true',
+        'SELECT * FROM ct_organizations WHERE subdomain = $1 AND is_active = true',
         [orgSlug]
       );
       
