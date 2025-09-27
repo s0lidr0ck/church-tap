@@ -7,7 +7,7 @@ const router = express.Router();
 // Search verses
 router.get('/search', optionalAuth, (req, res) => {
   const { q: query, limit = 10, offset = 0 } = req.query;
-  const orgId = req.organizationId || 1;
+  const orgId = req.organization?.id || 1;
   
   if (!query || query.trim().length < 2) {
     return res.status(400).json({ success: false, error: 'Search query must be at least 2 characters' });
@@ -68,7 +68,7 @@ router.get('/search', optionalAuth, (req, res) => {
 // POST endpoint for verse search (for frontend compatibility)
 router.post('/search', optionalAuth, (req, res) => {
   const { query, limit = 20, offset = 0 } = req.body;
-  const orgId = req.organizationId || 1;
+  const orgId = req.organization?.id || 1;
   
   if (!query || query.trim().length < 2) {
     return res.status(400).json({ success: false, error: 'Search query must be at least 2 characters' });
@@ -130,7 +130,7 @@ router.post('/search', optionalAuth, (req, res) => {
 // Get verse history for the last N days
 router.get('/history/:days', optionalAuth, (req, res) => {
   const days = parseInt(req.params.days) || 30;
-  const orgId = req.organizationId || 1;
+  const orgId = req.organization?.id || 1;
   
   // Calculate the date N days ago
   const cutoffDate = new Date();
