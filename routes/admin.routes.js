@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const sharp = require('sharp');
 const fs = require('fs');
 const csv = require('csv-parser');
-const { dbQuery } = require('../config/database');
+const { dbQuery, db } = require('../config/database');
 const { requireAuth, requireOrgAuth, upload } = require('../config/middleware');
 const s3Service = require('../services/s3Service');
 const { VerseImportService } = require('../services/verseService');
@@ -103,12 +103,12 @@ router.get('/check-session', (req, res) => {
 
 // Get all verses (admin)
 router.get('/verses', requireOrgAuth, (req, res) => {
-  dbQuery.all(`SELECT * FROM ct_verses WHERE organization_id = $1 ORDER BY date DESC`, [req.organizationId], (err, rows) => {
+  db.query(`SELECT * FROM ct_verses WHERE organization_id = $1 ORDER BY date DESC`, [req.organizationId], (err, result) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
-    
-    const verses = rows.map(verse => ({
+
+    const verses = (result.rows || []).map(verse => ({
       ...verse,
       date: verse.date ? new Date(verse.date).toISOString().split('T')[0] : null,
       created_at: verse.created_at ? new Date(verse.created_at).toLocaleString() : null,
@@ -186,10 +186,10 @@ router.put('/verses/:id', requireOrgAuth, upload.single('image'), async (req, re
       image_path = s3Result.path;
     }
     
-    dbQuery.run(`UPDATE ct_verses SET date = $1, content_type = $2, verse_text = $3, image_path = $4, 
+    db.query(`UPDATE ct_verses SET date = $1, content_type = $2, verse_text = $3, image_path = $4,
             bible_reference = $5, context = $6, tags = $7, published = $8 WHERE id = $9 AND organization_id = $10`,
       [date, content_type, verse_text, image_path, bible_reference, context, tags, published, id, req.organizationId],
-      function(err) {
+      (err, result) => {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
@@ -206,12 +206,13 @@ router.put('/verses/:id', requireOrgAuth, upload.single('image'), async (req, re
 router.delete('/verses/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   
-  dbQuery.get(`SELECT image_path FROM ct_verses WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], (err, verse) => {
+  db.query(`SELECT image_path FROM ct_verses WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], (err, result) => {
+    const verse = result.rows[0];
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
     
-    dbQuery.run(`DELETE FROM ct_verses WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], function(err) {
+    db.query(`DELETE FROM ct_verses WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], (err, result) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -238,29 +239,29 @@ router.post('/verses/bulk', requireOrgAuth, (req, res) => {
   
   switch (operation) {
     case 'delete':
-      dbQuery.run(`DELETE FROM ct_verses WHERE id IN (${placeholders}) AND organization_id = $${params.length}`, params, function(err) {
+      db.query(`DELETE FROM ct_verses WHERE id IN (${placeholders}) AND organization_id = $${params.length}`, params, (err, result) => {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
-        res.json({ success: true, affected: this.changes });
+        res.json({ success: true, affected: result.rowCount });
       });
       break;
       
     case 'publish':
-      dbQuery.run(`UPDATE ct_verses SET published = TRUE WHERE id IN (${placeholders}) AND organization_id = $${params.length}`, params, function(err) {
+      db.query(`UPDATE ct_verses SET published = TRUE WHERE id IN (${placeholders}) AND organization_id = $${params.length}`, params, (err, result) => {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
-        res.json({ success: true, affected: this.changes });
+        res.json({ success: true, affected: result.rowCount });
       });
       break;
       
     case 'unpublish':
-      dbQuery.run(`UPDATE ct_verses SET published = FALSE WHERE id IN (${placeholders}) AND organization_id = $${params.length}`, params, function(err) {
+      db.query(`UPDATE ct_verses SET published = FALSE WHERE id IN (${placeholders}) AND organization_id = $${params.length}`, params, (err, result) => {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
-        res.json({ success: true, affected: this.changes });
+        res.json({ success: true, affected: result.rowCount });
       });
       break;
       
@@ -268,11 +269,11 @@ router.post('/verses/bulk', requireOrgAuth, (req, res) => {
       if (!data.tags) {
         return res.status(400).json({ success: false, error: 'Tags required for tag update' });
       }
-      dbQuery.run(`UPDATE ct_verses SET tags = $1 WHERE id IN (${placeholders}) AND organization_id = $${verse_ids.length + 2}`, [data.tags, ...verse_ids, req.organizationId], function(err) {
+      db.query(`UPDATE ct_verses SET tags = $1 WHERE id IN (${placeholders}) AND organization_id = $${verse_ids.length + 2}`, [data.tags, ...verse_ids, req.organizationId], (err, result) => {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
-        res.json({ success: true, affected: this.changes });
+        res.json({ success: true, affected: result.rowCount });
       });
       break;
       
@@ -377,13 +378,13 @@ router.post('/verses/import', requireOrgAuth, upload.single('csv'), (req, res) =
 
 // CSV export
 router.get('/verses/export', requireOrgAuth, (req, res) => {
-  dbQuery.all(`SELECT date, content_type, verse_text, bible_reference, context, tags, published FROM ct_verses WHERE organization_id = $1 ORDER BY date DESC`, [req.organizationId], (err, rows) => {
+  db.query(`SELECT date, content_type, verse_text, bible_reference, context, tags, published FROM ct_verses WHERE organization_id = $1 ORDER BY date DESC`, [req.organizationId], (err, result) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
-    
+
     const csvHeader = 'date,content_type,verse_text,bible_reference,context,tags,published\n';
-    const csvRows = rows.map(row => {
+    const csvRows = (result.rows || []).map(row => {
       return [
         row.date,
         row.content_type,
@@ -480,7 +481,7 @@ router.put('/verse-import/settings', requireOrgAuth, (req, res) => {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
       
-      if (this.changes === 0) {
+      if (result.rowCount === 0) {
         return res.status(404).json({ success: false, error: 'Settings not found' });
       }
       
@@ -543,9 +544,9 @@ router.get('/dashboard', requireOrgAuth, (req, res) => {
   Promise.all([
     // Total verses count
     new Promise((resolve, reject) => {
-      dbQuery.all(`SELECT COUNT(*) as total FROM ct_verses WHERE organization_id = $1`, [organizationId], (err, rows) => {
+      db.query(`SELECT COUNT(*) as total FROM ct_verses WHERE organization_id = $1`, [organizationId], (err, result) => {
         if (err) reject(err);
-        else resolve(rows[0]?.total || 0);
+        else resolve(result.rows[0]?.total || 0);
       });
     }),
     

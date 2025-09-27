@@ -1,5 +1,5 @@
 const express = require('express');
-const { dbQuery } = require('../config/database');
+const { dbQuery, db } = require('../config/database');
 
 const router = express.Router();
 
@@ -18,7 +18,8 @@ router.post('/', (req, res) => {
   // Fallback: if attribution cookies are missing, try to resolve from anonymous_sessions by session_id
   const tryResolveAttribution = (cb) => {
     if (taggedSessionId || originatingTagId || !sessionIdCookie) return cb();
-    dbQuery.get(`SELECT tagged_session_id, originating_tag_id FROM anonymous_sessions WHERE session_id = $1 ORDER BY last_seen_at DESC`, [sessionIdCookie], (err, row) => {
+    db.query(`SELECT tagged_session_id, originating_tag_id FROM anonymous_sessions WHERE session_id = $1 ORDER BY last_seen_at DESC`, [sessionIdCookie], (err, result) => {
+      const row = result.rows[0];
       if (!err && row) {
         taggedSessionId = taggedSessionId || row.tagged_session_id;
         originatingTagId = originatingTagId || row.originating_tag_id;
