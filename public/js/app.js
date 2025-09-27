@@ -4307,10 +4307,33 @@ class ChurchTapApp {
       const data = await res.json();
       console.log('[CTA] response', data);
       const cta = data?.cta;
-      if (!cta) return;
+      if (!cta) {
+        this.adjustHeaderPosition(false); // No CTA - move header to top
+        return;
+      }
       this.renderCTACrawl(cta);
+      this.adjustHeaderPosition(true); // CTA present - keep header offset
     } catch (e) {
       console.warn('[CTA] fetch failed', e);
+      this.adjustHeaderPosition(false); // Error - assume no CTA
+    }
+  }
+
+  adjustHeaderPosition(hasCTA) {
+    const header = document.querySelector('header.glass-effect');
+    if (header) {
+      const topPosition = hasCTA ? '44px' : '0px';
+      header.style.top = topPosition;
+      console.log(`[CTA] Adjusted header to top: ${topPosition} (CTA: ${hasCTA ? 'present' : 'hidden'})`);
+    }
+
+    // Hide CTA element if no CTA
+    if (!hasCTA) {
+      const ctaCrawl = document.getElementById('ctaCrawl');
+      if (ctaCrawl) {
+        ctaCrawl.classList.add('hidden');
+        ctaCrawl.style.display = 'none';
+      }
     }
   }
 
