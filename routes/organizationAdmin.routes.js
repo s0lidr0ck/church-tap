@@ -114,19 +114,19 @@ module.exports = router;
 // Events (CT_events) - Admin
 // ===========================
 router.get('/events', requireOrgAuth, (req, res) => {
-  dbQuery.all(`
+  db.query(`
     SELECT id, title, description, location, address, start_at, end_at, all_day, link, is_active, notify_lead_minutes,
            is_recurring, recurrence_type, recurrence_interval, recurrence_days, recurrence_end_date,
            parent_event_id, instance_date, is_instance
-    FROM CT_events 
+    FROM CT_events
     WHERE organization_id = $1
     ORDER BY start_at DESC
-  `, [req.organizationId], (err, rows) => {
+  `, [req.organizationId], (err, result) => {
     if (err) {
       console.error('Error fetching events:', err);
       return res.status(500).json({ success: false, error: 'Failed to fetch events' });
     }
-    res.json({ success: true, events: rows || [] });
+    res.json({ success: true, events: result.rows || [] });
   });
 });
 
@@ -181,28 +181,28 @@ router.put('/events/:id', requireOrgAuth, (req, res) => {
   if (!title || !start_at) {
     return res.status(400).json({ success: false, error: 'Title and start_at are required' });
   }
-  dbQuery.run(`
-    UPDATE CT_events 
+  db.query(`
+    UPDATE CT_events
     SET title = $1, description = $2, location = $3, address = $4, start_at = $5, end_at = $6, all_day = $7, link = $8, is_active = $9, notify_lead_minutes = $10
     WHERE id = $11 AND organization_id = $12
-  `, [title, description || null, location || null, address || null, start_at, end_at || null, !!all_day, link || null, is_active !== false, notify_lead_minutes || 120, id, req.organizationId], function(err) {
+  `, [title, description || null, location || null, address || null, start_at, end_at || null, !!all_day, link || null, is_active !== false, notify_lead_minutes || 120, id, req.organizationId], (err, result) => {
     if (err) {
       console.error('Error updating event:', err);
       return res.status(500).json({ success: false, error: 'Failed to update event' });
     }
-    if (this.changes === 0) return res.status(404).json({ success: false, error: 'Event not found' });
+    if (result.rowCount === 0) return res.status(404).json({ success: false, error: 'Event not found' });
     res.json({ success: true });
   });
 });
 
 router.delete('/events/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
-  dbQuery.run(`DELETE FROM CT_events WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], function(err) {
+  db.query(`DELETE FROM CT_events WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], (err, result) => {
     if (err) {
       console.error('Error deleting event:', err);
       return res.status(500).json({ success: false, error: 'Failed to delete event' });
     }
-    if (this.changes === 0) return res.status(404).json({ success: false, error: 'Event not found' });
+    if (result.rowCount === 0) return res.status(404).json({ success: false, error: 'Event not found' });
     res.json({ success: true });
   });
 });

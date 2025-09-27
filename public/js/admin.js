@@ -883,7 +883,11 @@ class AdminDashboard {
     const tbody = document.getElementById('eventsTableBody');
     tbody.innerHTML = events.map(ev => `
       <tr class="hover:bg-gray-50">
-        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${ev.title}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+          ${ev.title}
+          ${ev.is_recurring ? '<span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">🔄 Recurring</span>' : ''}
+          ${ev.is_instance ? '<span class="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">📅 Instance</span>' : ''}
+        </td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${new Date(ev.start_at).toLocaleString()}</td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${ev.location || ''}</td>
         <td class="px-6 py-4 whitespace-nowrap">${ev.is_active ? '<span class="status-badge status-published">Active</span>' : '<span class="status-badge status-draft">Inactive</span>'}</td>
@@ -947,6 +951,34 @@ class AdminDashboard {
             <input id="ev_active" type="checkbox" ${ev?.is_active !== false ? 'checked' : ''}>
           </div>
         </div>
+
+        <!-- Recurring Events Section -->
+        <div class="mt-4 border-t pt-4">
+          <div class="flex items-center mb-3">
+            <input id="ev_is_recurring" type="checkbox" ${ev?.is_recurring ? 'checked' : ''} class="mr-2">
+            <label class="text-sm font-medium">Recurring Event</label>
+          </div>
+
+          <div id="recurring_options" class="${ev?.is_recurring ? '' : 'hidden'} grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label class="text-sm">Repeat</label>
+              <select id="ev_recurrence_type" class="w-full px-3 py-2 border rounded-md">
+                <option value="weekly" ${ev?.recurrence_type === 'weekly' ? 'selected' : ''}>Weekly</option>
+                <option value="daily" ${ev?.recurrence_type === 'daily' ? 'selected' : ''}>Daily</option>
+                <option value="monthly" ${ev?.recurrence_type === 'monthly' ? 'selected' : ''}>Monthly</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-sm">Every</label>
+              <input id="ev_recurrence_interval" type="number" min="1" class="w-full px-3 py-2 border rounded-md" value="${ev?.recurrence_interval || 1}">
+            </div>
+            <div class="md:col-span-2">
+              <label class="text-sm">End Repeat (optional)</label>
+              <input id="ev_recurrence_end" type="date" class="w-full px-3 py-2 border rounded-md" value="${ev?.recurrence_end_date ? ev.recurrence_end_date.split('T')[0] : ''}">
+            </div>
+          </div>
+        </div>
+
         <div class="mt-4 flex justify-end space-x-2">
           <button id="ev_cancel" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">Cancel</button>
           <button id="ev_save" class="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white">Save</button>
@@ -954,6 +986,18 @@ class AdminDashboard {
       </div>`;
     wrapper.addEventListener('click', (e) => { if (e.target === wrapper) wrapper.remove(); });
     document.body.appendChild(wrapper);
+
+    // Toggle recurring options visibility
+    const recurringCheckbox = document.getElementById('ev_is_recurring');
+    const recurringOptions = document.getElementById('recurring_options');
+    recurringCheckbox.addEventListener('change', () => {
+      if (recurringCheckbox.checked) {
+        recurringOptions.classList.remove('hidden');
+      } else {
+        recurringOptions.classList.add('hidden');
+      }
+    });
+
     document.getElementById('ev_cancel').onclick = () => wrapper.remove();
     document.getElementById('ev_save').onclick = async () => {
       const payload = {
@@ -966,7 +1010,11 @@ class AdminDashboard {
         all_day: document.getElementById('ev_all_day').checked,
         link: document.getElementById('ev_link').value,
         is_active: document.getElementById('ev_active').checked,
-        notify_lead_minutes: parseInt(document.getElementById('ev_notify').value || '120', 10)
+        notify_lead_minutes: parseInt(document.getElementById('ev_notify').value || '120', 10),
+        is_recurring: document.getElementById('ev_is_recurring').checked,
+        recurrence_type: document.getElementById('ev_recurrence_type').value,
+        recurrence_interval: parseInt(document.getElementById('ev_recurrence_interval').value || '1', 10),
+        recurrence_end_date: document.getElementById('ev_recurrence_end').value || null
       };
       const method = id ? 'PUT' : 'POST';
       const url = id ? `/api/admin/organization/events/${id}` : '/api/admin/organization/events';
