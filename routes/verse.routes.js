@@ -1,5 +1,5 @@
 const express = require('express');
-const { dbQuery } = require('../config/database');
+const { dbQuery, db } = require('../config/database');
 
 const router = express.Router();
 
@@ -7,17 +7,17 @@ const router = express.Router();
 router.get('/random', (req, res) => {
   const orgId = req.organizationId || 1;
 
-  dbQuery.get(`SELECT * FROM ct_verses WHERE published = TRUE AND organization_id = $1 ORDER BY RANDOM() LIMIT 1`, [orgId], (err, row) => {
+  db.query(`SELECT * FROM ct_verses WHERE published = TRUE AND organization_id = $1 ORDER BY RANDOM() LIMIT 1`, [orgId], (err, result) => {
     if (err) {
       console.error('Random verse error:', err);
       return res.status(500).json({ success: false, error: 'Database error' });
     }
 
-    if (!row) {
+    if (!result.rows || result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'No verses found' });
     }
 
-    res.json({ success: true, verse: row });
+    res.json({ success: true, verse: result.rows[0] });
   });
 });
 
@@ -26,13 +26,14 @@ router.get('/:date', (req, res) => {
   const { date } = req.params;
   const orgId = req.organizationId || 1;
 
-  dbQuery.get(`SELECT * FROM ct_verses WHERE date = $1 AND published = TRUE AND organization_id = $2`, [date, orgId], (err, scheduledVerse) => {
+  db.query(`SELECT * FROM ct_verses WHERE date = $1 AND published = TRUE AND organization_id = $2`, [date, orgId], (err, result) => {
     if (err) {
+      console.error('Verse by date error:', err);
       return res.status(500).json({ success: false, error: 'Database error' });
     }
 
-    if (scheduledVerse) {
-      return res.json({ success: true, verse: scheduledVerse });
+    if (result.rows && result.rows.length > 0) {
+      return res.json({ success: true, verse: result.rows[0] });
     } else {
       return res.json({ success: false, message: 'No verse found for this date' });
     }
@@ -47,17 +48,20 @@ router.post('/heart', (req, res) => {
     return res.status(400).json({ success: false, error: 'Missing required fields' });
   }
 
-  dbQuery.run(`UPDATE ct_verses SET hearts = hearts + 1 WHERE id = $1`, [verse_id], function(err) {
+  db.query(`UPDATE ct_verses SET hearts = hearts + 1 WHERE id = $1`, [verse_id], (err, result) => {
     if (err) {
+      console.error('Heart verse error:', err);
       return res.status(500).json({ success: false, error: 'Database error' });
     }
 
-    dbQuery.get(`SELECT hearts FROM ct_verses WHERE id = $1`, [verse_id], (err, row) => {
+    db.query(`SELECT hearts FROM ct_verses WHERE id = $1`, [verse_id], (err, result) => {
       if (err) {
+        console.error('Get hearts error:', err);
         return res.status(500).json({ success: false, error: 'Database error' });
       }
 
-      res.json({ success: true, hearts: row ? row.hearts : 0 });
+      const hearts = result.rows.length > 0 ? result.rows[0].hearts : 0;
+      res.json({ success: true, hearts: hearts });
     });
   });
 });
