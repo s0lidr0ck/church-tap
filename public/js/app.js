@@ -1,6 +1,11 @@
 class ChurchTapApp {
   constructor() {
-    this.currentDate = new Date().toISOString().split('T')[0];
+    // Use local date instead of UTC date
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    this.currentDate = `${year}-${month}-${day}`;
     this.currentVerse = null;
     this.textSize = localStorage.getItem('textSize') || 'medium';
     this.theme = localStorage.getItem('theme') || 'light';
@@ -616,23 +621,27 @@ class ChurchTapApp {
 
   updateDateDisplay(date) {
     const dateObj = new Date(date + 'T00:00:00');
-    const today = new Date();
-    const yesterday = new Date(today);
+    const now = new Date();
+
+    // Create local date strings for comparison
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
-    
-    const dateStr = dateObj.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+    const dateStr = dateObj.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
-    
+
     document.getElementById('currentDate').textContent = dateStr;
-    
+
     const description = document.getElementById('dateDescription');
-    if (date === today.toISOString().split('T')[0]) {
+    if (date === todayStr) {
       description.textContent = "Today's Verse";
-    } else if (date === yesterday.toISOString().split('T')[0]) {
+    } else if (date === yesterdayStr) {
       description.textContent = "Yesterday's Verse";
     } else {
       description.textContent = "Church Tap";
@@ -681,7 +690,12 @@ class ChurchTapApp {
   }
 
   goToToday() {
-    const today = new Date().toISOString().split('T')[0];
+    // Use local date instead of UTC date
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const today = `${year}-${month}-${day}`;
     this.currentDate = today;
     this.loadVerse(today);
     this.loadCommunity(today);
