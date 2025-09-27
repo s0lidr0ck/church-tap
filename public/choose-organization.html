@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="theme-color" content="#0ea5e9">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Church Tap">
+
+  <title>Join a Group - Church Tap</title>
+  <meta name="description" content="Find and join a church or ministry group near you.">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Apple Touch Icons -->
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-192x192.png">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link href="/css/style.css" rel="stylesheet">
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(registration => console.log('SW registered'))
+          .catch(error => console.log('SW registration failed'));
+      });
+    }
+  </script>
+</head>
+<body class="h-full overflow-x-hidden">
+  <!-- Splash Screen -->
+  <div id="splash" class="splash-screen">
+    <div class="text-center">
+      <div class="splash-logo">✞</div>
+      <div class="text-white text-lg mt-4">Church Tap</div>
+      <div class="text-white/80 text-sm mt-2">Join a Group</div>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app" class="hidden min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <!-- Header -->
+    <header class="glass-effect sticky z-40 px-4 py-3 border-b border-white/20" style="top: 44px;">
+      <div class="flex items-center justify-between max-w-lg mx-auto">
+        <!-- Logo/Title -->
+        <div class="flex items-center space-x-2">
+          <span class="text-2xl">⛪</span>
+          <div>
+            <h1 class="text-lg font-semibold text-gray-800 dark:text-white">Join a Group</h1>
+            <p class="text-xs text-gray-600 dark:text-gray-400">Find your community</p>
+          </div>
+        </div>
+
+        <!-- Right Controls -->
+        <div class="flex items-center space-x-2">
+          <!-- Back Button -->
+          <button onclick="history.back()" class="p-3 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Go back">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="pb-8 pt-12">
+      <!-- Search Section -->
+      <div class="px-4 py-6">
+        <div class="max-w-lg mx-auto space-y-4">
+
+          <!-- Main Search Bar -->
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+            </div>
+            <input
+              type="text"
+              id="searchInput"
+              class="block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Search churches, ministries..."
+              autocomplete="off"
+            >
+          </div>
+
+          <!-- Location and Filter Row -->
+          <div class="flex gap-3">
+            <!-- Use Location Button -->
+            <button
+              id="useLocationBtn"
+              class="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors touch-manipulation"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+              <span id="locationBtnText">Use My Location</span>
+            </button>
+
+            <!-- Filter Button -->
+            <button
+              id="filterBtn"
+              class="px-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Active Filters Display -->
+          <div id="activeFilters" class="hidden flex flex-wrap gap-2">
+            <!-- Active filters will appear here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter Modal -->
+      <div id="filterModal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-end justify-center">
+        <div class="bg-white dark:bg-gray-800 rounded-t-xl w-full max-w-lg mx-4 p-6 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Filter Groups</h3>
+            <button id="closeFilterBtn" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Group Type</label>
+            <div class="space-y-2">
+              <label class="flex items-center">
+                <input type="radio" name="orgType" value="" class="mr-2" checked>
+                <span class="text-gray-700 dark:text-gray-300">All Types</span>
+              </label>
+              <label class="flex items-center">
+                <input type="radio" name="orgType" value="church" class="mr-2">
+                <span class="text-gray-700 dark:text-gray-300">⛪ Churches</span>
+              </label>
+              <label class="flex items-center">
+                <input type="radio" name="orgType" value="ministry" class="mr-2">
+                <span class="text-gray-700 dark:text-gray-300">🤲 Ministries</span>
+              </label>
+              <label class="flex items-center">
+                <input type="radio" name="orgType" value="small_group" class="mr-2">
+                <span class="text-gray-700 dark:text-gray-300">👥 Small Groups</span>
+              </label>
+              <label class="flex items-center">
+                <input type="radio" name="orgType" value="bible_study" class="mr-2">
+                <span class="text-gray-700 dark:text-gray-300">📖 Bible Studies</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="flex gap-3 pt-4">
+            <button id="clearFiltersBtn" class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+              Clear
+            </button>
+            <button id="applyFiltersBtn" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+              Apply
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results Section -->
+      <div class="px-4">
+        <div class="max-w-lg mx-auto">
+
+          <!-- Loading State -->
+          <div id="loadingState" class="text-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p class="mt-4 text-gray-600 dark:text-gray-400">Finding groups...</p>
+          </div>
+
+          <!-- Results Header -->
+          <div id="resultsHeader" class="hidden mb-4">
+            <div class="flex items-center justify-between">
+              <p class="text-sm text-gray-600 dark:text-gray-400">
+                <span id="resultsCount">0</span> groups found
+              </p>
+              <button id="sortBtn" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                Sort by: <span id="sortType">Name</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Organizations List -->
+          <div id="organizationsList" class="hidden space-y-3">
+            <!-- Organizations will be populated here -->
+          </div>
+
+          <!-- Empty State -->
+          <div id="emptyState" class="hidden text-center py-12">
+            <div class="text-6xl mb-4">🔍</div>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">No groups found</h3>
+            <p class="text-gray-600 dark:text-gray-400 mb-6">Try adjusting your search or location</p>
+            <button id="showAllBtn" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+              Show All Groups
+            </button>
+          </div>
+
+          <!-- Error State -->
+          <div id="errorState" class="hidden text-center py-12">
+            <div class="text-6xl mb-4">⚠️</div>
+            <h3 class="text-lg font-semibold text-red-800 dark:text-red-300 mb-2">Something went wrong</h3>
+            <p class="text-red-600 dark:text-red-400 mb-6" id="errorMessage">Unable to load groups at this time.</p>
+            <button onclick="location.reload()" class="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg">
+              🔄 Try Again
+            </button>
+          </div>
+
+          <!-- Request New Organization -->
+          <div id="requestSection" class="hidden mt-8 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Don't see your group?</h3>
+            <p class="text-gray-600 dark:text-gray-400 mb-4">You can request to add a new organization to ChurchTap.</p>
+            <button id="requestOrgBtn" class="w-full px-4 py-2 border border-blue-300 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20">
+              📝 Request New Organization
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    class OrganizationChooser {
+      constructor() {
+        this.tagId = this.getTagIdFromUrl();
+        this.organizations = [];
+        this.filteredOrganizations = [];
+        this.userLocation = null;
+        this.currentFilters = {
+          search: '',
+          type: '',
+          sortBy: 'name' // name, distance
+        };
+
+        if (!this.tagId) {
+          this.showError('No bracelet ID provided. Please scan your bracelet again.');
+          return;
+        }
+
+        this.initializeUI();
+        this.setupEventListeners();
+        this.loadOrganizations();
+      }
+
+      getTagIdFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('uid');
+      }
+
+      initializeUI() {
+        // Hide splash screen after a brief moment
+        setTimeout(() => {
+          document.getElementById('splash').style.display = 'none';
+          document.getElementById('app').classList.remove('hidden');
+        }, 800);
+      }
+
+      setupEventListeners() {
+        // Search input
+        const searchInput = document.getElementById('searchInput');
+        searchInput.addEventListener('input', (e) => {
+          this.currentFilters.search = e.target.value;
+          this.filterAndDisplayOrganizations();
+        });
+
+        // Use location button
+        document.getElementById('useLocationBtn').addEventListener('click', () => {
+          this.requestLocation();
+        });
+
+        // Filter modal
+        document.getElementById('filterBtn').addEventListener('click', () => {
+          document.getElementById('filterModal').classList.remove('hidden');
+        });
+
+        document.getElementById('closeFilterBtn').addEventListener('click', () => {
+          document.getElementById('filterModal').classList.add('hidden');
+        });
+
+        document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+          this.applyFilters();
+        });
+
+        document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+          this.clearFilters();
+        });
+
+        // Sort button
+        document.getElementById('sortBtn').addEventListener('click', () => {
+          this.toggleSort();
+        });
+
+        // Show all button
+        document.getElementById('showAllBtn').addEventListener('click', () => {
+          this.showAll();
+        });
+
+        // Request organization button
+        document.getElementById('requestOrgBtn').addEventListener('click', () => {
+          window.location.href = `/request-organization?uid=${this.tagId}`;
+        });
+
+        // Filter modal backdrop
+        document.getElementById('filterModal').addEventListener('click', (e) => {
+          if (e.target.id === 'filterModal') {
+            document.getElementById('filterModal').classList.add('hidden');
+          }
+        });
+      }
+
+      async loadOrganizations() {
+        try {
+          this.showLoading();
+
+          // Use the existing search API without any parameters to get all organizations
+          const response = await fetch('/api/organizations/search');
+
+          if (!response.ok) {
+            throw new Error('Failed to load organizations');
+          }
+
+          const data = await response.json();
+          this.organizations = data.organizations || [];
+
+          this.hideLoading();
+
+          if (this.organizations.length === 0) {
+            this.showEmptyState();
+            return;
+          }
+
+          this.filteredOrganizations = [...this.organizations];
+          this.displayOrganizations();
+          this.showRequestSection();
+
+        } catch (error) {
+          console.error('Error loading organizations:', error);
+          this.hideLoading();
+          this.showError('Unable to connect to server. Please check your internet connection.');
+        }
+      }
+
+      async requestLocation() {
+        const locationBtn = document.getElementById('useLocationBtn');
+        const locationBtnText = document.getElementById('locationBtnText');
+
+        if (!navigator.geolocation) {
+          alert('Geolocation is not supported by this browser.');
+          return;
+        }
+
+        locationBtnText.textContent = 'Getting location...';
+        locationBtn.disabled = true;
+
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            this.userLocation = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            };
+
+            locationBtnText.textContent = '📍 Location found';
+
+            // Reload organizations with location
+            await this.loadOrganizationsWithLocation();
+
+            // Update sort to distance if we have location
+            this.currentFilters.sortBy = 'distance';
+            this.updateSortDisplay();
+
+            setTimeout(() => {
+              locationBtnText.textContent = 'Use My Location';
+              locationBtn.disabled = false;
+            }, 2000);
+          },
+          (error) => {
+            console.error('Error getting location:', error);
+            locationBtnText.textContent = 'Location denied';
+
+            setTimeout(() => {
+              locationBtnText.textContent = 'Use My Location';
+              locationBtn.disabled = false;
+            }, 2000);
+          }
+        );
+      }
+
+      async loadOrganizationsWithLocation() {
+        if (!this.userLocation) return;
+
+        try {
+          this.showLoading();
+
+          const params = new URLSearchParams({
+            lat: this.userLocation.lat,
+            lng: this.userLocation.lng,
+            radius: 50 // 50 mile radius
+          });
+
+          const response = await fetch(`/api/organizations/search?${params}`);
+
+          if (!response.ok) {
+            throw new Error('Failed to load organizations');
+          }
+
+          const data = await response.json();
+          this.organizations = data.organizations || [];
+
+          this.hideLoading();
+          this.filteredOrganizations = [...this.organizations];
+          this.filterAndDisplayOrganizations();
+
+        } catch (error) {
+          console.error('Error loading organizations with location:', error);
+          // Fall back to original organizations
+          this.hideLoading();
+          this.filterAndDisplayOrganizations();
+        }
+      }
+
+      filterAndDisplayOrganizations() {
+        let filtered = [...this.organizations];
+
+        // Apply search filter
+        if (this.currentFilters.search) {
+          const searchTerm = this.currentFilters.search.toLowerCase();
+          filtered = filtered.filter(org =>
+            org.name.toLowerCase().includes(searchTerm) ||
+            (org.location && org.location.toLowerCase().includes(searchTerm))
+          );
+        }
+
+        // Apply type filter
+        if (this.currentFilters.type) {
+          filtered = filtered.filter(org => org.type === this.currentFilters.type);
+        }
+
+        // Sort results
+        this.sortOrganizations(filtered);
+
+        this.filteredOrganizations = filtered;
+        this.displayOrganizations();
+      }
+
+      sortOrganizations(organizations) {
+        if (this.currentFilters.sortBy === 'distance' && this.userLocation) {
+          organizations.sort((a, b) => {
+            if (a.distance === null) return 1;
+            if (b.distance === null) return -1;
+            return a.distance - b.distance;
+          });
+        } else {
+          organizations.sort((a, b) => a.name.localeCompare(b.name));
+        }
+      }
+
+      displayOrganizations() {
+        const container = document.getElementById('organizationsList');
+        const resultsHeader = document.getElementById('resultsHeader');
+        const resultsCount = document.getElementById('resultsCount');
+        const emptyState = document.getElementById('emptyState');
+
+        if (this.filteredOrganizations.length === 0) {
+          container.classList.add('hidden');
+          resultsHeader.classList.add('hidden');
+          emptyState.classList.remove('hidden');
+          return;
+        }
+
+        emptyState.classList.add('hidden');
+        resultsHeader.classList.remove('hidden');
+        container.classList.remove('hidden');
+
+        resultsCount.textContent = this.filteredOrganizations.length;
+
+        container.innerHTML = this.filteredOrganizations.map(org => this.createOrganizationCard(org)).join('');
+      }
+
+      createOrganizationCard(org) {
+        const typeEmoji = {
+          church: '⛪',
+          ministry: '🤲',
+          small_group: '👥',
+          bible_study: '📖'
+        };
+
+        const emoji = typeEmoji[org.type] || '⛪';
+        const distanceText = org.distance !== null ? `${org.distance} mi` : '';
+
+        return `
+          <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer transition-colors group"
+               onclick="organizationChooser.selectOrganization('${org.subdomain}', '${org.name.replace(/'/g, '\\\'')}')"
+               data-org-id="${org.id}">
+            <div class="flex items-start justify-between">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center space-x-2 mb-1">
+                  <span class="text-lg">${emoji}</span>
+                  <h3 class="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    ${org.name}
+                  </h3>
+                </div>
+
+                ${org.location ? `
+                  <div class="flex items-center space-x-1 text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    <span>📍</span>
+                    <span>${org.location}</span>
+                  </div>
+                ` : ''}
+
+                <div class="flex items-center space-x-3 text-sm text-gray-500 dark:text-gray-500">
+                  <span class="capitalize">${org.type?.replace('_', ' ') || 'Organization'}</span>
+                  ${distanceText ? `<span>• ${distanceText}</span>` : ''}
+                </div>
+              </div>
+
+              <div class="ml-4 flex-shrink-0">
+                <svg class="w-5 h-5 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      async selectOrganization(subdomain, displayName) {
+        try {
+          // Show loading state
+          const orgCard = event.currentTarget;
+          orgCard.innerHTML = `
+            <div class="text-center py-4">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Connecting to ${displayName}...</p>
+            </div>
+          `;
+
+          // Make request to associate bracelet with organization
+          const response = await fetch('/api/bracelets/claim', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              tag_id: this.tagId,
+              organization_short_name: subdomain
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to claim bracelet');
+          }
+
+          // Success - redirect to the tag scanning URL which will load the organization
+          window.location.href = `/t/${this.tagId}?claimed=true`;
+
+        } catch (error) {
+          console.error('Error claiming bracelet:', error);
+          this.showError('Failed to connect bracelet. Please try again.');
+        }
+      }
+
+      applyFilters() {
+        const selectedType = document.querySelector('input[name="orgType"]:checked').value;
+        this.currentFilters.type = selectedType;
+
+        document.getElementById('filterModal').classList.add('hidden');
+        this.filterAndDisplayOrganizations();
+        this.updateActiveFilters();
+      }
+
+      clearFilters() {
+        this.currentFilters.type = '';
+        document.querySelector('input[name="orgType"][value=""]').checked = true;
+        document.getElementById('filterModal').classList.add('hidden');
+        this.filterAndDisplayOrganizations();
+        this.updateActiveFilters();
+      }
+
+      updateActiveFilters() {
+        const container = document.getElementById('activeFilters');
+        const filters = [];
+
+        if (this.currentFilters.type) {
+          const typeLabels = {
+            church: '⛪ Churches',
+            ministry: '🤲 Ministries',
+            small_group: '👥 Small Groups',
+            bible_study: '📖 Bible Studies'
+          };
+          filters.push(typeLabels[this.currentFilters.type]);
+        }
+
+        if (filters.length > 0) {
+          container.innerHTML = filters.map(filter => `
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+              ${filter}
+            </span>
+          `).join('');
+          container.classList.remove('hidden');
+        } else {
+          container.classList.add('hidden');
+        }
+      }
+
+      toggleSort() {
+        if (this.userLocation) {
+          this.currentFilters.sortBy = this.currentFilters.sortBy === 'name' ? 'distance' : 'name';
+        } else {
+          this.currentFilters.sortBy = 'name';
+        }
+
+        this.updateSortDisplay();
+        this.filterAndDisplayOrganizations();
+      }
+
+      updateSortDisplay() {
+        const sortType = document.getElementById('sortType');
+        sortType.textContent = this.currentFilters.sortBy === 'distance' ? 'Distance' : 'Name';
+      }
+
+      showAll() {
+        this.currentFilters.search = '';
+        this.currentFilters.type = '';
+        document.getElementById('searchInput').value = '';
+        document.querySelector('input[name="orgType"][value=""]').checked = true;
+        this.filterAndDisplayOrganizations();
+        this.updateActiveFilters();
+      }
+
+      showLoading() {
+        document.getElementById('loadingState').classList.remove('hidden');
+        document.getElementById('organizationsList').classList.add('hidden');
+        document.getElementById('resultsHeader').classList.add('hidden');
+        document.getElementById('emptyState').classList.add('hidden');
+        document.getElementById('errorState').classList.add('hidden');
+      }
+
+      hideLoading() {
+        document.getElementById('loadingState').classList.add('hidden');
+      }
+
+      showEmptyState() {
+        document.getElementById('emptyState').classList.remove('hidden');
+        document.getElementById('organizationsList').classList.add('hidden');
+        document.getElementById('resultsHeader').classList.add('hidden');
+      }
+
+      showRequestSection() {
+        document.getElementById('requestSection').classList.remove('hidden');
+      }
+
+      showError(message) {
+        this.hideLoading();
+        document.getElementById('errorMessage').textContent = message;
+        document.getElementById('errorState').classList.remove('hidden');
+        document.getElementById('organizationsList').classList.add('hidden');
+        document.getElementById('resultsHeader').classList.add('hidden');
+        document.getElementById('emptyState').classList.add('hidden');
+      }
+    }
+
+    // Initialize when page loads
+    let organizationChooser;
+    document.addEventListener('DOMContentLoaded', () => {
+      organizationChooser = new OrganizationChooser();
+    });
+  </script>
+
+</body>
+</html>

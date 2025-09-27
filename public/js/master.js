@@ -8,8 +8,12 @@ class MasterPortal {
   }
 
   async openViewAdminsModal(orgId) {
+    // Close any existing admin modals first
+    const existingModals = document.querySelectorAll('.admin-modal');
+    existingModals.forEach(modal => document.body.removeChild(modal));
+    
     const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 admin-modal';
     modal.innerHTML = `
       <div class="bg-white rounded-xl max-w-lg w-full p-6">
         <h3 class="text-lg font-semibold mb-4">Organization Admins</h3>
@@ -40,16 +44,17 @@ class MasterPortal {
         } else {
           list.innerHTML = data.admins.map(a => `
             <div class="flex items-center justify-between p-3 border rounded-lg">
-              <div>
-                <div class="text-sm font-medium text-gray-900">${a.username}</div>
+              <div class="flex-1 cursor-pointer" onclick="masterPortal.editAdmin(${orgId}, ${a.id})">
+                <div class="text-sm font-medium text-blue-600 hover:text-blue-800">${a.username}</div>
                 <div class="text-xs text-gray-500">${a.email || ''}</div>
+                <div class="text-xs text-gray-400">Role: ${a.role || 'admin'} • Last login: ${a.last_login_at ? new Date(a.last_login_at).toLocaleDateString() : 'Never'}</div>
               </div>
-              <div class="flex items-center space-x-3 text-xs text-gray-600">
-                <span class="mr-1">${a.role || 'admin'}</span>
+              <div class="flex items-center space-x-2 text-xs">
                 <span class="${a.is_active ? 'text-green-600' : 'text-red-600'}">${a.is_active ? 'Active' : 'Inactive'}</span>
-                <button data-action="toggle-admin-active" data-org-id="${orgId}" data-admin-id="${a.id}" class="text-blue-600 hover:text-blue-800">
+                <button data-action="toggle-admin-active" data-org-id="${orgId}" data-admin-id="${a.id}" class="px-2 py-1 text-blue-600 hover:text-blue-800 border border-blue-300 rounded">
                   ${a.is_active ? 'Deactivate' : 'Activate'}
                 </button>
+                ${!a.is_active ? `<button data-action="delete-admin" data-org-id="${orgId}" data-admin-id="${a.id}" class="px-2 py-1 text-red-600 hover:text-red-800 border border-red-300 rounded">Delete</button>` : ''}
               </div>
             </div>
           `).join('');
@@ -77,16 +82,193 @@ class MasterPortal {
           });
           const data = await resp.json();
           if (data.success) {
-            this.openViewAdminsModal(orgIdAttr); // reload modal content
-            this.showToast('Admin status updated');
+            masterPortal.refreshAdminsList(orgIdAttr); // refresh content only
+            masterPortal.showToast('Admin status updated');
           } else {
-            this.showToast(data.error || 'Failed to update admin', 'error');
+            masterPortal.showToast(data.error || 'Failed to update admin', 'error');
+          }
+        } catch (err) {
+          this.showToast('Connection error', 'error');
+        }
+      }
+      // Handle delete admin action
+      if (target && target.matches('[data-action="delete-admin"]')) {
+        const orgIdAttr = target.getAttribute('data-org-id');
+        const adminIdAttr = target.getAttribute('data-admin-id');
+        
+        if (!confirm('Are you sure you want to permanently delete this admin? This action cannot be undone.')) {
+          return;
+        }
+        
+        try {
+          const resp = await fetch(`/api/master/organizations/${orgIdAttr}/admins/${adminIdAttr}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          const data = await resp.json();
+          if (data.success) {
+            this.refreshAdminsList(orgIdAttr); // refresh content only
+            this.showToast('Admin deleted successfully');
+          } else {
+            this.showToast(data.error || 'Failed to delete admin', 'error');
           }
         } catch (err) {
           this.showToast('Connection error', 'error');
         }
       }
     }, { once: true });
+  }
+
+  async refreshAdminsList(orgId) {
+    // Find the existing admin list element and refresh it
+    const list = document.getElementById('orgAdminsList');
+    if (!list) return; // Modal is not open
+    
+    list.innerHTML = '<div class="text-sm text-gray-500">Loading...</div>';
+    
+    try {
+      const resp = await fetch(`/api/master/organizations/${orgId}/admins`);
+      const data = await resp.json();
+      
+      if (data.success && Array.isArray(data.admins)) {
+        if (data.admins.length === 0) {
+          list.innerHTML = '<div class="text-sm text-gray-500">No admins found.</div>';
+        } else {
+          list.innerHTML = data.admins.map(a => `
+            <div class="flex items-center justify-between p-3 border rounded-lg">
+              <div class="flex-1 cursor-pointer" onclick="masterPortal.editAdmin(${orgId}, ${a.id})">
+                <div class="text-sm font-medium text-blue-600 hover:text-blue-800">${a.username}</div>
+                <div class="text-xs text-gray-500">${a.email || ''}</div>
+                <div class="text-xs text-gray-400">Role: ${a.role || 'admin'} • Last login: ${a.last_login_at ? new Date(a.last_login_at).toLocaleDateString() : 'Never'}</div>
+              </div>
+              <div class="flex items-center space-x-2 text-xs">
+                <span class="${a.is_active ? 'text-green-600' : 'text-red-600'}">${a.is_active ? 'Active' : 'Inactive'}</span>
+                <button data-action="toggle-admin-active" data-org-id="${orgId}" data-admin-id="${a.id}" class="px-2 py-1 text-blue-600 hover:text-blue-800 border border-blue-300 rounded">
+                  ${a.is_active ? 'Deactivate' : 'Activate'}
+                </button>
+                ${!a.is_active ? `<button data-action="delete-admin" data-org-id="${orgId}" data-admin-id="${a.id}" class="px-2 py-1 text-red-600 hover:text-red-800 border border-red-300 rounded">Delete</button>` : ''}
+              </div>
+            </div>
+          `).join('');
+        }
+      } else {
+        list.innerHTML = '<div class="text-sm text-red-600">Failed to load admins.</div>';
+      }
+    } catch (err) {
+      list.innerHTML = '<div class="text-sm text-red-600">Error loading admins.</div>';
+    }
+  }
+
+  async editAdmin(orgId, adminId) {
+    // Fetch admin details first
+    try {
+      const resp = await fetch(`/api/master/organizations/${orgId}/admins/${adminId}`);
+      const data = await resp.json();
+      
+      if (!data.success) {
+        this.showToast('Failed to load admin details', 'error');
+        return;
+      }
+      
+      const admin = data.admin;
+      this.showEditAdminModal(orgId, admin);
+    } catch (err) {
+      this.showToast('Connection error', 'error');
+    }
+  }
+
+  showEditAdminModal(orgId, admin) {
+    // Close any existing edit modals first
+    const existingEditModals = document.querySelectorAll('.edit-admin-modal');
+    existingEditModals.forEach(modal => document.body.removeChild(modal));
+    
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 edit-admin-modal';
+    modal.innerHTML = `
+      <div class="bg-white rounded-xl max-w-md w-full p-6">
+        <h3 class="text-lg font-semibold mb-4">✏️ Edit Admin: ${admin.username}</h3>
+        <form id="editAdminForm" class="space-y-4">
+          <input type="hidden" id="editAdminId" value="${admin.id}">
+          <input type="hidden" id="editOrgId" value="${orgId}">
+          
+          <div>
+            <label class="block text-sm font-medium mb-1">Username</label>
+            <input id="editAdminUsername" type="text" value="${admin.username}" required class="w-full p-2 border rounded">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium mb-1">Email</label>
+            <input id="editAdminEmail" type="email" value="${admin.email || ''}" class="w-full p-2 border rounded">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium mb-1">Role</label>
+            <select id="editAdminRole" class="w-full p-2 border rounded">
+              <option value="admin" ${admin.role === 'admin' ? 'selected' : ''}>Admin</option>
+              <option value="super_admin" ${admin.role === 'super_admin' ? 'selected' : ''}>Super Admin</option>
+              <option value="viewer" ${admin.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+            </select>
+          </div>
+          
+          <div class="flex items-center space-x-2">
+            <input id="editAdminActive" type="checkbox" ${admin.is_active ? 'checked' : ''} class="rounded">
+            <label for="editAdminActive" class="text-sm">Active</label>
+          </div>
+          
+          <div class="flex justify-end space-x-3 pt-4">
+            <button type="button" id="cancelEditAdmin" class="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    `;
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) document.body.removeChild(modal);
+    });
+    
+    document.body.appendChild(modal);
+    
+    document.getElementById('cancelEditAdmin').addEventListener('click', () => {
+      document.body.removeChild(modal);
+    });
+    
+    document.getElementById('editAdminForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await this.handleEditAdminSubmit(modal);
+    });
+  }
+
+  async handleEditAdminSubmit(modal) {
+    const orgId = document.getElementById('editOrgId').value;
+    const adminId = document.getElementById('editAdminId').value;
+    
+    const formData = {
+      username: document.getElementById('editAdminUsername').value,
+      email: document.getElementById('editAdminEmail').value || null,
+      role: document.getElementById('editAdminRole').value,
+      is_active: document.getElementById('editAdminActive').checked
+    };
+    
+    try {
+      const resp = await fetch(`/api/master/organizations/${orgId}/admins/${adminId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      
+      const data = await resp.json();
+      if (data.success) {
+        document.body.removeChild(modal);
+        this.showToast('Admin updated successfully');
+        // Refresh the admin list if it's open
+        this.refreshAdminsList(orgId);
+      } else {
+        this.showToast(data.error || 'Failed to update admin', 'error');
+      }
+    } catch (err) {
+      this.showToast('Connection error', 'error');
+    }
   }
 
   init() {
@@ -137,14 +319,29 @@ class MasterPortal {
     });
 
     // Navigation
-    document.getElementById('dashboardMasterNav').addEventListener('click', (e) => {
-      e.preventDefault();
-      this.showMasterTab('dashboard');
-    });
-    document.getElementById('organizationsMasterNav').addEventListener('click', (e) => {
-      e.preventDefault();
-      this.showMasterTab('organizations');
-    });
+    const dashboardNav = document.getElementById('dashboardMasterNav');
+    if (dashboardNav) {
+      dashboardNav.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showMasterTab('dashboard');
+      });
+    }
+
+    const organizationsNav = document.getElementById('organizationsMasterNav');
+    if (organizationsNav) {
+      organizationsNav.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showMasterTab('organizations');
+      });
+    }
+
+    const orgRequestsNav = document.getElementById('orgRequestsMasterNav');
+    if (orgRequestsNav) {
+      orgRequestsNav.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showMasterTab('orgRequests');
+      });
+    }
     // Handle creating and viewing admins for an organization (event delegation)
     document.addEventListener('click', (e) => {
       const target = e.target;
@@ -211,6 +408,21 @@ class MasterPortal {
     document.getElementById('addOrganizationBtn').addEventListener('click', () => {
       this.showOrganizationModal();
     });
+
+    // Organization requests management
+    const requestStatusFilter = document.getElementById('requestStatusFilter');
+    if (requestStatusFilter) {
+      requestStatusFilter.addEventListener('change', () => {
+        this.loadOrganizationRequests();
+      });
+    }
+
+    const refreshRequestsBtn = document.getElementById('refreshRequestsBtn');
+    if (refreshRequestsBtn) {
+      refreshRequestsBtn.addEventListener('click', () => {
+        this.loadOrganizationRequests();
+      });
+    }
 
     // Organization modal
     document.getElementById('cancelOrganizationModal').addEventListener('click', () => {
@@ -419,7 +631,10 @@ class MasterPortal {
       if (data.success) {
         this.currentMasterAdmin = data.admin;
         this.showMasterDashboard();
-        this.loadDashboardData();
+        // Add small delay to ensure session is properly established
+        setTimeout(() => {
+          this.loadDashboardData();
+        }, 100);
       } else {
         errorEl.textContent = data.error || 'Login failed';
         errorEl.classList.remove('hidden');
@@ -496,6 +711,7 @@ class MasterPortal {
     const titleMap = {
       'dashboard': '🚀 Master Dashboard',
       'organizations': '🏢 Organizations',
+      'orgRequests': '📝 Organization Requests',
       'nfcTags': '🏷️ NFC Tags',
       'billing': '💳 Billing & Plans', 
       'analytics': '📈 Global Analytics',
@@ -511,6 +727,8 @@ class MasterPortal {
     // Load data for specific tabs
     if (tabName === 'organizations') {
       this.loadOrganizations();
+    } else if (tabName === 'orgRequests') {
+      this.loadOrganizationRequests();
     } else if (tabName === 'nfcTags') {
       this.loadNFCTags();
       this.loadNFCTagBatches();
@@ -548,8 +766,22 @@ class MasterPortal {
   }
 
   async loadDashboardData() {
+    // Check if user is authenticated first
+    if (!this.currentMasterAdmin) {
+      console.log('User not authenticated, redirecting to login');
+      this.showMasterLogin();
+      return;
+    }
+
     try {
       const overviewResp = await fetch('/api/master/overview');
+
+      if (overviewResp.status === 401) {
+        console.log('Authentication expired, redirecting to login');
+        this.showMasterLogin();
+        return;
+      }
+
       const overview = await overviewResp.json();
 
       if (overview.success) {
@@ -688,8 +920,22 @@ class MasterPortal {
   }
 
   async loadOrganizations() {
+    // Check if user is authenticated first
+    if (!this.currentMasterAdmin) {
+      console.log('User not authenticated, redirecting to login');
+      this.showMasterLogin();
+      return;
+    }
+
     try {
       const response = await fetch('/api/master/organizations');
+
+      if (response.status === 401) {
+        console.log('Authentication expired, redirecting to login');
+        this.showMasterLogin();
+        return;
+      }
+
       const data = await response.json();
 
       if (data.success) {
@@ -889,10 +1135,46 @@ class MasterPortal {
       document.getElementById('organizationEmail').value = organization.contact_email || '';
       document.getElementById('organizationPlan').value = organization.plan_type;
       document.getElementById('organizationCustomDomain').value = organization.custom_domain || '';
+      
+      // New fields (with null checks)
+      const orgTypeEl = document.getElementById('organizationType');
+      if (orgTypeEl) orgTypeEl.value = organization.org_type || '';
+
+      const joinTypeEl = document.getElementById('organizationJoinType');
+      if (joinTypeEl) joinTypeEl.value = organization.join_type || 'open';
+
+      const addressEl = document.getElementById('organizationAddress');
+      if (addressEl) addressEl.value = organization.address || '';
+
+      const cityEl = document.getElementById('organizationCity');
+      if (cityEl) cityEl.value = organization.city || '';
+
+      const stateEl = document.getElementById('organizationState');
+      if (stateEl) stateEl.value = organization.state || '';
+
+      const zipEl = document.getElementById('organizationZipCode');
+      if (zipEl) zipEl.value = organization.zip_code || '';
+
+      const countryEl = document.getElementById('organizationCountry');
+      if (countryEl) countryEl.value = organization.country || 'US';
+
+      const latEl = document.getElementById('organizationLatitude');
+      if (latEl) latEl.value = organization.latitude || '';
+
+      const lngEl = document.getElementById('organizationLongitude');
+      if (lngEl) lngEl.value = organization.longitude || '';
+
+      // Update button text for editing
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.textContent = 'Save Changes';
     } else {
       title.textContent = '✨ Add New Organization';
+
+      // Update button text for creating
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.textContent = 'Create Organization';
     }
-    
+
     modal.classList.remove('hidden');
   }
 
@@ -907,7 +1189,18 @@ class MasterPortal {
       subdomain: document.getElementById('organizationSubdomain').value,
       contact_email: document.getElementById('organizationEmail').value,
       plan_type: document.getElementById('organizationPlan').value,
-      custom_domain: document.getElementById('organizationCustomDomain').value
+      custom_domain: document.getElementById('organizationCustomDomain').value,
+      
+      // New fields
+      org_type: document.getElementById('organizationType').value,
+      join_type: document.getElementById('organizationJoinType').value,
+      address: document.getElementById('organizationAddress').value,
+      city: document.getElementById('organizationCity').value,
+      state: document.getElementById('organizationState').value,
+      zip_code: document.getElementById('organizationZipCode').value,
+      country: document.getElementById('organizationCountry').value,
+      latitude: document.getElementById('organizationLatitude').value || null,
+      longitude: document.getElementById('organizationLongitude').value || null
     };
 
     try {
@@ -949,7 +1242,10 @@ class MasterPortal {
     const organization = this.organizations.find(o => o.id === orgId);
     if (organization) {
       // Open organization's admin panel in new tab
-      window.open(`https://${organization.subdomain}.churchtap.app/admin`, '_blank');
+      // Use localhost for development, production domain for live
+      const isDev = window.location.hostname === 'localhost';
+      const baseUrl = isDev ? `http://localhost:3000` : `https://${organization.subdomain}.churchtap.app`;
+      window.open(`${baseUrl}/admin`, '_blank');
     }
   }
 
@@ -1578,12 +1874,19 @@ class MasterPortal {
       const params = new URLSearchParams({
         timeframe: this.currentTimeframe
       });
-      
+
       if (this.currentOrganization) {
         params.append('organization_id', this.currentOrganization);
       }
 
       const response = await fetch(`/api/master/analytics/stats?${params}`);
+
+      // Handle missing endpoint gracefully
+      if (response.status === 404 || response.status === 500) {
+        console.log('Analytics endpoint not available, showing placeholder data');
+        this.showPlaceholderAnalytics();
+        return;
+      }
       const data = await response.json();
       
       if (data.success) {
@@ -1601,7 +1904,23 @@ class MasterPortal {
       }
     } catch (error) {
       console.error('Error loading analytics stats:', error);
+      this.showPlaceholderAnalytics();
     }
+  }
+
+  showPlaceholderAnalytics() {
+    // Show placeholder data when analytics endpoint is not available
+    const totalScansEl = document.getElementById('totalScans');
+    if (totalScansEl) totalScansEl.textContent = '--';
+
+    const uniqueTagsEl = document.getElementById('uniqueTags');
+    if (uniqueTagsEl) uniqueTagsEl.textContent = '--';
+
+    const avgEngagementEl = document.getElementById('avgEngagement');
+    if (avgEngagementEl) avgEngagementEl.textContent = '--';
+
+    const topOrganizationsEl = document.getElementById('topOrganizations');
+    if (topOrganizationsEl) topOrganizationsEl.innerHTML = '<div class="text-gray-500 text-center py-4">Analytics data not available</div>';
   }
 
   updateMapMarkers(locations) {
@@ -1962,12 +2281,24 @@ class MasterPortal {
       }
 
       const response = await fetch(`/api/master/analytics/tag-activities?${params}`);
+
+      // Handle missing endpoint gracefully
+      if (response.status === 404 || response.status === 500) {
+        console.log('Tag activities endpoint not available');
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (emptyEl) emptyEl.classList.remove('hidden');
+        return;
+      }
+
       const data = await response.json();
-      
+
       // Hide loading state
       if (loadingEl) loadingEl.classList.add('hidden');
-      
+
       if (data.success) {
+        const totalEl = document.getElementById('tagActivitiesTotal');
+        if (totalEl) totalEl.textContent = data.total ?? 0;
+
         if (data.activities && data.activities.length === 0) {
           if (emptyEl) emptyEl.classList.remove('hidden');
         } else if (data.activities && data.activities.length > 0) {
@@ -2002,25 +2333,35 @@ class MasterPortal {
         `${activity.city}, ${activity.country}` : 
         (activity.country || 'Unknown');
 
+      // Session information - show session ID and interaction type
+      const sessionInfo = activity.session_id ? 
+        `${activity.interaction_type || 'scan'}<br><span class="text-xs text-gray-500">${activity.session_id.substring(0, 8)}...</span>` : 
+        'Unknown, Unknown';
+
+      // Organization information
+      const orgInfo = activity.organization_name ? 
+        `${activity.organization_name}<br><span class="text-xs text-gray-500">${activity.subdomain || ''}</span>` : 
+        'None';
+
       return `
         <tr class="hover:bg-gray-50">
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-            ${new Date(activity.created_at).toLocaleString()}
+            ${new Date(activity.created_at).toLocaleString('en-US', { timeZone: 'America/Chicago' })}
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
             <code class="text-sm bg-gray-100 px-2 py-1 rounded">${activity.tag_id}</code>
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-            ${activity.organization_name || 'Unknown'}
-            ${activity.subdomain ? `<div class="text-xs text-gray-500">${activity.subdomain}</div>` : ''}
+            ${activity.interaction_type || 'scan'}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            ${sessionInfo}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
             ${location}
           </td>
-          <td class="px-6 py-4 whitespace-nowrap">
-            <button onclick="masterPortal.loadIPDetails('${activity.ip_address}')" class="text-sm text-blue-600 hover:text-blue-800 hover:underline">
-              ${activity.ip_address}
-            </button>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            ${orgInfo}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm">
             ${followupBadge}
@@ -2036,14 +2377,17 @@ class MasterPortal {
   }
 
   updateTagActivitiesPagination(pagination, total) {
-    const infoEl = document.getElementById('tagActivitiesPaginationInfo');
-    if (infoEl) {
-      const start = pagination.offset + 1;
-      const end = Math.min(pagination.offset + pagination.limit, total);
-      infoEl.innerHTML = `
-        Showing <span class="font-medium">${start}</span> to <span class="font-medium">${end}</span> of <span class="font-medium">${total}</span> results
-      `;
-    }
+    const totalNum = typeof total === 'string' ? parseInt(total, 10) : (total || 0);
+    const start = totalNum === 0 ? 0 : (pagination.offset + 1);
+    const end = Math.min(pagination.offset + pagination.limit, totalNum);
+
+    const startEl = document.getElementById('tagActivitiesShowingStart');
+    const endEl = document.getElementById('tagActivitiesShowingEnd');
+    const totalEl = document.getElementById('tagActivitiesShowingTotal');
+
+    if (startEl) startEl.textContent = start;
+    if (endEl) endEl.textContent = end;
+    if (totalEl) totalEl.textContent = totalNum;
 
     // Simple pagination for now
     const paginationEl = document.getElementById('tagActivitiesPagination');
@@ -2369,6 +2713,303 @@ class MasterPortal {
         ` : ''}
       </div>
     `;
+  }
+
+  // ========================================
+  // ORGANIZATION REQUEST MANAGEMENT
+  // ========================================
+
+  async loadOrganizationRequests() {
+    try {
+      const statusFilterElement = document.getElementById('requestStatusFilter');
+      const statusFilter = statusFilterElement ? statusFilterElement.value : '';
+      const url = `/api/master/organization-requests${statusFilter ? `?status=${statusFilter}` : ''}`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.success) {
+        this.displayOrganizationRequests(data.requests);
+        this.updatePendingRequestsBadge(data.requests);
+      } else {
+        this.showToast('Failed to load organization requests', 'error');
+      }
+    } catch (error) {
+      console.error('Error loading organization requests:', error);
+      this.showToast('Error loading organization requests', 'error');
+    }
+  }
+
+  displayOrganizationRequests(requests) {
+    const tbody = document.getElementById('orgRequestsTableBody');
+    
+    if (requests.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+            No organization requests found
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = requests.map(request => {
+      const statusBadge = this.getStatusBadge(request.status);
+      const typeIcon = this.getOrgTypeIcon(request.org_type);
+      const submittedDate = new Date(request.submitted_at).toLocaleDateString();
+      
+      return `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div class="flex items-center">
+              <span class="text-lg mr-2">${typeIcon}</span>
+              <div>
+                <div class="text-sm font-medium text-gray-900">${request.org_name}</div>
+                <div class="text-sm text-gray-500">churchtap.app/${request.requested_subdomain}</div>
+              </div>
+            </div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="text-sm text-gray-900 capitalize">${request.org_type.replace('_', ' ')}</span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div class="text-sm text-gray-900">${request.contact_name}</div>
+            <div class="text-sm text-gray-500">${request.contact_email}</div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div class="text-sm text-gray-900">${request.city}, ${request.state}</div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            ${statusBadge}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            ${submittedDate}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+            <div class="flex space-x-2">
+              <button onclick="masterPortal.viewRequestDetails(${request.id})" 
+                      class="text-blue-600 hover:text-blue-900">View</button>
+              ${request.status === 'pending' ? `
+                <button onclick="masterPortal.approveRequest(${request.id})" 
+                        class="text-green-600 hover:text-green-900">Approve</button>
+                <button onclick="masterPortal.denyRequest(${request.id})" 
+                        class="text-red-600 hover:text-red-900">Deny</button>
+              ` : ''}
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  getStatusBadge(status) {
+    const badges = {
+      'pending': '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>',
+      'under_review': '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Under Review</span>',
+      'approved': '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Approved</span>',
+      'denied': '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Denied</span>'
+    };
+    return badges[status] || status;
+  }
+
+  getOrgTypeIcon(type) {
+    const icons = {
+      'church': '⛪',
+      'ministry': '🙏',
+      'small_group': '👥',
+      'bible_study': '📖'
+    };
+    return icons[type] || '🏢';
+  }
+
+  updatePendingRequestsBadge(requests) {
+    const pendingCount = requests.filter(r => r.status === 'pending').length;
+    const badge = document.getElementById('pendingRequestsBadge');
+    
+    if (pendingCount > 0) {
+      badge.textContent = pendingCount;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  async viewRequestDetails(requestId) {
+    try {
+      const response = await fetch(`/api/master/organization-requests/${requestId}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        this.showRequestDetailsModal(data.request);
+      } else {
+        this.showToast('Failed to load request details', 'error');
+      }
+    } catch (error) {
+      console.error('Error loading request details:', error);
+      this.showToast('Error loading request details', 'error');
+    }
+  }
+
+  showRequestDetailsModal(request) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.innerHTML = `
+      <div class="bg-white rounded-xl max-w-2xl w-full max-h-screen overflow-y-auto p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-lg font-semibold">Organization Request Details</h3>
+          <button id="closeRequestDetails" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 class="font-medium text-gray-900 mb-3">Organization Information</h4>
+            <div class="space-y-2 text-sm">
+              <div><span class="font-medium">Name:</span> ${request.org_name}</div>
+              <div><span class="font-medium">Type:</span> ${request.org_type.replace('_', ' ')}</div>
+              <div><span class="font-medium">Subdomain:</span> ${request.requested_subdomain}</div>
+              <div><span class="font-medium">Description:</span> ${request.description || 'N/A'}</div>
+            </div>
+          </div>
+          
+          <div>
+            <h4 class="font-medium text-gray-900 mb-3">Contact Information</h4>
+            <div class="space-y-2 text-sm">
+              <div><span class="font-medium">Name:</span> ${request.contact_name}</div>
+              <div><span class="font-medium">Email:</span> ${request.contact_email}</div>
+              <div><span class="font-medium">Phone:</span> ${request.contact_phone || 'N/A'}</div>
+              <div><span class="font-medium">Title:</span> ${request.contact_title || 'N/A'}</div>
+            </div>
+          </div>
+          
+          <div>
+            <h4 class="font-medium text-gray-900 mb-3">Location</h4>
+            <div class="space-y-2 text-sm">
+              <div><span class="font-medium">Address:</span> ${request.address}</div>
+              <div><span class="font-medium">City:</span> ${request.city}</div>
+              <div><span class="font-medium">State:</span> ${request.state}</div>
+              <div><span class="font-medium">ZIP:</span> ${request.zip_code || 'N/A'}</div>
+            </div>
+          </div>
+          
+          <div>
+            <h4 class="font-medium text-gray-900 mb-3">Request Status</h4>
+            <div class="space-y-2 text-sm">
+              <div><span class="font-medium">Status:</span> ${this.getStatusBadge(request.status)}</div>
+              <div><span class="font-medium">Submitted:</span> ${new Date(request.submitted_at).toLocaleString()}</div>
+              ${request.reviewed_at ? `<div><span class="font-medium">Reviewed:</span> ${new Date(request.reviewed_at).toLocaleString()}</div>` : ''}
+              ${request.review_notes ? `<div><span class="font-medium">Notes:</span> ${request.review_notes}</div>` : ''}
+            </div>
+          </div>
+        </div>
+        
+        ${request.status === 'pending' ? `
+          <div class="mt-6 flex justify-end space-x-3">
+            <button onclick="masterPortal.denyRequest(${request.id})" class="btn-secondary">Deny</button>
+            <button onclick="masterPortal.approveRequest(${request.id})" class="btn-primary">Approve</button>
+          </div>
+        ` : ''}
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    document.getElementById('closeRequestDetails').addEventListener('click', () => {
+      document.body.removeChild(modal);
+    });
+  }
+
+  async approveRequest(requestId) {
+    if (!confirm('Are you sure you want to approve this organization request?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/master/organization-requests/${requestId}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({})
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        this.showToast('Organization request approved successfully!', 'success');
+        this.loadOrganizationRequests(); // Refresh the list
+        
+        // Show setup information
+        if (data.setup_url) {
+          this.showSetupInfoModal(data);
+        }
+      } else {
+        this.showToast(data.error || 'Failed to approve request', 'error');
+      }
+    } catch (error) {
+      console.error('Error approving request:', error);
+      this.showToast('Error approving request', 'error');
+    }
+  }
+
+  async denyRequest(requestId) {
+    const reason = prompt('Please provide a reason for denying this request:');
+    if (!reason) return;
+
+    try {
+      const response = await fetch(`/api/master/organization-requests/${requestId}/deny`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        this.showToast('Organization request denied', 'success');
+        this.loadOrganizationRequests(); // Refresh the list
+      } else {
+        this.showToast(data.error || 'Failed to deny request', 'error');
+      }
+    } catch (error) {
+      console.error('Error denying request:', error);
+      this.showToast('Error denying request', 'error');
+    }
+  }
+
+  showSetupInfoModal(data) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.innerHTML = `
+      <div class="bg-white rounded-xl max-w-lg w-full p-6">
+        <h3 class="text-lg font-semibold mb-4">✅ Organization Approved</h3>
+        <p class="text-gray-600 mb-4">The organization has been created successfully. You can now send the setup link to the contact person.</p>
+        
+        <div class="bg-gray-50 p-4 rounded-lg mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Setup Link:</label>
+          <div class="flex">
+            <input type="text" value="${data.setup_url}" readonly 
+                   class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg text-sm bg-white">
+            <button onclick="navigator.clipboard.writeText('${data.setup_url}')" 
+                    class="px-3 py-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 text-sm">
+              Copy
+            </button>
+          </div>
+        </div>
+        
+        <div class="flex justify-end">
+          <button onclick="this.closest('.fixed').remove()" class="btn-primary">Close</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
   }
 }
 

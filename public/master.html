@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Church Tap - Master Portal</title>
-  <script src="https://cdn.tailwindcss.com"></script>
   <link href="/css/style.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -75,7 +74,13 @@
                 <span class="mr-3 text-lg">🏢</span>
                 Organizations
               </a>
-              
+
+              <a href="#" id="orgRequestsMasterNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-lg">
+                <span class="mr-3 text-lg">📋</span>
+                Organization Requests
+                <span id="pendingRequestsBadge" class="hidden ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1"></span>
+              </a>
+
               <a href="#" id="billingMasterNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-lg">
                 <span class="mr-3 text-lg">💳</span>
                 Billing & Plans
@@ -377,7 +382,47 @@
               </div>
             </div>
 
-            <!-- Other tab contents... -->
+            <!-- Organization Requests Tab -->
+            <div id="orgRequestsMasterContent" class="tab-content hidden">
+              <div class="mb-6 flex justify-between items-center">
+                <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">📋 Organization Requests</h1>
+                <div class="flex items-center space-x-4">
+                  <select id="requestsStatusFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Organization Requests Table -->
+              <div class="modern-card overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                  <h3 class="text-lg font-medium text-gray-900">📋 Organization Requests</h3>
+                </div>
+
+                <div class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact Info</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="orgRequestsTableBody" class="bg-white divide-y divide-gray-200">
+                      <!-- Organization requests will be loaded here -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
             <div id="billingMasterContent" class="tab-content hidden">
               <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-8">💳 Billing & Plans</h1>
               <div class="modern-card p-6">
@@ -730,12 +775,109 @@
 
           <div>
             <label for="organizationCustomDomain" class="block text-sm font-medium text-gray-700">Custom Domain (Optional)</label>
-            <input type="text" id="organizationCustomDomain" 
+            <input type="text" id="organizationCustomDomain"
                    class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
                    placeholder="verses.yourchurch.org">
           </div>
 
-          
+          <!-- Organization Details Section -->
+          <div class="border-t pt-6">
+            <h4 class="text-md font-medium text-gray-900 mb-4">Organization Details</h4>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label for="organizationType" class="block text-sm font-medium text-gray-700">Organization Type</label>
+                <select id="organizationType"
+                        class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                  <option value="">Select Type</option>
+                  <option value="church">Church</option>
+                  <option value="ministry">Ministry</option>
+                  <option value="nonprofit">Non-Profit</option>
+                  <option value="business">Business</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="organizationJoinType" class="block text-sm font-medium text-gray-700">Join Type</label>
+                <select id="organizationJoinType"
+                        class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                  <option value="open">Open (Anyone can join)</option>
+                  <option value="approval">Approval Required</option>
+                  <option value="invite">Invite Only</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Address Section -->
+          <div class="border-t pt-6">
+            <h4 class="text-md font-medium text-gray-900 mb-4">Address Information</h4>
+
+            <div>
+              <label for="organizationAddress" class="block text-sm font-medium text-gray-700">Street Address</label>
+              <input type="text" id="organizationAddress"
+                     class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                     placeholder="123 Main Street">
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div>
+                <label for="organizationCity" class="block text-sm font-medium text-gray-700">City</label>
+                <input type="text" id="organizationCity"
+                       class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="Dallas">
+              </div>
+
+              <div>
+                <label for="organizationState" class="block text-sm font-medium text-gray-700">State/Province</label>
+                <input type="text" id="organizationState"
+                       class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="TX">
+              </div>
+
+              <div>
+                <label for="organizationZipCode" class="block text-sm font-medium text-gray-700">ZIP/Postal Code</label>
+                <input type="text" id="organizationZipCode"
+                       class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="75201">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div>
+                <label for="organizationCountry" class="block text-sm font-medium text-gray-700">Country</label>
+                <select id="organizationCountry"
+                        class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                  <option value="US">United States</option>
+                  <option value="CA">Canada</option>
+                  <option value="GB">United Kingdom</option>
+                  <option value="AU">Australia</option>
+                  <option value="DE">Germany</option>
+                  <option value="FR">France</option>
+                  <option value="IT">Italy</option>
+                  <option value="ES">Spain</option>
+                  <option value="BR">Brazil</option>
+                  <option value="MX">Mexico</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="organizationLatitude" class="block text-sm font-medium text-gray-700">Latitude (Optional)</label>
+                <input type="number" id="organizationLatitude" step="any"
+                       class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="32.7767">
+              </div>
+
+              <div>
+                <label for="organizationLongitude" class="block text-sm font-medium text-gray-700">Longitude (Optional)</label>
+                <input type="number" id="organizationLongitude" step="any"
+                       class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="-96.7970">
+              </div>
+            </div>
+          </div>
 
           <div class="flex justify-end space-x-3 pt-4">
             <button type="button" id="cancelOrganizationModal" class="btn-secondary-modern">Cancel</button>

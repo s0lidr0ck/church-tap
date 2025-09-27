@@ -406,6 +406,45 @@ class AdminDashboard {
         this.saveImportSettings();
       });
     }
+
+    // Users page event listeners
+    const refreshUsersBtn = document.getElementById('refreshUsers');
+    if (refreshUsersBtn) {
+      refreshUsersBtn.addEventListener('click', () => {
+        this.loadUsers();
+      });
+    }
+
+    const userTagSearch = document.getElementById('userTagSearch');
+    if (userTagSearch) {
+      userTagSearch.addEventListener('input', () => {
+        this.filterUsers();
+      });
+    }
+
+    const userTagFilter = document.getElementById('userTagFilter');
+    if (userTagFilter) {
+      userTagFilter.addEventListener('change', () => {
+        this.filterUsers();
+      });
+    }
+
+    // User posts modal
+    const closeUserPostsModal = document.getElementById('closeUserPostsModal');
+    if (closeUserPostsModal) {
+      closeUserPostsModal.addEventListener('click', () => {
+        this.hideElement('userPostsModal');
+      });
+    }
+
+    const userPostsModal = document.getElementById('userPostsModal');
+    if (userPostsModal) {
+      userPostsModal.addEventListener('click', (e) => {
+        if (e.target === userPostsModal) {
+          this.hideElement('userPostsModal');
+        }
+      });
+    }
   }
 
   applySavedBrandTheme() {
@@ -1419,39 +1458,267 @@ class AdminDashboard {
   }
 
   async loadUsers() {
+    this.showLoading('loadingUsers');
+    this.hideElement('usersTableContainer');
+    this.hideElement('noUsersMessage');
+
     try {
-      // Reuse analytics data for user statistics
-      const response = await fetch('/api/admin/analytics?days=30');
+      const response = await fetch('/api/admin/users');
+      if (!response.ok) throw new Error('Failed to load users');
+
       const data = await response.json();
 
-      if (data.success) {
-        this.renderUserStats(data.analytics);
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load users');
       }
+
+      this.hideLoading('loadingUsers');
+
+      // Update stats
+      const totalTagsEl = document.getElementById('totalTags');
+      const activeTagsEl = document.getElementById('activeTags');
+      const communityContributorsEl = document.getElementById('communityContributors');
+
+      if (totalTagsEl) totalTagsEl.textContent = data.stats.total_tags.toLocaleString();
+      if (activeTagsEl) activeTagsEl.textContent = data.stats.active_tags.toLocaleString();
+      if (communityContributorsEl) communityContributorsEl.textContent = data.stats.community_contributors.toLocaleString();
+
+      // Store users data for filtering
+      this.usersData = data.users;
+
+      if (data.users.length === 0) {
+        this.showElement('noUsersMessage');
+      } else {
+        this.showElement('usersTableContainer');
+        this.renderUsersTable(data.users);
+      }
+
     } catch (error) {
-      console.error('Error loading user stats:', error);
+      console.error('Error loading users:', error);
+      this.hideLoading('loadingUsers');
+      this.showNotification('Error loading user data', 'error');
     }
   }
 
-  renderUserStats(analytics) {
-    // Update user statistics
-    const totalVisitorsEl = document.getElementById('totalVisitors');
-    const activeUsersEl = document.getElementById('activeUsersCount');
-    const returnRateEl = document.getElementById('returnRate');
+  renderUsersTable(users) {
+    const tbody = document.getElementById('usersTableBody');
+    if (!tbody) return;
 
-    if (totalVisitorsEl && analytics.visitor_retention) {
-      totalVisitorsEl.textContent = (analytics.visitor_retention.unique_visitors || 0).toLocaleString();
+    tbody.innerHTML = '';
+
+    users.forEach(user => {
+      const row = document.createElement('tr');
+      const lastActivity = user.last_activity ? new Date(user.last_activity).toLocaleDateString() : 'Never';
+      const firstActivity = user.first_activity ? new Date(user.first_activity).toLocaleDateString() : 'Never';
+      const totalPosts = user.community_posts.total_posts || 0;
+
+      row.innerHTML = `
+        <td class="px-6 py-4 whitespace-nowrap">
+          <div class="flex items-center">
+            <div class="flex-shrink-0 h-8 w-8">
+              <div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <span class="text-xs font-medium text-blue-600">${user.tag_id.slice(-4)}</span>
+              </div>
+            </div>
+            <div class="ml-4">
+              <div class="text-sm font-medium text-gray-900">${user.tag_id}</div>
+              <div class="text-sm text-gray-500">First: ${firstActivity}</div>
+            </div>
+          </div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+          ${lastActivity}
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+          <div class="text-sm font-medium">${user.total_interactions}</div>
+          <div class="text-xs text-gray-500">${user.active_days} days</div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+          ${user.active_days}
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          ${totalPosts > 0 ? `
+            <div class="flex space-x-2">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                🙏 ${user.community_posts.prayer_count || 0}
+              </span>
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                🎉 ${user.community_posts.praise_count || 0}
+              </span>
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                💭 ${user.community_posts.insight_count || 0}
+              </span>
+            </div>
+          ` : `
+            <span class="text-sm text-gray-400">No posts</span>
+          `}
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+          ${totalPosts > 0 ? `
+            <button onclick="adminDashboard.viewUserPosts('${user.tag_id}')"
+                    class="text-primary-600 hover:text-primary-900">
+              View Posts (${totalPosts})
+            </button>
+          ` : `
+            <span class="text-gray-400">No posts</span>
+          `}
+        </td>
+      `;
+
+      tbody.appendChild(row);
+    });
+  }
+
+  async viewUserPosts(tagId) {
+    document.getElementById('userPostsModalTitle').textContent = `Posts from Tag ${tagId}`;
+    document.getElementById('userPostsModalSubtitle').textContent = `Community posts and interactions from ${tagId}`;
+
+    this.showElement('userPostsModal');
+    this.showElement('loadingUserPosts');
+    this.hideElement('userPostsList');
+    this.hideElement('noUserPosts');
+
+    try {
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(tagId)}/posts`);
+      if (!response.ok) throw new Error('Failed to load user posts');
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load user posts');
+      }
+
+      this.hideElement('loadingUserPosts');
+
+      // Update modal stats
+      document.getElementById('modalPrayerCount').textContent = data.stats.prayer_requests;
+      document.getElementById('modalPraiseCount').textContent = data.stats.praise_reports;
+      document.getElementById('modalInsightCount').textContent = data.stats.verse_insights;
+      document.getElementById('modalTotalCount').textContent = data.stats.total;
+
+      if (data.posts.length === 0) {
+        this.showElement('noUserPosts');
+      } else {
+        this.showElement('userPostsList');
+        this.renderUserPosts(data.posts);
+      }
+
+    } catch (error) {
+      console.error('Error loading user posts:', error);
+      this.hideElement('loadingUserPosts');
+      this.showNotification('Error loading user posts', 'error');
+    }
+  }
+
+  renderUserPosts(posts) {
+    const container = document.getElementById('userPostsList');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    posts.forEach(post => {
+      const postEl = document.createElement('div');
+      postEl.className = 'border rounded-lg p-4 bg-white';
+
+      const typeColors = {
+        'prayer_request': 'bg-blue-100 text-blue-800',
+        'praise_report': 'bg-green-100 text-green-800',
+        'verse_insight': 'bg-purple-100 text-purple-800'
+      };
+
+      const typeLabels = {
+        'prayer_request': '🙏 Prayer Request',
+        'praise_report': '🎉 Praise Report',
+        'verse_insight': '💭 Verse Insight'
+      };
+
+      const createdAt = new Date(post.created_at).toLocaleString();
+
+      postEl.innerHTML = `
+        <div class="flex justify-between items-start mb-2">
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeColors[post.type]}">
+            ${typeLabels[post.type]}
+          </span>
+          <div class="text-xs text-gray-500">
+            ${createdAt}
+            ${post.is_hidden ? ' • <span class="text-red-600">Hidden</span>' : ''}
+          </div>
+        </div>
+        <div class="text-sm text-gray-900 mb-2">
+          ${this.escapeHtml(post.content)}
+        </div>
+        <div class="flex justify-between items-center text-xs text-gray-500">
+          <span>${post.prayer_count || 0} interactions</span>
+          <div class="space-x-2">
+            ${post.is_hidden ? `
+              <button onclick="adminDashboard.togglePostVisibility('${post.type}', ${post.id}, false)"
+                      class="text-green-600 hover:text-green-800">Unhide</button>
+            ` : `
+              <button onclick="adminDashboard.togglePostVisibility('${post.type}', ${post.id}, true)"
+                      class="text-red-600 hover:text-red-800">Hide</button>
+            `}
+          </div>
+        </div>
+      `;
+
+      container.appendChild(postEl);
+    });
+  }
+
+  async togglePostVisibility(type, postId, hide) {
+    try {
+      const endpoints = {
+        'prayer_request': 'prayer-request',
+        'praise_report': 'praise-report',
+        'verse_insight': 'verse-insight'
+      };
+
+      const response = await fetch(`/api/admin/${endpoints[type]}/${postId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: hide ? 'hide' : 'unhide' })
+      });
+
+      if (!response.ok) throw new Error('Failed to update post visibility');
+
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error);
+
+      this.showNotification(data.message, 'success');
+
+      // Refresh the posts modal
+      const tagId = document.getElementById('userPostsModalTitle').textContent.replace('Posts from Tag ', '');
+      await this.viewUserPosts(tagId);
+
+    } catch (error) {
+      console.error('Error toggling post visibility:', error);
+      this.showNotification('Error updating post visibility', 'error');
+    }
+  }
+
+  filterUsers() {
+    if (!this.usersData) return;
+
+    const search = document.getElementById('userTagSearch').value.toLowerCase();
+    const filter = document.getElementById('userTagFilter').value;
+
+    let filteredUsers = this.usersData;
+
+    // Apply search filter
+    if (search) {
+      filteredUsers = filteredUsers.filter(user =>
+        user.tag_id.toLowerCase().includes(search)
+      );
     }
 
-    if (activeUsersEl && analytics.tag_stats) {
-      activeUsersEl.textContent = (analytics.tag_stats.unique_visitors || 0).toLocaleString();
+    // Apply category filter
+    if (filter === 'active') {
+      filteredUsers = filteredUsers.filter(user => user.total_interactions > 0);
+    } else if (filter === 'community') {
+      filteredUsers = filteredUsers.filter(user => user.community_posts.total_posts > 0);
     }
 
-    if (returnRateEl && analytics.visitor_retention) {
-      const visitors = analytics.visitor_retention.unique_visitors || 0;
-      const returnVisitors = analytics.visitor_retention.return_visitors_7d || 0;
-      const rate = visitors > 0 ? ((returnVisitors / visitors) * 100).toFixed(1) : 0;
-      returnRateEl.textContent = `${rate}%`;
-    }
+    this.renderUsersTable(filteredUsers);
   }
 
   async loadAnalytics() {
@@ -1852,21 +2119,17 @@ class AdminDashboard {
   }
 
   renderCommunityData(community) {
-    const { prayer_requests, praise_reports, verse_insights } = community;
+    const { prayer_requests, praise_reports, verse_insights, recent_prayers, recent_praise, recent_insights } = community;
     
     // Update stats
     document.getElementById('totalPrayerRequests').textContent = prayer_requests.length;
     document.getElementById('totalPraiseReports').textContent = praise_reports.length;
     document.getElementById('totalVerseInsights').textContent = (verse_insights || []).length;
 
-    // Render prayer requests
-    this.renderAdminPrayerRequests(prayer_requests);
-    
-    // Render praise reports
-    this.renderAdminPraiseReports(praise_reports);
-    
-    // Render verse insights
-    this.renderAdminVerseInsights(verse_insights || []);
+    // Render recent posts (these have IDs for moderation)
+    this.renderAdminPrayerRequests(recent_prayers || []);
+    this.renderAdminPraiseReports(recent_praise || []);
+    this.renderAdminVerseInsights(recent_insights || []);
   }
 
   renderAdminPrayerRequests(prayerRequests) {
@@ -1882,6 +2145,7 @@ class AdminDashboard {
       return;
     }
 
+
     container.innerHTML = prayerRequests.map(request => `
       <div class="px-4 py-4">
         <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
@@ -1889,10 +2153,6 @@ class AdminDashboard {
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
               <span class="text-sm font-medium text-gray-900">${request.date}</span>
               <span class="text-xs text-gray-500">${this.formatDateTime(request.created_at)}</span>
-              ${request.is_approved ? 
-                '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Approved</span>' :
-                '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>'
-              }
               ${request.is_hidden ? 
                 '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Hidden</span>' :
                 ''
@@ -1905,15 +2165,10 @@ class AdminDashboard {
             </div>
           </div>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-2 lg:ml-4">
-            ${!request.is_approved ? 
-              `<button onclick="adminDashboard.moderatePrayerRequest(${request.id}, true, false)" class="text-green-600 hover:text-green-900 text-sm font-medium">Approve</button>` :
-              `<button onclick="adminDashboard.moderatePrayerRequest(${request.id}, false, false)" class="text-yellow-600 hover:text-yellow-900 text-sm font-medium">Unapprove</button>`
-            }
             ${!request.is_hidden ? 
-              `<button onclick="adminDashboard.moderatePrayerRequest(${request.id}, ${request.is_approved}, true)" class="text-orange-600 hover:text-orange-900 text-sm font-medium">Hide</button>` :
-              `<button onclick="adminDashboard.moderatePrayerRequest(${request.id}, ${request.is_approved}, false)" class="text-blue-600 hover:text-blue-900 text-sm font-medium">Show</button>`
+              `<button onclick="adminDashboard.hidePrayerRequest(${request.id})" class="text-orange-600 hover:text-orange-900 text-sm font-medium">Hide</button>` :
+              `<button onclick="adminDashboard.unhidePrayerRequest(${request.id})" class="text-blue-600 hover:text-blue-900 text-sm font-medium">Unhide</button>`
             }
-            <button onclick="adminDashboard.deletePrayerRequest(${request.id})" class="text-red-600 hover:text-red-900 text-sm font-medium">Delete</button>
           </div>
         </div>
       </div>
@@ -1940,10 +2195,6 @@ class AdminDashboard {
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
               <span class="text-sm font-medium text-gray-900">${report.date}</span>
               <span class="text-xs text-gray-500">${this.formatDateTime(report.created_at)}</span>
-              ${report.is_approved ? 
-                '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Approved</span>' :
-                '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>'
-              }
               ${report.is_hidden ? 
                 '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Hidden</span>' :
                 ''
@@ -1956,22 +2207,17 @@ class AdminDashboard {
             </div>
           </div>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-2 lg:ml-4">
-            ${!report.is_approved ? 
-              `<button onclick="adminDashboard.moderatePraiseReport(${report.id}, true, false)" class="text-green-600 hover:text-green-900 text-sm font-medium">Approve</button>` :
-              `<button onclick="adminDashboard.moderatePraiseReport(${report.id}, false, false)" class="text-yellow-600 hover:text-yellow-900 text-sm font-medium">Unapprove</button>`
-            }
             ${!report.is_hidden ? 
-              `<button onclick="adminDashboard.moderatePraiseReport(${report.id}, ${report.is_approved}, true)" class="text-orange-600 hover:text-orange-900 text-sm font-medium">Hide</button>` :
-              `<button onclick="adminDashboard.moderatePraiseReport(${report.id}, ${report.is_approved}, false)" class="text-blue-600 hover:text-blue-900 text-sm font-medium">Show</button>`
+              `<button onclick="adminDashboard.hidePraiseReport(${report.id})" class="text-orange-600 hover:text-orange-900 text-sm font-medium">Hide</button>` :
+              `<button onclick="adminDashboard.unhidePraiseReport(${report.id})" class="text-blue-600 hover:text-blue-900 text-sm font-medium">Unhide</button>`
             }
-            <button onclick="adminDashboard.deletePraiseReport(${report.id})" class="text-red-600 hover:text-red-900 text-sm font-medium">Delete</button>
           </div>
         </div>
       </div>
     `).join('');
   }
 
-  async moderatePrayerRequest(id, isApproved, isHidden) {
+  async hidePrayerRequest(id) {
     try {
       const response = await fetch(`/api/admin/prayer-request/${id}`, {
         method: 'PUT',
@@ -1979,26 +2225,49 @@ class AdminDashboard {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          is_approved: isApproved,
-          is_hidden: isHidden
+          action: 'hide'
         })
       });
-      
+
       const data = await response.json();
-      
       if (data.success) {
+        this.showToast(data.message || 'Prayer request hidden');
         this.loadCommunityData();
-        this.showToast('Prayer request updated successfully!');
       } else {
-        this.showToast(data.error || 'Failed to update prayer request', 'error');
+        this.showToast(data.error || 'Failed to hide prayer request', 'error');
       }
     } catch (error) {
-      console.error('Error moderating prayer request:', error);
-      this.showToast('Connection error', 'error');
+      console.error('Error hiding prayer request:', error);
+      this.showToast('Error hiding prayer request', 'error');
     }
   }
 
-  async moderatePraiseReport(id, isApproved, isHidden) {
+  async unhidePrayerRequest(id) {
+    try {
+      const response = await fetch(`/api/admin/prayer-request/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'unhide'
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        this.showToast(data.message || 'Prayer request unhidden');
+        this.loadCommunityData();
+      } else {
+        this.showToast(data.error || 'Failed to unhide prayer request', 'error');
+      }
+    } catch (error) {
+      console.error('Error unhiding prayer request:', error);
+      this.showToast('Error unhiding prayer request', 'error');
+    }
+  }
+
+  async hidePraiseReport(id) {
     try {
       const response = await fetch(`/api/admin/praise-report/${id}`, {
         method: 'PUT',
@@ -2006,22 +2275,45 @@ class AdminDashboard {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          is_approved: isApproved,
-          is_hidden: isHidden
+          action: 'hide'
         })
       });
-      
+
       const data = await response.json();
-      
       if (data.success) {
+        this.showToast(data.message || 'Praise report hidden');
         this.loadCommunityData();
-        this.showToast('Praise report updated successfully!');
       } else {
-        this.showToast(data.error || 'Failed to update praise report', 'error');
+        this.showToast(data.error || 'Failed to hide praise report', 'error');
       }
     } catch (error) {
-      console.error('Error moderating praise report:', error);
-      this.showToast('Connection error', 'error');
+      console.error('Error hiding praise report:', error);
+      this.showToast('Error hiding praise report', 'error');
+    }
+  }
+
+  async unhidePraiseReport(id) {
+    try {
+      const response = await fetch(`/api/admin/praise-report/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'unhide'
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        this.showToast(data.message || 'Praise report unhidden');
+        this.loadCommunityData();
+      } else {
+        this.showToast(data.error || 'Failed to unhide praise report', 'error');
+      }
+    } catch (error) {
+      console.error('Error unhiding praise report:', error);
+      this.showToast('Error unhiding praise report', 'error');
     }
   }
 
@@ -2103,10 +2395,6 @@ class AdminDashboard {
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
               <span class="text-sm font-medium text-gray-900">${insight.date}</span>
               <span class="text-xs text-gray-500">${this.formatDateTime(insight.created_at)}</span>
-              ${insight.is_approved ? 
-                '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Approved</span>' :
-                '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>'
-              }
               ${insight.is_hidden ? 
                 '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Hidden</span>' :
                 ''
@@ -2119,22 +2407,17 @@ class AdminDashboard {
             </div>
           </div>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-2 lg:ml-4">
-            ${!insight.is_approved ? 
-              `<button onclick="adminDashboard.moderateVerseInsight(${insight.id}, true, false)" class="text-green-600 hover:text-green-900 text-sm font-medium">Approve</button>` :
-              `<button onclick="adminDashboard.moderateVerseInsight(${insight.id}, false, false)" class="text-yellow-600 hover:text-yellow-900 text-sm font-medium">Unapprove</button>`
-            }
             ${!insight.is_hidden ? 
-              `<button onclick="adminDashboard.moderateVerseInsight(${insight.id}, ${insight.is_approved}, true)" class="text-orange-600 hover:text-orange-900 text-sm font-medium">Hide</button>` :
-              `<button onclick="adminDashboard.moderateVerseInsight(${insight.id}, ${insight.is_approved}, false)" class="text-blue-600 hover:text-blue-900 text-sm font-medium">Show</button>`
+              `<button onclick="adminDashboard.hideVerseInsight(${insight.id})" class="text-orange-600 hover:text-orange-900 text-sm font-medium">Hide</button>` :
+              `<button onclick="adminDashboard.unhideVerseInsight(${insight.id})" class="text-blue-600 hover:text-blue-900 text-sm font-medium">Unhide</button>`
             }
-            <button onclick="adminDashboard.deleteVerseInsight(${insight.id})" class="text-red-600 hover:text-red-900 text-sm font-medium">Delete</button>
           </div>
         </div>
       </div>
     `).join('');
   }
 
-  async moderateVerseInsight(id, isApproved, isHidden) {
+  async hideVerseInsight(id) {
     try {
       const response = await fetch(`/api/admin/verse-insight/${id}`, {
         method: 'PUT',
@@ -2142,22 +2425,45 @@ class AdminDashboard {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          is_approved: isApproved,
-          is_hidden: isHidden
+          action: 'hide'
         })
       });
-      
+
       const data = await response.json();
-      
       if (data.success) {
+        this.showToast(data.message || 'Verse insight hidden');
         this.loadCommunityData();
-        this.showToast('Verse insight updated successfully!');
       } else {
-        this.showToast(data.error || 'Failed to update verse insight', 'error');
+        this.showToast(data.error || 'Failed to hide verse insight', 'error');
       }
     } catch (error) {
-      console.error('Error moderating verse insight:', error);
-      this.showToast('Connection error', 'error');
+      console.error('Error hiding verse insight:', error);
+      this.showToast('Error hiding verse insight', 'error');
+    }
+  }
+
+  async unhideVerseInsight(id) {
+    try {
+      const response = await fetch(`/api/admin/verse-insight/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'unhide'
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        this.showToast(data.message || 'Verse insight unhidden');
+        this.loadCommunityData();
+      } else {
+        this.showToast(data.error || 'Failed to unhide verse insight', 'error');
+      }
+    } catch (error) {
+      console.error('Error unhiding verse insight:', error);
+      this.showToast('Error unhiding verse insight', 'error');
     }
   }
 

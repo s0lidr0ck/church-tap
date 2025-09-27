@@ -8,10 +8,19 @@ class ChurchTapApp {
     this.favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
     this.recentlyViewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
     
-    // Get organization and tag parameters from URL
+    // Get organization and tag parameters from URL or injected context
     const urlParams = new URLSearchParams(window.location.search);
-    this.orgParam = urlParams.get('org');
-    this.tagIdParam = urlParams.get('tag_id');
+
+    // Check for injected NFC context first, then fall back to URL parameters
+    if (window.nfcOrgContext) {
+      this.orgParam = window.nfcOrgContext.orgParam;
+      this.tagIdParam = window.nfcOrgContext.tagIdParam;
+      console.log('🏷️ Using injected NFC context:', window.nfcOrgContext);
+    } else {
+      this.orgParam = urlParams.get('org');
+      this.tagIdParam = urlParams.get('tag_id');
+      console.log('🔗 Using URL parameters: org=' + this.orgParam + ', tag_id=' + this.tagIdParam);
+    }
     
     // Handle tag_id persistence with cookies
     this.setupTagIdTracking();
@@ -37,33 +46,59 @@ class ChurchTapApp {
       this.updateTranslationButtons();
       this.hideSplashScreen();
       
-      // Load content but don't let it block the UI
-      Promise.race([
-        this.loadVerse(this.currentDate),
-        new Promise(resolve => setTimeout(resolve, 5000)) // 5 second fallback
-      ]).catch(err => {
-        console.error('Verse loading failed:', err);
-        this.showOfflineMessage();
-      });
+      // Load content with proper error handling
+      this.loadVerse(this.currentDate)
+        .catch(err => {
+          console.error('Verse loading failed:', err);
+          this.showErrorState('verse', 'Unable to load today\'s verse. Please check your connection and try again.');
+        });
       
-      Promise.race([
-        this.loadCommunity(this.currentDate),
-        new Promise(resolve => setTimeout(resolve, 5000)) // 5 second fallback
-      ]).catch(err => {
-        console.error('Community loading failed:', err);
-      });
+      this.loadCommunity(this.currentDate)
+        .catch(err => {
+          console.error('Community loading failed:', err);
+          this.showErrorState('community', 'Unable to load community content.');
+        });
       
       this.setupSwipeGestures();
       this.checkNotificationPermission();
       this.detectNFCSupport();
       this.loadOrganizationLinks();
+      this.updateCalendarIndicatorForToday();
+      this.initCTA();
       this.updateMenuIndicators();
       this.updateTagSessionUI();
     } catch (error) {
       console.error('Init error:', error);
-      // Still show the app even if there's an error
+      this.showCriticalError('Application failed to initialize. Please refresh the page.');
       this.hideSplashScreen();
     }
+  }
+
+  // Build URL with org subdomain hint and extra query params
+  withOrg(path, extraParams = {}) {
+    // For API calls, use relative URLs so they go to the same server serving the page
+    if (path.startsWith('/api/')) {
+      // Use URLSearchParams for relative URLs to avoid origin issues
+      const params = new URLSearchParams();
+      if (this.orgParam) params.set('org', this.orgParam);
+      Object.keys(extraParams || {}).forEach(k => {
+        if (extraParams[k] !== undefined && extraParams[k] !== null) {
+          params.set(k, extraParams[k]);
+        }
+      });
+      const queryString = params.toString();
+      return queryString ? `${path}?${queryString}` : path;
+    }
+    
+    // For non-API paths, use the original logic
+    const url = new URL(path, window.location.origin);
+    if (this.orgParam) url.searchParams.set('org', this.orgParam);
+    Object.keys(extraParams || {}).forEach(k => {
+      if (extraParams[k] !== undefined && extraParams[k] !== null) {
+        url.searchParams.set(k, extraParams[k]);
+      }
+    });
+    return url.toString();
   }
 
   setupEventListeners() {
@@ -106,9 +141,45 @@ class ChurchTapApp {
       this.toggleQuickMenu();
     });
 
+    // Organization Links toggle
+    const linksBtn = document.getElementById('linksBtn');
+    if (linksBtn) {
+      linksBtn.addEventListener('click', () => {
+        this.toggleLinksMenu();
+      });
+    }
+
+    // Calendar controls
+    const calendarBtn = document.getElementById('calendarBtn');
+    if (calendarBtn) {
+      calendarBtn.addEventListener('click', () => this.openCalendarModal());
+    }
+    const closeCalendarBtn = document.getElementById('closeCalendarBtn');
+    if (closeCalendarBtn) {
+      closeCalendarBtn.addEventListener('click', () => this.closeCalendarModal());
+    }
+    const prevMonthBtn = document.getElementById('prevMonthBtn');
+    if (prevMonthBtn) {
+      prevMonthBtn.addEventListener('click', () => this.shiftCalendarMonth(-1));
+    }
+    const nextMonthBtn = document.getElementById('nextMonthBtn');
+    if (nextMonthBtn) {
+      nextMonthBtn.addEventListener('click', () => this.shiftCalendarMonth(1));
+    }
+
     // Clear tag session
     document.getElementById('clearTagSessionBtn').addEventListener('click', () => {
       this.clearTagSession();
+    });
+
+    // Change Group button
+    document.getElementById('changeGroupBtn').addEventListener('click', () => {
+      this.changeGroup();
+    });
+
+    // Request a Group button
+    document.getElementById('requestGroupBtn').addEventListener('click', () => {
+      this.requestGroup();
     });
 
     // Main action buttons
@@ -195,12 +266,20 @@ class ChurchTapApp {
       this.toggleQuickMenu();
     });
 
-    // Close menu when clicking outside
+    // Close menus when clicking outside
     document.addEventListener('click', (e) => {
+      // Quick menu
       const menu = document.getElementById('quickMenu');
       const toggle = document.getElementById('menuToggle');
       if (!menu.contains(e.target) && !toggle.contains(e.target)) {
         menu.classList.add('hidden');
+      }
+      
+      // Links menu
+      const linksMenu = document.getElementById('quickLinksMenu');
+      const linksToggle = document.getElementById('linksBtn');
+      if (linksMenu && linksToggle && !linksMenu.contains(e.target) && !linksToggle.contains(e.target)) {
+        this.hideLinksMenu();
       }
     });
 
@@ -482,6 +561,59 @@ class ChurchTapApp {
     document.querySelector('#noVerse p').textContent = 'Please check your connection and try again.';
   }
 
+  showErrorState(section, message) {
+    if (section === 'verse') {
+      this.hideLoading();
+      document.getElementById('verseContent').classList.add('hidden');
+      document.getElementById('noVerse').classList.remove('hidden');
+      document.querySelector('#noVerse h3').textContent = 'Something went wrong';
+      document.querySelector('#noVerse p').textContent = message;
+      document.getElementById('backToToday').textContent = 'Try Again';
+      document.getElementById('backToToday').onclick = () => this.retry('verse');
+    } else if (section === 'community') {
+      const container = document.getElementById('communityContent');
+      if (container) {
+        container.innerHTML = `
+          <div class="text-center py-8">
+            <div class="text-4xl mb-4">⚠️</div>
+            <h3 class="text-lg font-medium text-gray-800 dark:text-white mb-2">Something went wrong</h3>
+            <p class="text-gray-600 dark:text-gray-400 mb-4">${message}</p>
+            <button onclick="app.retry('community')" class="btn-primary">Try Again</button>
+          </div>
+        `;
+      }
+    }
+  }
+
+  showCriticalError(message) {
+    document.body.innerHTML = `
+      <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100">
+        <div class="text-center p-8">
+          <div class="text-6xl mb-4">🚨</div>
+          <h1 class="text-2xl font-bold text-gray-900 mb-4">Critical Error</h1>
+          <p class="text-gray-700 mb-6">${message}</p>
+          <button onclick="location.reload()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium">
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  retry(section) {
+    if (section === 'verse') {
+      this.loadVerse(this.currentDate).catch(err => {
+        console.error('Retry failed:', err);
+        this.showErrorState('verse', 'Still unable to load verse. Please try refreshing the page.');
+      });
+    } else if (section === 'community') {
+      this.loadCommunity(this.currentDate).catch(err => {
+        console.error('Community retry failed:', err);
+        this.showErrorState('community', 'Still unable to load community content.');
+      });
+    }
+  }
+
   updateDateDisplay(date) {
     const dateObj = new Date(date + 'T00:00:00');
     const today = new Date();
@@ -518,14 +650,27 @@ class ChurchTapApp {
     const twoWeeksAgoStr = twoWeeksAgo.toISOString().split('T')[0];
     
     // Don't go beyond today or 2 weeks ago
-    if (newDate > today || newDate < twoWeeksAgoStr) {
+    if (newDate > today) {
       navigator.vibrate && navigator.vibrate(100);
+      this.showToast('Cannot view future dates', 'info');
+      return;
+    }
+    
+    if (newDate < twoWeeksAgoStr) {
+      navigator.vibrate && navigator.vibrate(100);
+      this.showToast('Can only view verses from the past 2 weeks', 'info');
       return;
     }
     
     this.currentDate = newDate;
-    this.loadVerse(newDate);
-    this.loadCommunity(newDate);
+    this.loadVerse(newDate).catch(err => {
+      console.error('Navigation verse load failed:', err);
+      this.showErrorState('verse', 'Unable to load verse for this date.');
+    });
+    this.loadCommunity(newDate).catch(err => {
+      console.error('Navigation community load failed:', err);
+      this.showErrorState('community', 'Unable to load community content for this date.');
+    });
     
     // Add animation class
     const container = document.getElementById('verseContainer');
@@ -685,6 +830,29 @@ class ChurchTapApp {
   toggleQuickMenu() {
     const menu = document.getElementById('quickMenu');
     menu.classList.toggle('hidden');
+  }
+
+  toggleLinksMenu() {
+    const menu = document.getElementById('quickLinksMenu');
+    const linksBtn = document.getElementById('linksBtn');
+    
+    menu.classList.toggle('hidden');
+    
+    // Update aria-expanded
+    if (linksBtn) {
+      linksBtn.setAttribute('aria-expanded', !menu.classList.contains('hidden'));
+    }
+  }
+
+  hideLinksMenu() {
+    const menu = document.getElementById('quickLinksMenu');
+    const linksBtn = document.getElementById('linksBtn');
+    
+    menu.classList.add('hidden');
+    
+    if (linksBtn) {
+      linksBtn.setAttribute('aria-expanded', 'false');
+    }
   }
 
   hideQuickMenu() {
@@ -2227,6 +2395,19 @@ class ChurchTapApp {
 
   async trackAnalytics(action, verseId = null) {
     try {
+      // Resolve originating tag id from current app state / storage / URL param
+      let originatingTagId = this.currentTagId;
+      if (!originatingTagId) {
+        try {
+          const stored = JSON.parse(localStorage.getItem('nfc_tag_session') || 'null');
+          if (stored && stored.tagId) originatingTagId = stored.tagId;
+        } catch (_) {}
+      }
+      if (!originatingTagId) {
+        const url = new URL(window.location.href);
+        originatingTagId = url.searchParams.get('tag_id') || undefined;
+      }
+
       await fetch('/api/analytics', {
         method: 'POST',
         headers: {
@@ -2236,7 +2417,8 @@ class ChurchTapApp {
           action: action,
           verse_id: verseId,
           user_token: this.userToken,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          originating_tag_id: originatingTagId
         })
       });
     } catch (error) {
@@ -3592,6 +3774,16 @@ class ChurchTapApp {
           </form>
         </div>
 
+        <!-- Bracelet & Organization -->
+        <div id="braceletOrgSection">
+          <h4 class="text-md font-semibold mb-3 text-gray-900 dark:text-white">🏷️ Bracelet & Organization</h4>
+          <div id="braceletOrgContent" class="space-y-4">
+            <div class="text-center text-gray-500 dark:text-gray-400">
+              Loading bracelet information...
+            </div>
+          </div>
+        </div>
+
         <div class="flex space-x-3">
           <button type="button" onclick="window.churchTapApp.closeModal()" class="btn-secondary flex-1">Close</button>
         </div>
@@ -3608,6 +3800,9 @@ class ChurchTapApp {
       e.preventDefault();
       this.handlePreferencesUpdate();
     });
+
+    // Load bracelet information
+    this.loadBraceletInfo();
   }
 
   async handleProfileUpdate() {
@@ -3873,36 +4068,44 @@ class ChurchTapApp {
     document.body.appendChild(modal);
   }
 
-  // Load and display organization links
+  // Load and display organization links [UPDATED v2]
   async loadOrganizationLinks() {
     try {
-      console.log('Loading organization links...');
-      const response = await fetch('/api/organization/links');
+      console.log('🔗 [v2] Loading organization links...');
+      const url = this.withOrg('/api/organization/links');
+      console.log('🔗 [v2] Fetching URL:', url);
+      
+      const response = await fetch(url);
+      console.log('🔗 [v2] Response status:', response.status);
+      console.log('🔗 [v2] Response ok:', response.ok);
+      
       if (!response.ok) {
-        console.log('No organization links available - response not ok');
+        console.log('🔗 [v2] No organization links available - response not ok, status:', response.status);
+        const errorText = await response.text();
+        console.log('🔗 [v2] Error response:', errorText);
         return;
       }
       
       const links = await response.json();
-      console.log('Loaded organization links:', links);
+      console.log('🔗 [v2] Loaded organization links:', links);
       this.displayOrganizationLinks(links);
     } catch (error) {
-      console.error('Error loading organization links:', error);
+      console.error('🔗 [v2] Error loading organization links:', error);
     }
   }
 
   displayOrganizationLinks(links) {
-    const linksContainer = document.getElementById('organizationLinksList');
-    const linksMenu = document.getElementById('organizationLinksMenu');
+    const linksContainer = document.getElementById('quickLinksList');
+    const linksButton = document.getElementById('linksBtn');
     
     console.log('DisplayOrganizationLinks called with:', links);
     console.log('Links container found:', !!linksContainer);
-    console.log('Links menu found:', !!linksMenu);
+    console.log('Links button found:', !!linksButton);
     
     if (!linksContainer || !links || links.length === 0) {
-      console.log('Hiding links menu - no links or container missing');
-      if (linksMenu) {
-        linksMenu.style.display = 'none';
+      console.log('Hiding links button - no links or container missing');
+      if (linksButton) {
+        linksButton.style.display = 'none';
       }
       return;
     }
@@ -3935,7 +4138,356 @@ class ChurchTapApp {
       </button>
     `).join('');
     
-    linksMenu.style.display = 'block';
+    // Show the links button
+    if (linksButton) {
+      linksButton.style.display = 'flex';
+    }
+  }
+
+  // ===== Calendar & CTA additions =====
+  formatLocalDateString(dateInput) {
+    const d = (dateInput instanceof Date) ? dateInput : new Date(dateInput);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  async updateCalendarIndicatorForToday() {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const res = await fetch(this.withOrg('/api/organization/calendar/daily', { date: today }));
+      const data = await res.json();
+      console.log('[Calendar] daily events for', today, data);
+      const dot = document.getElementById('calendarIndicator');
+      if (dot) {
+        if (data?.success && (data.events || []).length > 0) dot.classList.remove('hidden');
+        else dot.classList.add('hidden');
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  async openCalendarModal() {
+    this.trackAnalytics && this.trackAnalytics('calendar_open');
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    this._calendar = { ym, events: [], selectedDate: null };
+    this.loadMonth(ym).then(() => {
+      this.renderCalendarMonth();
+      const modal = document.getElementById('calendarModal');
+      modal && modal.classList.remove('hidden');
+    });
+  }
+
+  closeCalendarModal() {
+    const modal = document.getElementById('calendarModal');
+    modal && modal.classList.add('hidden');
+  }
+
+  shiftCalendarMonth(delta) {
+    if (!this._calendar) return;
+    const [y, m] = this._calendar.ym.split('-').map(n => parseInt(n,10));
+    const d = new Date(y, m-1+delta, 1);
+    this._calendar.ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    this.loadMonth(this._calendar.ym).then(() => this.renderCalendarMonth());
+  }
+
+  async loadMonth(ym) {
+    const res = await fetch(this.withOrg('/api/organization/calendar/month', { ym }));
+    const data = await res.json();
+    this._calendar.events = data?.events || [];
+  }
+
+  renderCalendarMonth() {
+    const grid = document.getElementById('calendarGrid');
+    const label = document.getElementById('calendarMonthLabel');
+    const list = document.getElementById('calendarEventList');
+    if (!grid || !label || !list || !this._calendar) return;
+
+    const [y, m] = this._calendar.ym.split('-').map(n => parseInt(n,10));
+    const first = new Date(y, m-1, 1);
+    const monthName = first.toLocaleString([], { month: 'long', year: 'numeric' });
+    label.textContent = monthName;
+
+    const startIdx = first.getDay();
+    const daysInMonth = new Date(y, m, 0).getDate();
+
+    const daysWithEvents = new Set(
+      this._calendar.events.map(ev => this.formatLocalDateString(ev.start_at))
+    );
+
+    grid.innerHTML = '';
+    for (let i=0;i<startIdx;i++) {
+      const cell = document.createElement('div');
+      cell.className = 'h-10 sm:h-12 rounded-lg';
+      grid.appendChild(cell);
+    }
+    for (let d=1; d<=daysInMonth; d++) {
+      const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const cell = document.createElement('button');
+      cell.className = 'h-10 sm:h-12 rounded-lg text-sm flex items-center justify-center relative bg-white border border-gray-200 hover:bg-gray-50 transition-colors dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700';
+      cell.innerHTML = `<span>${d}</span>`;
+      if (daysWithEvents.has(dateStr)) {
+        const dot = document.createElement('span');
+        dot.className = 'absolute bottom-1 w-1.5 h-1.5 bg-primary-600 rounded-full';
+        cell.appendChild(dot);
+        cell.classList.add('font-semibold','text-primary-700','ring-1','ring-primary-300','bg-primary-50','dark:text-primary-300','dark:ring-primary-800');
+      }
+      const todayLocal = new Date();
+      const todayStr = `${todayLocal.getFullYear()}-${String(todayLocal.getMonth()+1).padStart(2,'0')}-${String(todayLocal.getDate()).padStart(2,'0')}`;
+      if (dateStr === todayStr) {
+        cell.classList.add('outline','outline-1','outline-primary-400','dark:outline-primary-700');
+      }
+      cell.addEventListener('click', () => this.renderEventListForDate(dateStr));
+      grid.appendChild(cell);
+    }
+
+    const today = new Date().toISOString().slice(0,10);
+    const defaultDate = today.startsWith(`${y}-${String(m).padStart(2,'0')}`) ? today : `${y}-${String(m).padStart(2,'0')}-01`;
+    this.renderEventListForDate(defaultDate);
+  }
+
+  renderEventListForDate(dateStr) {
+    this.trackAnalytics && this.trackAnalytics('calendar_day_select');
+    if (!this._calendar) return;
+    this._calendar.selectedDate = dateStr;
+    const list = document.getElementById('calendarEventList');
+    if (!list) return;
+    const items = this._calendar.events.filter(ev => this.formatLocalDateString(ev.start_at) === dateStr);
+    if (items.length === 0) {
+      list.innerHTML = `<div class="text-sm text-gray-500 dark:text-gray-400 py-2">No events on ${dateStr}</div>`;
+      return;
+    }
+    const fmtTime = (ev) => {
+      if (ev.all_day) return 'All day';
+      const s = new Date(ev.start_at);
+      const e = ev.end_at ? new Date(ev.end_at) : null;
+      const f = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      return e ? `${f(s)} – ${f(e)}` : f(s);
+    };
+    list.innerHTML = items.map(ev => {
+      const dateLabel = new Date(ev.start_at).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+      const timeLabel = fmtTime(ev);
+      const addressAnchor = ev.address ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.address)}" target="_blank" class="underline">${ev.address}</a>` : '';
+      const directionsBtn = ev.address ? `<a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(ev.address)}" target="_blank" class="px-2 py-1 rounded-md text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600">Directions</a>` : '';
+      const detailsBtn = ev.link ? `<a href="${ev.link}" target="_blank" class="px-2 py-1 rounded-md text-xs bg-primary-600 hover:bg-primary-700 text-white" onclick="app.trackAnalytics && app.trackAnalytics('calendar_details_click')">Details</a>` : '';
+      return `
+        <div class="p-3 mb-2 bg-gray-50 border border-gray-200 rounded-lg text-sm dark:bg-gray-900/40 dark:border-gray-700">
+          <div class="font-semibold text-gray-900 dark:text-gray-100">${ev.title}</div>
+          <div class="mt-1 space-y-1 text-gray-700 dark:text-gray-300">
+            <div class="flex items-start gap-2"><span>🗓️</span><span>${dateLabel} • ${timeLabel}</span></div>
+            ${ev.location ? `<div class="flex items-start gap-2"><span>🏛️</span><span>${ev.location}</span></div>` : ''}
+            ${ev.address ? `<div class="flex items-start gap-2"><span>📍</span><span>${addressAnchor}</span></div>` : ''}
+          </div>
+          ${ev.description ? `<div class="mt-2 text-gray-600 dark:text-gray-400">${ev.description}</div>` : ''}
+          ${(detailsBtn || directionsBtn) ? `<div class="mt-3 flex items-center gap-2">${detailsBtn}${directionsBtn}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  async initCTA() {
+    try {
+      const res = await fetch(this.withOrg('/api/organization/cta'));
+      const data = await res.json();
+      console.log('[CTA] response', data);
+      const cta = data?.cta;
+      if (!cta) return;
+      this.renderCTACrawl(cta);
+    } catch (e) {
+      console.warn('[CTA] fetch failed', e);
+    }
+  }
+
+  renderCTACrawl(cta) {
+    let shell = document.getElementById('ctaCrawl');
+    let inner = document.getElementById('ctaCrawlInner');
+    let textEl = document.getElementById('ctaCrawlText');
+    let iconEl = document.getElementById('ctaCrawlIcon');
+    // If the container isn't in DOM (or got removed by reload), create it dynamically
+    if (!shell) {
+      shell = document.createElement('div');
+      shell.id = 'ctaCrawl';
+      shell.innerHTML = `
+        <div id="ctaCrawlInner" class="relative w-full mx-auto px-3 py-2 overflow-hidden flex items-center space-x-2">
+          <span id="ctaCrawlIcon">📣</span>
+          <div class="relative overflow-hidden" style="width: calc(100% - 60px);">
+            <div id="ctaCrawlText" class="whitespace-nowrap"></div>
+          </div>
+        </div>`;
+      document.body.appendChild(shell);
+      inner = shell.querySelector('#ctaCrawlInner');
+      textEl = shell.querySelector('#ctaCrawlText');
+      iconEl = shell.querySelector('#ctaCrawlIcon');
+    } else {
+      // Reparent to end of body to ensure top stacking order
+      document.body.appendChild(shell);
+    }
+    if (!shell || !inner || !textEl || !iconEl) {
+      console.warn('[CTA] elements missing', { shell: !!shell, inner: !!inner, textEl: !!textEl, iconEl: !!iconEl });
+      return;
+    }
+
+    inner.style.backgroundColor = cta.bg_color || '#0ea5e9';
+    inner.style.color = cta.text_color || '#ffffff';
+    iconEl.textContent = cta.icon || '📣';
+    textEl.textContent = cta.text || '';
+    // Blue bar style - flat like top menu
+    inner.style.borderRadius = '0';
+    inner.style.boxShadow = 'none';
+    inner.style.border = 'none';
+    inner.style.padding = '10px 12px';
+    iconEl.style.display = 'inline-flex';
+    iconEl.style.alignItems = 'center';
+    iconEl.style.justifyContent = 'center';
+    iconEl.style.width = '22px';
+    iconEl.style.height = '22px';
+    iconEl.style.borderRadius = '9999px';
+    iconEl.style.backgroundColor = 'rgba(255,255,255,0.9)';
+    iconEl.style.color = '#333';
+    textEl.style.fontWeight = '600';
+    textEl.style.fontSize = '14px';
+    textEl.style.letterSpacing = '0.2px';
+    textEl.style.whiteSpace = 'nowrap';
+    textEl.style.willChange = 'transform';
+    shell.classList.remove('hidden');
+    shell.style.position = 'fixed';
+    shell.style.left = '0';
+    shell.style.right = '0';
+    shell.style.top = '0px';
+    shell.style.padding = '0';
+    shell.style.display = 'block';
+    shell.style.zIndex = '2147483647';
+    shell.style.pointerEvents = 'none';
+    inner.style.pointerEvents = 'auto';
+    inner.style.transition = 'all 0.2s ease';
+    
+    // Add subtle hover effect and right arrow to indicate clickability
+    const rightArrow = document.createElement('div');
+    rightArrow.innerHTML = '▶';
+    rightArrow.style.position = 'absolute';
+    rightArrow.style.right = '12px';
+    rightArrow.style.top = '50%';
+    rightArrow.style.transform = 'translateY(-50%)';
+    rightArrow.style.color = 'rgba(255,255,255,0.9)';
+    rightArrow.style.fontSize = '12px';
+    rightArrow.style.fontWeight = 'bold';
+    rightArrow.style.pointerEvents = 'none';
+    rightArrow.style.transition = 'all 0.2s ease';
+    inner.appendChild(rightArrow);
+    
+    inner.addEventListener('mouseenter', () => {
+      inner.style.backgroundColor = `color-mix(in srgb, ${cta.bg_color || '#0ea5e9'} 90%, white 10%)`;
+      rightArrow.style.transform = 'translateY(-50%) translateX(2px)';
+    });
+    inner.addEventListener('mouseleave', () => {
+      inner.style.backgroundColor = cta.bg_color || '#0ea5e9';
+      rightArrow.style.transform = 'translateY(-50%) translateX(0px)';
+    });
+    
+    console.log('[CTA] rendering crawl, visible now');
+
+    // Simple marquee effect
+    const parent = textEl.parentElement;
+    parent.style.overflow = 'hidden';
+    
+    // Edge fades for marquee
+    const bg = cta.bg_color || '#0ea5e9';
+    const leftFade = document.createElement('div');
+    leftFade.style.position = 'absolute';
+    leftFade.style.left = '0';
+    leftFade.style.top = '0';
+    leftFade.style.bottom = '0';
+    leftFade.style.width = '8px';
+    leftFade.style.background = `linear-gradient(90deg, ${bg} 0%, ${bg} 40%, rgba(0,0,0,0) 100%)`;
+    leftFade.style.pointerEvents = 'none';
+    leftFade.style.zIndex = '2';
+    const rightFade = document.createElement('div');
+    rightFade.style.position = 'absolute';
+    rightFade.style.right = '30px'; // Stop fade before arrow
+    rightFade.style.top = '0';
+    rightFade.style.bottom = '0';
+    rightFade.style.width = '8px';
+    rightFade.style.background = `linear-gradient(270deg, ${bg} 0%, ${bg} 40%, rgba(0,0,0,0) 100%)`;
+    rightFade.style.pointerEvents = 'none';
+    rightFade.style.zIndex = '2';
+    // Ensure only one set of fades
+    Array.from(inner.querySelectorAll('.cta-fade')).forEach(n => n.remove());
+    leftFade.className = 'cta-fade';
+    rightFade.className = 'cta-fade';
+    inner.appendChild(leftFade);
+    inner.appendChild(rightFade);
+    const animate = () => {
+      const parentWidth = parent.clientWidth;
+      const textWidth = textEl.scrollWidth;
+      const arrowSpace = 50; // More conservative space for arrow + padding
+      const availableWidth = parentWidth - arrowSpace;
+      
+      if (textWidth <= availableWidth) {
+        // Text fits, position it normally at left
+        textEl.style.transform = 'translateX(0px)';
+        return;
+      }
+      
+      // Text needs to scroll - loop from right to left
+      let pos = availableWidth; // Start from right edge of available space
+      const speed = 40;
+      let last = performance.now();
+      
+      const step = (now) => {
+        const dt = (now - last) / 1000;
+        last = now;
+        pos -= speed * dt;
+        
+        // Loop: when text completely scrolls off left, restart from right
+        if (pos < -textWidth) {
+          pos = availableWidth;
+        }
+        
+        textEl.style.transform = `translateX(${pos}px)`;
+        requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    };
+    setTimeout(animate, 150);
+
+    // Guard: if some layout change hides it, re-assert visibility shortly after
+    setTimeout(() => {
+      shell.style.display = 'block';
+      shell.classList.remove('hidden');
+    }, 500);
+
+    // Impression once visible
+    try { this.trackAnalytics && this.trackAnalytics('cta_impression'); } catch(_) {}
+
+    inner.onclick = () => {
+      this.trackAnalytics && this.trackAnalytics('cta_expand');
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 z-50 bg-black/40 flex items-center justify-center';
+      
+      // Only show Open button if there's a valid URL
+      const hasUrl = cta.url && cta.url.trim() !== '';
+      const openButton = hasUrl ? 
+        `<a href="${cta.url}" target="_blank" class="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm" onclick="app.trackAnalytics && app.trackAnalytics('cta_click')">Open</a>` : 
+        '';
+      
+      modal.innerHTML = `
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4">
+          <div class="px-5 py-4">
+            <div class="text-2xl mb-2">${cta.icon || '📣'}</div>
+            <div class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-line">${cta.text || ''}</div>
+            <div class="mt-4 flex justify-end space-x-2">
+              ${openButton}
+              <button id="ctaCloseBtn" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 text-sm">Close</button>
+            </div>
+          </div>
+        </div>`;
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal || e.target.id === 'ctaCloseBtn') modal.remove();
+      });
+      document.body.appendChild(modal);
+    };
   }
 
   // Update menu indicators for theme and text size
@@ -3964,6 +4516,404 @@ class ChurchTapApp {
       };
       textSizeIndicator.textContent = sizeNames[this.textSize] || 'Medium';
     }
+
+    // Update group display
+    this.updateGroupDisplay();
+  }
+
+  // Update the current group display in the menu
+  updateGroupDisplay() {
+    const currentGroupName = document.getElementById('currentGroupName');
+    const groupSection = document.getElementById('groupSection');
+
+    if (currentGroupName) {
+      // Check for injected context first, then try to get from organization param
+      if (window.nfcOrgContext && window.nfcOrgContext.organization) {
+        currentGroupName.textContent = window.nfcOrgContext.organization.name;
+        groupSection.style.display = 'block';
+      } else if (this.orgParam) {
+        // Try to get organization name from a cached lookup or default display
+        currentGroupName.textContent = this.orgParam.toUpperCase();
+        groupSection.style.display = 'block';
+      } else {
+        currentGroupName.textContent = 'No Group Selected';
+        groupSection.style.display = 'block';
+      }
+    }
+  }
+
+  // Handle change group button click
+  changeGroup() {
+    // Get the current tag ID to pass to the chooser
+    const tagId = this.tagIdParam || this.currentTagId;
+
+    if (tagId) {
+      // Navigate to the organization chooser with the current tag ID
+      window.location.href = `/choose-organization?uid=${tagId}`;
+    } else {
+      // If no tag ID, show a message or navigate to a general chooser
+      this.showToast('No NFC tag session found. Please scan an NFC tag first.');
+    }
+
+    // Hide menu after action
+    this.hideQuickMenu();
+  }
+
+  // Handle request group button click
+  requestGroup() {
+    // Get the current tag ID to pass to the chooser page
+    const tagId = this.tagIdParam || this.currentTagId;
+
+    if (tagId) {
+      // Navigate to the organization chooser which has request functionality
+      window.location.href = `/choose-organization?uid=${tagId}`;
+    } else {
+      // If no tag ID, show a message or navigate to a general chooser
+      this.showToast('No NFC tag session found. Please scan an NFC tag first.');
+    }
+
+    // Hide menu after action
+    this.hideQuickMenu();
+  }
+
+  async loadBraceletInfo() {
+    const contentEl = document.getElementById('braceletOrgContent');
+    if (!contentEl) return;
+
+    try {
+      // Check if we have current tag ID from session or URL
+      const currentTagId = this.tagIdParam || this.getCurrentTagId();
+      
+      if (!currentTagId) {
+        contentEl.innerHTML = `
+          <div class="text-center py-4">
+            <div class="text-gray-500 dark:text-gray-400 mb-2">
+              🔍 No bracelet detected
+            </div>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              Tap your bracelet to see organization information
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      // Fetch bracelet information from the API
+      const response = await fetch(`/api/bracelet/info/${currentTagId}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch bracelet information');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.bracelet) {
+        this.displayBraceletInfo(data.bracelet, currentTagId);
+      } else {
+        this.displayUnclaimedBracelet(currentTagId);
+      }
+    } catch (error) {
+      console.error('Error loading bracelet info:', error);
+      contentEl.innerHTML = `
+        <div class="text-center py-4">
+          <div class="text-red-500 mb-2">❌ Error loading bracelet information</div>
+          <button onclick="window.churchTapApp.loadBraceletInfo()" class="btn-secondary">
+            🔄 Retry
+          </button>
+        </div>
+      `;
+    }
+  }
+
+  displayBraceletInfo(bracelet, tagId) {
+    const contentEl = document.getElementById('braceletOrgContent');
+    const { organization, status, last_scanned_at, scan_count } = bracelet;
+
+    contentEl.innerHTML = `
+      <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center space-x-2">
+            <span class="text-blue-600 dark:text-blue-400">🏷️</span>
+            <span class="font-medium text-gray-900 dark:text-white">Your Bracelet</span>
+          </div>
+          <span class="text-xs px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded-full">
+            ${status}
+          </span>
+        </div>
+        
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-gray-600 dark:text-gray-300">Bracelet ID:</span>
+            <code class="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">${tagId}</code>
+          </div>
+          
+          ${organization ? `
+            <div class="flex justify-between">
+              <span class="text-gray-600 dark:text-gray-300">Organization:</span>
+              <span class="font-medium text-gray-900 dark:text-white">${organization.name}</span>
+            </div>
+            
+            <div class="flex justify-between">
+              <span class="text-gray-600 dark:text-gray-300">Type:</span>
+              <span class="text-gray-900 dark:text-white">${organization.org_type || 'N/A'}</span>
+            </div>
+          ` : ''}
+          
+          <div class="flex justify-between">
+            <span class="text-gray-600 dark:text-gray-300">Total Scans:</span>
+            <span class="text-gray-900 dark:text-white">${scan_count || 0}</span>
+          </div>
+          
+          ${last_scanned_at ? `
+            <div class="flex justify-between">
+              <span class="text-gray-600 dark:text-gray-300">Last Used:</span>
+              <span class="text-gray-900 dark:text-white">${new Date(last_scanned_at).toLocaleDateString()}</span>
+            </div>
+          ` : ''}
+        </div>
+        
+        ${organization ? `
+          <div class="mt-4 pt-3 border-t border-blue-200 dark:border-blue-700 space-y-2">
+            <button onclick="window.churchTapApp.showChangeOrgModal('${tagId}')" 
+                    class="w-full btn-secondary text-sm">
+              🔄 Change Organization
+            </button>
+            
+            ${this.currentUser ? `
+              <div class="text-center">
+                <div id="braceletLinkStatus-${tagId}" class="text-xs">
+                  <span class="text-gray-500">Checking link status...</span>
+                </div>
+              </div>
+            ` : `
+              <div class="text-center">
+                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  💡 Have multiple bracelets?
+                </div>
+                <button onclick="window.churchTapApp.showAccountBenefitsModal('${tagId}')" 
+                        class="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">
+                  Learn about accounts
+                </button>
+              </div>
+            `}
+          </div>
+        ` : `
+          <div class="mt-4 pt-3 border-t border-blue-200 dark:border-blue-700">
+            <button onclick="window.location.href = '/choose-organization?uid=${tagId}'" 
+                    class="w-full btn-primary text-sm">
+              ✨ Claim Bracelet
+            </button>
+          </div>
+        `}
+      </div>
+    `;
+
+    // Check link status if user is logged in
+    if (this.currentUser && organization) {
+      this.checkAndUpdateLinkStatus(tagId);
+    }
+  }
+
+  displayUnclaimedBracelet(tagId) {
+    const contentEl = document.getElementById('braceletOrgContent');
+    
+    contentEl.innerHTML = `
+      <div class="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
+        <div class="flex items-center space-x-2 mb-3">
+          <span class="text-yellow-600 dark:text-yellow-400">🏷️</span>
+          <span class="font-medium text-gray-900 dark:text-white">Unclaimed Bracelet</span>
+        </div>
+        
+        <div class="space-y-2 text-sm mb-4">
+          <div class="flex justify-between">
+            <span class="text-gray-600 dark:text-gray-300">Bracelet ID:</span>
+            <code class="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">${tagId}</code>
+          </div>
+        </div>
+        
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          This bracelet hasn't been claimed to an organization yet.
+        </p>
+        
+        <button onclick="window.location.href = '/choose-organization?uid=${tagId}'" 
+                class="w-full btn-primary text-sm">
+          ✨ Choose Organization
+        </button>
+      </div>
+    `;
+  }
+
+  getCurrentTagId() {
+    // Try to get from current session
+    const session = this.getTagSession();
+    if (session && session.tagId) {
+      return session.tagId;
+    }
+    
+    // Try to get from URL parameters
+    if (this.tagIdParam) {
+      return this.tagIdParam;
+    }
+    
+    return null;
+  }
+
+  showChangeOrgModal(tagId) {
+    this.showModal('Change Organization', `
+      <div class="space-y-4">
+        <div class="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
+          <div class="flex items-center space-x-2 mb-2">
+            <span class="text-yellow-600 dark:text-yellow-400">⚠️</span>
+            <span class="font-medium text-gray-900 dark:text-white">Important</span>
+          </div>
+          <p class="text-sm text-gray-600 dark:text-gray-400">
+            Changing organizations will reassign your bracelet. This action may require approval 
+            from the new organization.
+          </p>
+        </div>
+        
+        <div class="space-y-3">
+          <button onclick="window.location.href = '/choose-organization?uid=${tagId}'" 
+                  class="w-full btn-primary">
+            🔄 Choose New Organization
+          </button>
+          
+          <button onclick="window.churchTapApp.closeModal()" 
+                  class="w-full btn-secondary">
+            Cancel
+          </button>
+        </div>
+      </div>
+    `);
+  }
+
+  async isBraceletLinked(tagId) {
+    // Check if this bracelet is already linked to the current user account
+    if (!this.currentUser || !this.authToken) {
+      return false;
+    }
+
+    try {
+      const response = await fetch(`/api/user/bracelet/${tagId}/linked`, {
+        headers: {
+          'Authorization': `Bearer ${this.authToken}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.success && data.linked;
+      }
+    } catch (error) {
+      console.error('Error checking bracelet link:', error);
+    }
+    
+    return false;
+  }
+
+  async linkBraceletToAccount(tagId) {
+    if (!this.currentUser) {
+      this.showToast('Please login first to link your bracelet');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/user/link-bracelet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.authToken}`
+        },
+        body: JSON.stringify({
+          bracelet_uid: tagId,
+          is_primary: true // Mark as primary since it's the one they're using
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        this.showToast('✅ Bracelet linked to your account!');
+        // Refresh the bracelet info to show the linked status
+        this.loadBraceletInfo();
+      } else {
+        this.showToast(`❌ ${data.error || 'Failed to link bracelet'}`);
+      }
+    } catch (error) {
+      console.error('Error linking bracelet:', error);
+      this.showToast('❌ Connection error. Please try again.');
+    }
+  }
+
+  async checkAndUpdateLinkStatus(tagId) {
+    const statusEl = document.getElementById(`braceletLinkStatus-${tagId}`);
+    if (!statusEl) return;
+
+    try {
+      const isLinked = await this.isBraceletLinked(tagId);
+      
+      if (isLinked) {
+        statusEl.innerHTML = `
+          <div class="text-green-600 dark:text-green-400 flex items-center justify-center space-x-1">
+            <span>✓</span>
+            <span>Linked to your account</span>
+          </div>
+        `;
+      } else {
+        statusEl.innerHTML = `
+          <button onclick="window.churchTapApp.linkBraceletToAccount('${tagId}')" 
+                  class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">
+            🔗 Link to your account
+          </button>
+        `;
+      }
+    } catch (error) {
+      console.error('Error updating link status:', error);
+      statusEl.innerHTML = `
+        <span class="text-gray-500">Link status unavailable</span>
+      `;
+    }
+  }
+
+  showAccountBenefitsModal(tagId) {
+    this.showModal('Account Benefits', `
+      <div class="space-y-4">
+        <div class="text-center">
+          <div class="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span class="text-2xl">🔗</span>
+          </div>
+          <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            Sync Across Multiple Bracelets
+          </h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Create an account to link multiple bracelets and keep your favorites, 
+            prayers, and preferences synced.
+          </p>
+        </div>
+        
+        <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+          <h4 class="font-medium text-gray-900 dark:text-white mb-2">✨ Benefits:</h4>
+          <ul class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+            <li>• Never lose your favorite verses</li>
+            <li>• Access prayer history from any bracelet</li>
+            <li>• Seamless experience when you get a new bracelet</li>
+            <li>• Optional - works great without an account too!</li>
+          </ul>
+        </div>
+        
+        <div class="space-y-3">
+          <button onclick="window.churchTapApp.showLoginModal()" 
+                  class="w-full btn-primary">
+            🔑 Login / Create Account
+          </button>
+          
+          <button onclick="window.churchTapApp.closeModal()" 
+                  class="w-full btn-secondary">
+            Maybe Later
+          </button>
+        </div>
+      </div>
+    `);
   }
 }
 

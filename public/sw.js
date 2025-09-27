@@ -32,8 +32,18 @@ self.addEventListener('fetch', event => {
         return fetch(event.request).catch(() => {
           // If network fails and it's a navigation request, show offline page
           if (event.request.mode === 'navigate') {
-            return caches.match('/verse');
+            return caches.match('/verse').then(offlineResponse => {
+              return offlineResponse || new Response('Offline', {
+                status: 503,
+                statusText: 'Service Unavailable'
+              });
+            });
           }
+          // For non-navigation requests, return a proper error response
+          return new Response('Network Error', {
+            status: 503,
+            statusText: 'Service Unavailable'
+          });
         });
       })
   );
