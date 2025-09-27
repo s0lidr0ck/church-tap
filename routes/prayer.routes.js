@@ -1,5 +1,5 @@
 const express = require('express');
-const { dbQuery } = require('../config/database');
+const { dbQuery, db } = require('../config/database');
 const { validateInput } = require('../middleware/validation');
 
 const router = express.Router();
