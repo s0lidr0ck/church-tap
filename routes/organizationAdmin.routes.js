@@ -2,6 +2,7 @@ const express = require('express');
 const { dbQuery } = require('../config/database');
 const { db } = require('../config/database');
 const { requireOrgAuth } = require('../config/middleware');
+const RecurringEventService = require('../services/recurringEventService');
 
 const router = express.Router();
 
@@ -158,7 +159,6 @@ router.post('/events', requireOrgAuth, async (req, res) => {
 
     // If it's a recurring event, generate instances
     if (is_recurring) {
-      const RecurringEventService = require('../services/recurringEventService');
       const event = { 
         id: eventId, 
         ...req.body, 
