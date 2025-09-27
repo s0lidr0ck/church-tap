@@ -30,14 +30,15 @@ const sessionConfig = {
 // Organization resolution middleware
 const resolveOrganization = async (req, res, next) => {
   try {
-    // Extract organization from subdomain, query param, or session
+    // Extract organization from subdomain, query param, NFC tag, or session
     let orgSlug = null;
-    
+    let organization = null;
+
     // Check query parameter first (for compatibility)
     if (req.query.org) {
       orgSlug = req.query.org;
     }
-    
+
     // Check subdomain if no query param
     if (!orgSlug) {
       const host = req.get('host') || '';
@@ -46,19 +47,51 @@ const resolveOrganization = async (req, res, next) => {
         orgSlug = subdomain;
       }
     }
-    
-    // Look up organization if we have a slug
-    if (orgSlug) {
-      const orgResult = await db.query(
-        'SELECT * FROM organizations WHERE subdomain = $1 AND is_active = true',
-        [orgSlug]
-      );
-      
-      if (orgResult.rows.length > 0) {
-        req.organization = orgResult.rows[0];
+
+    // Check for NFC tag URL pattern /t/:uid
+    if (!orgSlug && req.path && req.path.match(/^\/t\/[^\/]+$/)) {
+      const tagId = req.path.split('/')[2];
+      if (tagId) {
+        console.log('🏷️ Resolving organization for NFC tag:', tagId);
+        const tagResult = await db.query(`
+          SELECT nt.*, o.subdomain, o.id as org_id, o.name as org_name, o.is_active
+          FROM ct_nfc_tags nt
+          LEFT JOIN ct_organizations o ON nt.organization_id = o.id
+          WHERE nt.custom_id = $1 AND o.is_active = true
+        `, [tagId]);
+
+        if (tagResult.rows.length > 0) {
+          const tagData = tagResult.rows[0];
+          console.log('🏷️ Found organization for tag:', tagData.subdomain);
+          organization = {
+            id: tagData.org_id,
+            name: tagData.org_name,
+            subdomain: tagData.subdomain,
+            is_active: tagData.is_active
+          };
+          orgSlug = tagData.subdomain;
+        }
       }
     }
-    
+
+    // Look up organization by slug if we have one but no org object yet
+    if (orgSlug && !organization) {
+      const orgResult = await db.query(
+        'SELECT * FROM ct_organizations WHERE subdomain = $1 AND is_active = true',
+        [orgSlug]
+      );
+
+      if (orgResult.rows.length > 0) {
+        organization = orgResult.rows[0];
+      }
+    }
+
+    // Set organization context
+    if (organization) {
+      req.organization = organization;
+      console.log('✅ Organization resolved:', organization.subdomain, organization.name);
+    }
+
     next();
   } catch (error) {
     console.error('Error resolving organization:', error);
