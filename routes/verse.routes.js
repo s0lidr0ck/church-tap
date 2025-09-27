@@ -27,15 +27,28 @@ router.get('/:date', optionalAuth, (req, res) => {
   const { date } = req.params;
   const orgId = req.organization?.id || 1;
 
+  console.log(`[VERSE DEBUG] Requested date: ${date}`);
+  console.log(`[VERSE DEBUG] Organization context:`, req.organization);
+  console.log(`[VERSE DEBUG] Resolved orgId: ${orgId}`);
+  console.log(`[VERSE DEBUG] Query params:`, req.query);
+  console.log(`[VERSE DEBUG] Host:`, req.get('host'));
+
   db.query(`SELECT * FROM ct_verses WHERE date = $1 AND published = TRUE AND organization_id = $2`, [date, orgId], (err, result) => {
     if (err) {
       console.error('Verse by date error:', err);
       return res.status(500).json({ success: false, error: 'Database error' });
     }
 
+    console.log(`[VERSE DEBUG] Query executed successfully`);
+    console.log(`[VERSE DEBUG] Result rows found: ${result.rows?.length || 0}`);
+    if (result.rows?.length > 0) {
+      console.log(`[VERSE DEBUG] Found verse:`, result.rows[0]);
+    }
+
     if (result.rows && result.rows.length > 0) {
       return res.json({ success: true, verse: result.rows[0] });
     } else {
+      console.log(`[VERSE DEBUG] No verse found for date ${date} and orgId ${orgId}`);
       return res.json({ success: false, message: 'No verse found for this date' });
     }
   });
