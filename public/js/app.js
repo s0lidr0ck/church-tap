@@ -4331,11 +4331,11 @@ class ChurchTapApp {
     const mainContent = document.querySelector('main');
     if (mainContent) {
       if (hasCTA) {
-        // With CTA: need extra padding to account for both CTA (44px) and header
-        mainContent.style.paddingTop = '120px'; // 44px CTA + ~76px header
+        // With CTA: need extra padding to account for both CTA (44px) and header (~50px)
+        mainContent.style.paddingTop = '94px'; // 44px CTA + ~50px header
       } else {
-        // Without CTA: just account for header
-        mainContent.style.paddingTop = '76px'; // Just header height
+        // Without CTA: just account for header height
+        mainContent.style.paddingTop = '50px'; // Just header height
       }
       console.log(`[CTA] Adjusted main content padding-top for CTA: ${hasCTA ? 'present' : 'hidden'}`);
     }
