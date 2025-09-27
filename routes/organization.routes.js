@@ -121,7 +121,7 @@ router.get('/links', (req, res) => {
 
 // Calendar: get events for a specific day (YYYY-MM-DD)
 router.get('/calendar/daily', (req, res) => {
-  const orgId = req.organizationId || 1;
+  const orgId = req.organization?.id || 1;
   const { date } = req.query;
   if (!date) {
     return res.status(400).json({ success: false, error: 'date required (YYYY-MM-DD)' });
@@ -147,7 +147,7 @@ router.get('/calendar/daily', (req, res) => {
 
 // Calendar: get events for a given month (YYYY-MM)
 router.get('/calendar/month', (req, res) => {
-  const orgId = req.organizationId || 1;
+  const orgId = req.organization?.id || 1;
   const { ym } = req.query; // e.g., 2025-09
   if (!ym || !/^\d{4}-\d{2}$/.test(ym)) {
     return res.status(400).json({ success: false, error: 'ym required (YYYY-MM)' });
@@ -178,7 +178,7 @@ router.get('/calendar/month', (req, res) => {
 
 // Active CTA for organization
 router.get('/cta', (req, res) => {
-  const orgId = req.organizationId || 1;
+  const orgId = req.organization?.id || 1;
   dbQuery.get(
     `SELECT id, text, url, icon, bg_color, text_color, start_at, end_at
      FROM CT_organization_cta
