@@ -18,7 +18,7 @@ router.post('/links', requireOrgAuth, (req, res) => {
   db.query(
     `INSERT INTO ct_organization_links (organization_id, title, url, icon, sort_order)
      VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-    [req.organizationId, title, url, icon || 'website', sort_order || 0],
+    [req.session.organizationId, title, url, icon || 'website', sort_order || 0],
     (err, result) => {
       if (err) {
         console.error('Error creating organization link:', err);
@@ -29,7 +29,7 @@ router.post('/links', requireOrgAuth, (req, res) => {
         success: true,
         link: {
           id: result.rows[0].id,
-          organization_id: req.organizationId,
+          organization_id: req.session.organizationId,
           title,
           url,
           icon: icon || 'website',
@@ -54,7 +54,7 @@ router.put('/links/:id', requireOrgAuth, (req, res) => {
     `UPDATE ct_organization_links
      SET title = $1, url = $2, icon = $3, sort_order = $4, is_active = $5
      WHERE id = $6 AND organization_id = $7`,
-    [title, url, icon || 'website', sort_order || 0, is_active !== undefined ? is_active : true, id, req.organizationId],
+    [title, url, icon || 'website', sort_order || 0, is_active !== undefined ? is_active : true, id, req.session.organizationId],
     (err, result) => {
       if (err) {
         console.error('Error updating organization link:', err);
@@ -77,7 +77,7 @@ router.delete('/links/:id', requireOrgAuth, (req, res) => {
   db.query(
     `DELETE FROM ct_organization_links
      WHERE id = $1 AND organization_id = $2`,
-    [id, req.organizationId],
+    [id, req.session.organizationId],
     (err, result) => {
       if (err) {
         console.error('Error deleting organization link:', err);
@@ -95,11 +95,34 @@ router.delete('/links/:id', requireOrgAuth, (req, res) => {
 
 // Get organization links (public endpoint)
 router.get('/links', (req, res) => {
-  const orgId = req.organization?.id || 1;
-  console.log('Public links request for organization:', orgId);
-  console.log('Request query params:', req.query);
-  console.log('Organization from middleware:', req.organization);
-  console.log('Organization ID resolved:', orgId);
+  let orgId = req.organization?.id || null;
+  
+  // If no org from middleware, try to resolve from tag cookie
+  const originatingTagId = req.cookies?.originatingTag;
+  
+  const resolveOrgFromTag = (cb) => {
+    if (orgId) return cb();
+    if (!originatingTagId) {
+      orgId = 1; // Default fallback
+      return cb();
+    }
+    
+    db.query(`SELECT organization_id FROM ct_nfc_tags WHERE custom_id = $1`, [originatingTagId], (err, result) => {
+      if (!err && result.rows.length > 0) {
+        orgId = result.rows[0].organization_id;
+        console.log(`🔗 ✅ Resolved org ${orgId} from tag ${originatingTagId}`);
+      } else {
+        orgId = 1; // Default fallback
+      }
+      cb();
+    });
+  };
+  
+  resolveOrgFromTag(() => {
+    console.log('Public links request for organization:', orgId);
+    console.log('Request query params:', req.query);
+    console.log('Organization from middleware:', req.organization);
+    console.log('Organization ID resolved:', orgId);
   
   db.query(
     `SELECT id, title, url, icon, sort_order
@@ -117,11 +140,31 @@ router.get('/links', (req, res) => {
       res.json(result.rows);
     }
   );
+  });
 });
 
 // Calendar: get events for a specific day (YYYY-MM-DD)
 router.get('/calendar/daily', (req, res) => {
-  const orgId = req.organization?.id || 1;
+  let orgId = req.organization?.id || null;
+  const originatingTagId = req.cookies?.originatingTag;
+  
+  const resolveOrgFromTag = (cb) => {
+    if (orgId) return cb();
+    if (!originatingTagId) {
+      orgId = 1;
+      return cb();
+    }
+    db.query(`SELECT organization_id FROM ct_nfc_tags WHERE custom_id = $1`, [originatingTagId], (err, result) => {
+      if (!err && result.rows.length > 0) {
+        orgId = result.rows[0].organization_id;
+      } else {
+        orgId = 1;
+      }
+      cb();
+    });
+  };
+  
+  resolveOrgFromTag(() => {
   const { date } = req.query;
   if (!date) {
     return res.status(400).json({ success: false, error: 'date required (YYYY-MM-DD)' });
@@ -143,11 +186,31 @@ router.get('/calendar/daily', (req, res) => {
       res.json({ success: true, events: result.rows || [] });
     }
   );
+  });
 });
 
 // Calendar: get events for a given month (YYYY-MM)
 router.get('/calendar/month', (req, res) => {
-  const orgId = req.organization?.id || 1;
+  let orgId = req.organization?.id || null;
+  const originatingTagId = req.cookies?.originatingTag;
+  
+  const resolveOrgFromTag = (cb) => {
+    if (orgId) return cb();
+    if (!originatingTagId) {
+      orgId = 1;
+      return cb();
+    }
+    db.query(`SELECT organization_id FROM ct_nfc_tags WHERE custom_id = $1`, [originatingTagId], (err, result) => {
+      if (!err && result.rows.length > 0) {
+        orgId = result.rows[0].organization_id;
+      } else {
+        orgId = 1;
+      }
+      cb();
+    });
+  };
+  
+  resolveOrgFromTag(() => {
   const { ym } = req.query; // e.g., 2025-09
   if (!ym || !/^\d{4}-\d{2}$/.test(ym)) {
     return res.status(400).json({ success: false, error: 'ym required (YYYY-MM)' });
@@ -174,11 +237,31 @@ router.get('/calendar/month', (req, res) => {
       res.json({ success: true, events: result.rows || [] });
     }
   );
+  });
 });
 
 // Active CTA for organization
 router.get('/cta', (req, res) => {
-  const orgId = req.organization?.id || 1;
+  let orgId = req.organization?.id || null;
+  const originatingTagId = req.cookies?.originatingTag;
+  
+  const resolveOrgFromTag = (cb) => {
+    if (orgId) return cb();
+    if (!originatingTagId) {
+      orgId = 1;
+      return cb();
+    }
+    db.query(`SELECT organization_id FROM ct_nfc_tags WHERE custom_id = $1`, [originatingTagId], (err, result) => {
+      if (!err && result.rows.length > 0) {
+        orgId = result.rows[0].organization_id;
+      } else {
+        orgId = 1;
+      }
+      cb();
+    });
+  };
+  
+  resolveOrgFromTag(() => {
   db.query(
     `SELECT id, text, url, icon, bg_color, text_color, start_at, end_at
      FROM CT_organization_cta
@@ -197,6 +280,7 @@ router.get('/cta', (req, res) => {
       res.json({ success: true, cta: result.rows[0] || null });
     }
   );
+  });
 });
 
 // Get all public organizations for bracelet claiming

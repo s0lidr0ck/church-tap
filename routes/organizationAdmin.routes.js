@@ -12,7 +12,7 @@ router.get('/links', requireOrgAuth, (req, res) => {
     `SELECT * FROM ct_organization_links
      WHERE organization_id = $1
      ORDER BY sort_order ASC, title ASC`,
-    [req.organizationId],
+    [req.session.organizationId],
     (err, result) => {
       if (err) {
         console.error('Error fetching organization links:', err);
@@ -34,7 +34,7 @@ router.post('/links', requireOrgAuth, (req, res) => {
   dbQuery.run(
     `INSERT INTO ct_organization_links (organization_id, title, url, icon, sort_order)
      VALUES ($1, $2, $3, $4, $5)`,
-    [req.organizationId, title, url, icon || 'website', sort_order || 0],
+    [req.session.organizationId, title, url, icon || 'website', sort_order || 0],
     function(err) {
       if (err) {
         console.error('Error creating organization link:', err);
@@ -45,7 +45,7 @@ router.post('/links', requireOrgAuth, (req, res) => {
         success: true, 
         link: {
           id: this.lastID,
-          organization_id: req.organizationId,
+          organization_id: req.session.organizationId,
           title,
           url,
           icon: icon || 'website',
@@ -70,7 +70,7 @@ router.put('/links/:id', requireOrgAuth, (req, res) => {
     `UPDATE ct_organization_links 
      SET title = $1, url = $2, icon = $3, sort_order = $4, is_active = $5
      WHERE id = $6 AND organization_id = $7`,
-    [title, url, icon || 'website', sort_order || 0, is_active !== undefined ? is_active : true, id, req.organizationId],
+    [title, url, icon || 'website', sort_order || 0, is_active !== undefined ? is_active : true, id, req.session.organizationId],
     function(err) {
       if (err) {
         console.error('Error updating organization link:', err);
@@ -93,7 +93,7 @@ router.delete('/links/:id', requireOrgAuth, (req, res) => {
   dbQuery.run(
     `DELETE FROM ct_organization_links 
      WHERE id = $1 AND organization_id = $2`,
-    [id, req.organizationId],
+    [id, req.session.organizationId],
     function(err) {
       if (err) {
         console.error('Error deleting organization link:', err);
@@ -145,7 +145,7 @@ router.get('/events', requireOrgAuth, (req, res) => {
       ORDER BY start_at DESC
     `;
 
-    db.query(query, [req.organizationId], (err, result) => {
+    db.query(query, [req.session.organizationId], (err, result) => {
       if (err) {
         console.error('Error fetching events:', err);
         return res.status(500).json({ success: false, error: 'Failed to fetch events' });
@@ -190,12 +190,12 @@ router.post('/events', requireOrgAuth, async (req, res) => {
     `;
 
     const params = hasRecurringColumns ? [
-      req.organizationId, title, description || null, location || null, address || null,
+      req.session.organizationId, title, description || null, location || null, address || null,
       start_at, end_at || null, !!all_day, link || null, is_active !== false, notify_lead_minutes || 120,
       !!is_recurring, recurrence_type || null, recurrence_interval || 1,
       recurrence_days ? JSON.stringify(recurrence_days) : null, recurrence_end_date || null
     ] : [
-      req.organizationId, title, description || null, location || null, address || null,
+      req.session.organizationId, title, description || null, location || null, address || null,
       start_at, end_at || null, !!all_day, link || null, is_active !== false, notify_lead_minutes || 120
     ];
 
@@ -208,7 +208,7 @@ router.post('/events', requireOrgAuth, async (req, res) => {
       const event = {
         id: eventId,
         ...req.body,
-        organization_id: req.organizationId,
+        organization_id: req.session.organizationId,
         is_recurring: true
       };
       await RecurringEventService.generateInstancesForEvent(event, new Date(Date.now() + 90 * 24 * 60 * 60 * 1000));
@@ -231,7 +231,7 @@ router.put('/events/:id', requireOrgAuth, (req, res) => {
     UPDATE CT_events
     SET title = $1, description = $2, location = $3, address = $4, start_at = $5, end_at = $6, all_day = $7, link = $8, is_active = $9, notify_lead_minutes = $10
     WHERE id = $11 AND organization_id = $12
-  `, [title, description || null, location || null, address || null, start_at, end_at || null, !!all_day, link || null, is_active !== false, notify_lead_minutes || 120, id, req.organizationId], (err, result) => {
+  `, [title, description || null, location || null, address || null, start_at, end_at || null, !!all_day, link || null, is_active !== false, notify_lead_minutes || 120, id, req.session.organizationId], (err, result) => {
     if (err) {
       console.error('Error updating event:', err);
       return res.status(500).json({ success: false, error: 'Failed to update event' });
@@ -243,7 +243,7 @@ router.put('/events/:id', requireOrgAuth, (req, res) => {
 
 router.delete('/events/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
-  db.query(`DELETE FROM CT_events WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], (err, result) => {
+  db.query(`DELETE FROM CT_events WHERE id = $1 AND organization_id = $2`, [id, req.session.organizationId], (err, result) => {
     if (err) {
       console.error('Error deleting event:', err);
       return res.status(500).json({ success: false, error: 'Failed to delete event' });
@@ -262,7 +262,7 @@ router.get('/ctas', requireOrgAuth, (req, res) => {
     FROM CT_organization_cta
     WHERE organization_id = $1
     ORDER BY COALESCE(start_at, NOW()) DESC
-  `, [req.organizationId], (err, rows) => {
+  `, [req.session.organizationId], (err, rows) => {
     if (err) {
       console.error('Error fetching CTAs:', err);
       return res.status(500).json({ success: false, error: 'Failed to fetch CTAs' });
@@ -279,7 +279,7 @@ router.post('/ctas', requireOrgAuth, (req, res) => {
   dbQuery.run(`
     INSERT INTO CT_organization_cta (organization_id, text, url, icon, bg_color, text_color, start_at, end_at, is_active)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-  `, [req.organizationId, text, url || null, icon || '📣', bg_color || '#0ea5e9', text_color || '#ffffff', start_at || null, end_at || null, is_active !== false], function(err) {
+  `, [req.session.organizationId, text, url || null, icon || '📣', bg_color || '#0ea5e9', text_color || '#ffffff', start_at || null, end_at || null, is_active !== false], function(err) {
     if (err) {
       console.error('Error creating CTA:', err);
       return res.status(500).json({ success: false, error: 'Failed to create CTA' });
@@ -298,7 +298,7 @@ router.put('/ctas/:id', requireOrgAuth, (req, res) => {
     UPDATE CT_organization_cta
     SET text = $1, url = $2, icon = $3, bg_color = $4, text_color = $5, start_at = $6, end_at = $7, is_active = $8
     WHERE id = $9 AND organization_id = $10
-  `, [text, url || null, icon || '📣', bg_color || '#0ea5e9', text_color || '#ffffff', start_at || null, end_at || null, is_active !== false, id, req.organizationId], (err, result) => {
+  `, [text, url || null, icon || '📣', bg_color || '#0ea5e9', text_color || '#ffffff', start_at || null, end_at || null, is_active !== false, id, req.session.organizationId], (err, result) => {
     if (err) {
       console.error('Error updating CTA:', err);
       return res.status(500).json({ success: false, error: 'Failed to update CTA' });
@@ -310,7 +310,7 @@ router.put('/ctas/:id', requireOrgAuth, (req, res) => {
 
 router.delete('/ctas/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
-  db.query(`DELETE FROM ct_organization_cta WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], (err, result) => {
+  db.query(`DELETE FROM ct_organization_cta WHERE id = $1 AND organization_id = $2`, [id, req.session.organizationId], (err, result) => {
     if (err) {
       console.error('Error deleting CTA:', err);
       return res.status(500).json({ success: false, error: 'Failed to delete CTA' });
@@ -329,7 +329,7 @@ router.get('/bracelet-requests', requireOrgAuth, (req, res) => {
   const { status } = req.query;
   
   let whereClause = 'WHERE bm.organization_id = $1';
-  const params = [req.organizationId];
+  const params = [req.session.organizationId];
   
   if (status && ['pending', 'approved', 'denied'].includes(status)) {
     whereClause += ' AND bm.status = $2';
@@ -374,7 +374,7 @@ router.post('/bracelet-requests/:id/approve', requireOrgAuth, (req, res) => {
     SELECT bm.id, bm.bracelet_uid, bm.organization_id, bm.status
     FROM ct_bracelet_memberships bm
     WHERE bm.id = $1 AND bm.organization_id = $2
-  `, [id, req.organizationId], (err, result) => {
+  `, [id, req.session.organizationId], (err, result) => {
     if (err) {
       console.error('Error fetching bracelet request:', err);
       return res.status(500).json({ success: false, error: 'Database error' });
@@ -412,7 +412,7 @@ router.post('/bracelet-requests/:id/approve', requireOrgAuth, (req, res) => {
           // Don't fail the approval, just log the error
         }
         
-        console.log(`✅ Bracelet request approved: ${request.bracelet_uid} for organization ${req.organizationId}`);
+        console.log(`✅ Bracelet request approved: ${request.bracelet_uid} for organization ${req.session.organizationId}`);
         
         res.json({ 
           success: true, 
@@ -434,7 +434,7 @@ router.post('/bracelet-requests/:id/deny', requireOrgAuth, (req, res) => {
     SELECT bm.id, bm.bracelet_uid, bm.organization_id, bm.status
     FROM ct_bracelet_memberships bm
     WHERE bm.id = $1 AND bm.organization_id = $2
-  `, [id, req.organizationId], (err, result) => {
+  `, [id, req.session.organizationId], (err, result) => {
     if (err) {
       console.error('Error fetching bracelet request:', err);
       return res.status(500).json({ success: false, error: 'Database error' });
@@ -472,7 +472,7 @@ router.post('/bracelet-requests/:id/deny', requireOrgAuth, (req, res) => {
           // Don't fail the denial, just log the error
         }
         
-        console.log(`❌ Bracelet request denied: ${request.bracelet_uid} for organization ${req.organizationId}`);
+        console.log(`❌ Bracelet request denied: ${request.bracelet_uid} for organization ${req.session.organizationId}`);
         
         res.json({ 
           success: true, 
@@ -489,7 +489,7 @@ router.get('/ctas', requireOrgAuth, (req, res) => {
     SELECT * FROM ct_organization_cta 
     WHERE organization_id = $1 AND is_active = true
     ORDER BY sort_order ASC, created_at DESC
-  `, [req.organizationId], (err, rows) => {
+  `, [req.session.organizationId], (err, rows) => {
     if (err) {
       console.error('Error fetching CTAs:', err);
       return res.status(500).json({ success: false, error: 'Failed to fetch CTAs' });
@@ -502,7 +502,7 @@ router.get('/ctas', requireOrgAuth, (req, res) => {
 // Create CTA
 router.post('/ctas', requireOrgAuth, (req, res) => {
   const { title, description, url, button_text, sort_order, is_active } = req.body;
-  const organizationId = req.organizationId;
+  const organizationId = req.session.organizationId;
   
   dbQuery.run(`
     INSERT INTO ct_organization_cta (organization_id, title, description, url, button_text, sort_order, is_active, created_at)
@@ -521,7 +521,7 @@ router.post('/ctas', requireOrgAuth, (req, res) => {
 router.put('/ctas/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   const { title, description, url, button_text, sort_order, is_active } = req.body;
-  const organizationId = req.organizationId;
+  const organizationId = req.session.organizationId;
   
   dbQuery.run(`
     UPDATE ct_organization_cta 
@@ -540,7 +540,7 @@ router.put('/ctas/:id', requireOrgAuth, (req, res) => {
 // Delete CTA
 router.delete('/ctas/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
-  const organizationId = req.organizationId;
+  const organizationId = req.session.organizationId;
   
   dbQuery.run(`
     DELETE FROM ct_organization_cta 

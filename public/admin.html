@@ -380,9 +380,9 @@
         <div class="modern-card p-6">
           <h3 class="text-lg font-medium text-gray-900 mb-4">🚀 Quick Actions</h3>
           <div class="flex flex-wrap gap-3">
-            <button class="btn-primary-modern">Create New Verse</button>
-            <button class="btn-secondary-modern">View Analytics</button>
-            <button class="btn-secondary-modern">Manage Community</button>
+            <button onclick="adminDashboard.showVerseModal()" class="btn-primary-modern">Create New Verse</button>
+            <button onclick="adminDashboard.showTab('analytics')" class="btn-secondary-modern">View Analytics</button>
+            <button onclick="adminDashboard.showTab('community')" class="btn-secondary-modern">Manage Community</button>
           </div>
         </div>
       </div>
@@ -423,8 +423,8 @@
         <!-- Verses List -->
         <div class="modern-card overflow-hidden">
           <!-- Desktop Table View -->
-          <div class="block">
-            <table class="min-w-full divide-y divide-gray-200 admin-table responsive-table">
+          <div class="hidden lg:block overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 admin-table">
               <thead class="bg-gray-50">
                 <tr>
                   <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -457,7 +457,7 @@
           </div>
           
           <!-- Mobile Card View -->
-          <div class="hidden">
+          <div class="block lg:hidden">
             <div id="versesList" class="divide-y divide-gray-200">
               <!-- Verses will be loaded here -->
             </div>
@@ -839,9 +839,9 @@
             <p class="text-gray-500">When users scan NFC tags associated with your organization, they'll appear here.</p>
           </div>
 
-          <!-- Users Table -->
+          <!-- Users Table - Desktop -->
           <div id="usersTableContainer" class="hidden">
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto max-lg:hidden">
               <table class="min-w-full divide-y divide-gray-200 admin-table">
                 <thead class="bg-gray-50">
                   <tr>
@@ -857,6 +857,13 @@
                   <!-- User tags will be loaded here -->
                 </tbody>
               </table>
+            </div>
+            
+            <!-- Mobile Card View -->
+            <div class="lg:hidden">
+              <div id="usersCardList" class="divide-y divide-gray-200">
+                <!-- User tags will be loaded here -->
+              </div>
             </div>
           </div>
         </div>
@@ -1103,25 +1110,25 @@
 
   <!-- Add/Edit Verse Modal -->
   <div id="verseModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
-      <div class="mt-3">
-        <h3 id="modalTitle" class="text-lg font-medium text-gray-900 mb-4">Add New Verse</h3>
+    <div class="relative top-20 mx-auto p-8 mb-20 border border-gray-200 w-11/12 md:w-3/4 lg:w-1/2 shadow-2xl rounded-lg" style="background-color: #C1C5C9;">
+      <div>
+        <h3 id="modalTitle" class="text-2xl font-semibold text-gray-900 mb-8">Add New Verse</h3>
         
-        <form id="verseForm" class="space-y-4">
+        <form id="verseForm" class="space-y-6">
           <input type="hidden" id="verseId">
           
           <!-- Date -->
           <div>
-            <label for="verseDate" class="block text-sm font-medium text-gray-700">Date</label>
+            <label for="verseDate" class="block text-sm font-semibold text-gray-800 mb-3">Date</label>
             <input type="date" id="verseDate" required 
-                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm">
+                   class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-colors">
           </div>
 
           <!-- Content Type -->
           <div>
-            <label for="contentType" class="block text-sm font-medium text-gray-700">Content Type</label>
+            <label for="contentType" class="block text-sm font-semibold text-gray-800 mb-3">Content Type</label>
             <select id="contentType" required 
-                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm">
+                    class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-colors">
               <option value="text">Text Verse</option>
               <option value="image">Image Verse</option>
             </select>
@@ -1129,58 +1136,58 @@
 
           <!-- Verse Text (Always shown for searchability) -->
           <div>
-            <label for="verseText" class="block text-sm font-medium text-gray-700">Verse Text</label>
+            <label for="verseText" class="block text-sm font-semibold text-gray-800 mb-3">Verse Text</label>
             <textarea id="verseText" rows="4" 
-                      class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-colors"
                       placeholder="Enter the verse text (required for searchability)..."></textarea>
-            <p class="mt-1 text-xs text-gray-500">This text will be used for searching, even for image verses.</p>
+            <p class="mt-2 text-xs text-gray-600">This text will be used for searching, even for image verses.</p>
           </div>
 
           <!-- Image Upload (Only for Image Verses) -->
           <div id="imageFields" class="hidden">
-            <label for="verseImage" class="block text-sm font-medium text-gray-700">Verse Image</label>
+            <label for="verseImage" class="block text-sm font-semibold text-gray-800 mb-3">Verse Image</label>
             <input type="file" id="verseImage" accept="image/*" 
-                   class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100">
-            <p class="mt-1 text-xs text-gray-500">Recommended: 9:16 aspect ratio (portrait). Include verse text above for searchability.</p>
+                   class="block w-full text-sm text-gray-600 file:mr-4 file:py-2.5 file:px-5 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 file:transition-colors">
+            <p class="mt-2 text-xs text-gray-600">Recommended: 9:16 aspect ratio (portrait). Include verse text above for searchability.</p>
           </div>
 
           <!-- Bible Reference -->
           <div>
-            <label for="bibleReference" class="block text-sm font-medium text-gray-700">Bible Reference</label>
+            <label for="bibleReference" class="block text-sm font-semibold text-gray-800 mb-3">Bible Reference</label>
             <input type="text" id="bibleReference" 
-                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                   class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-colors"
                    placeholder="e.g., John 3:16">
           </div>
 
           <!-- Context -->
           <div>
-            <label for="verseContext" class="block text-sm font-medium text-gray-700">Context/Commentary (Optional)</label>
-            <textarea id="verseContext" rows="3" 
-                      class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+            <label for="verseContext" class="block text-sm font-semibold text-gray-800 mb-3">Context/Commentary (Optional)</label>
+            <textarea id="verseContext" rows="9" 
+                      class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-colors"
                       placeholder="Additional context or commentary..."></textarea>
           </div>
 
           <!-- Tags -->
           <div>
-            <label for="verseTags" class="block text-sm font-medium text-gray-700">Tags</label>
+            <label for="verseTags" class="block text-sm font-semibold text-gray-800 mb-3">Tags</label>
             <input type="text" id="verseTags" 
-                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                   class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-colors"
                    placeholder="hope, comfort, strength (comma-separated)">
           </div>
 
           <!-- Published -->
-          <div class="flex items-center">
+          <div class="flex items-center p-5 bg-white rounded-lg border border-gray-200">
             <input type="checkbox" id="versePublished" 
                    class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded">
-            <label for="versePublished" class="ml-2 block text-sm text-gray-900">
+            <label for="versePublished" class="ml-3 block text-sm font-medium text-gray-800">
               Publish immediately (or schedule for auto-publish at midnight)
             </label>
           </div>
 
           <!-- Form Actions -->
-          <div class="flex justify-end space-x-3 pt-4">
-            <button type="button" id="cancelModal" class="btn-secondary">Cancel</button>
-            <button type="submit" class="btn-primary">Save Verse</button>
+          <div class="flex justify-end space-x-4 pt-8 mt-2 border-t border-gray-300">
+            <button type="button" id="cancelModal" class="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 font-medium transition-colors">Cancel</button>
+            <button type="submit" class="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 font-medium transition-colors">Save Verse</button>
           </div>
         </form>
       </div>
@@ -1189,34 +1196,34 @@
 
   <!-- Add/Edit Link Modal -->
   <div id="linkModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
-      <div class="mt-3">
-        <h3 id="linkModalTitle" class="text-lg font-medium text-gray-900 mb-4">Add New Link</h3>
+    <div class="relative top-20 mx-auto p-8 mb-20 border border-gray-200 w-11/12 md:w-3/4 lg:w-1/2 shadow-2xl rounded-lg" style="background-color: #C1C5C9;">
+      <div>
+        <h3 id="linkModalTitle" class="text-2xl font-semibold text-gray-900 mb-8">Add New Link</h3>
 
-        <form id="linkForm" class="space-y-4">
+        <form id="linkForm" class="space-y-6">
           <input type="hidden" id="linkId">
 
           <!-- Title -->
           <div>
-            <label for="linkTitle" class="block text-sm font-medium text-gray-700">Link Title</label>
+            <label for="linkTitle" class="block text-sm font-semibold text-gray-800 mb-3">Link Title</label>
             <input type="text" id="linkTitle" required
-                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                   class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-colors"
                    placeholder="e.g., Church Website">
           </div>
 
           <!-- URL -->
           <div>
-            <label for="linkUrl" class="block text-sm font-medium text-gray-700">URL</label>
+            <label for="linkUrl" class="block text-sm font-semibold text-gray-800 mb-3">URL</label>
             <input type="url" id="linkUrl" required
-                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                   class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-colors"
                    placeholder="https://example.com">
           </div>
 
           <!-- Icon -->
           <div>
-            <label for="linkIcon" class="block text-sm font-medium text-gray-700">Icon</label>
+            <label for="linkIcon" class="block text-sm font-semibold text-gray-800 mb-3">Icon</label>
             <select id="linkIcon"
-                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm">
+                    class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-colors">
               <option value="website">🌐 Website</option>
               <option value="calendar">📅 Calendar</option>
               <option value="email">✉️ Email</option>
@@ -1238,26 +1245,26 @@
 
           <!-- Sort Order -->
           <div>
-            <label for="linkSortOrder" class="block text-sm font-medium text-gray-700">Sort Order</label>
+            <label for="linkSortOrder" class="block text-sm font-semibold text-gray-800 mb-3">Sort Order</label>
             <input type="number" id="linkSortOrder" min="0" value="0"
-                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                   class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-colors"
                    placeholder="0">
-            <p class="mt-1 text-xs text-gray-500">Lower numbers appear first in the menu</p>
+            <p class="mt-2 text-xs text-gray-600">Lower numbers appear first in the menu</p>
           </div>
 
           <!-- Active Status -->
-          <div class="flex items-center">
+          <div class="flex items-center p-5 bg-white rounded-lg border border-gray-200">
             <input type="checkbox" id="linkIsActive" checked
                    class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded">
-            <label for="linkIsActive" class="ml-2 block text-sm text-gray-900">
+            <label for="linkIsActive" class="ml-3 block text-sm font-medium text-gray-800">
               Active (visible in the main app)
             </label>
           </div>
 
           <!-- Form Actions -->
-          <div class="flex justify-end space-x-3 pt-4">
-            <button type="button" id="cancelLinkModal" class="btn-secondary">Cancel</button>
-            <button type="submit" class="btn-primary">Save Link</button>
+          <div class="flex justify-end space-x-4 pt-8 mt-2 border-t border-gray-300">
+            <button type="button" id="cancelLinkModal" class="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 font-medium transition-colors">Cancel</button>
+            <button type="submit" class="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 font-medium transition-colors">Save Link</button>
           </div>
         </form>
       </div>

@@ -55,10 +55,34 @@ router.post('/claim', (req, res) => {
                 already_claimed: true
               });
             } else {
-              return res.status(409).json({
-                success: false,
-                error: 'Bracelet already claimed by another organization'
-              });
+              // Allow switching organizations - update the existing membership
+              console.log(`🔄 Switching bracelet ${tag_id} from organization ${existingMembership.organization_id} to ${organization.id}`);
+              
+              db.query(
+                `UPDATE ct_bracelet_memberships 
+                 SET organization_id = $1, status = 'approved', created_at = NOW()
+                 WHERE bracelet_uid = $2`,
+                [organization.id, tag_id],
+                (err, updateResult) => {
+                  if (err) {
+                    console.error('Error switching bracelet organization:', err);
+                    return res.status(500).json({ success: false, error: 'Failed to switch organization' });
+                  }
+
+                  console.log(`✅ Successfully switched bracelet ${tag_id} to ${organization.name}`);
+                  res.json({
+                    success: true,
+                    message: `Bracelet successfully switched to ${organization.name}`,
+                    switched: true,
+                    organization: {
+                      id: organization.id,
+                      name: organization.name,
+                      short_name: organization_short_name
+                    }
+                  });
+                }
+              );
+              return;
             }
           }
 

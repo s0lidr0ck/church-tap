@@ -750,49 +750,49 @@ class AdminDashboard {
 
     // Render mobile card view
     mobileContainer.innerHTML = verses.map(verse => `
-      <div class="px-4 py-4 flex items-center justify-between hover:bg-gray-50">
-        <div class="flex-1">
-          <div class="flex items-center space-x-3">
-            <div class="flex-shrink-0">
-              ${verse.content_type === 'image' 
-                ? '<span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center text-sm">🖼️</span>'
-                : '<span class="w-8 h-8 bg-green-100 text-green-600 rounded-lg flex items-center justify-center text-sm">📝</span>'
+      <div class="px-4 py-4 hover:bg-gray-50">
+        <div class="flex items-center space-x-3">
+          <div class="flex-shrink-0">
+            ${verse.content_type === 'image' 
+              ? '<span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center text-sm">🖼️</span>'
+              : '<span class="w-8 h-8 bg-green-100 text-green-600 rounded-lg flex items-center justify-center text-sm">📝</span>'
+            }
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center space-x-2">
+              <p class="text-sm font-medium text-gray-900">${verse.date}</p>
+              ${verse.published ? 
+                '<span class="status-badge status-published">Published</span>' :
+                '<span class="status-badge status-draft">Draft</span>'
               }
             </div>
-            <div class="flex-1">
-              <div class="flex items-center space-x-2">
-                <p class="text-sm font-medium text-gray-900">${verse.date}</p>
-                ${verse.published ? 
-                  '<span class="status-badge status-published">Published</span>' :
-                  '<span class="status-badge status-draft">Draft</span>'
-                }
-              </div>
-              <div class="mt-1">
-                <p class="text-sm text-gray-600">
-                  ${verse.bible_reference || 'No reference'}
-                </p>
-                ${verse.content_type === 'text' && verse.verse_text ? 
-                  `<p class="text-sm text-gray-500 mt-1">${verse.verse_text.substring(0, 100)}${verse.verse_text.length > 100 ? '...' : ''}</p>` :
-                  ''
-                }
-              </div>
-              ${verse.tags ? 
-                `<div class="mt-2 flex flex-wrap gap-1">
-                  ${verse.tags.split(',').map(tag => 
-                    `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">${tag.trim()}</span>`
-                  ).join('')}
-                </div>` :
+            <div class="mt-1">
+              <p class="text-sm text-gray-600">
+                ${verse.bible_reference || 'No reference'}
+              </p>
+              ${verse.content_type === 'text' && verse.verse_text ? 
+                `<p class="text-sm text-gray-500 mt-1">${verse.verse_text.substring(0, 100)}${verse.verse_text.length > 100 ? '...' : ''}</p>` :
                 ''
               }
             </div>
+            ${verse.tags ? 
+              `<div class="mt-2 flex flex-wrap gap-1">
+                ${verse.tags.split(',').map(tag => 
+                  `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">${tag.trim()}</span>`
+                ).join('')}
+              </div>` :
+              ''
+            }
           </div>
         </div>
-        <div class="flex items-center space-x-2">
+        <div class="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
           <span class="text-sm text-gray-500">❤️ ${verse.hearts || 0}</span>
-          <button onclick="adminDashboard.editVerse(${verse.id})" 
-                  class="text-primary-600 hover:text-primary-900 text-sm font-medium">Edit</button>
-          <button onclick="adminDashboard.deleteVerse(${verse.id})" 
-                  class="text-red-600 hover:text-red-900 text-sm font-medium">Delete</button>
+          <div class="flex items-center space-x-3">
+            <button onclick="adminDashboard.editVerse(${verse.id})" 
+                    class="text-primary-600 hover:text-primary-900 text-sm font-medium">Edit</button>
+            <button onclick="adminDashboard.deleteVerse(${verse.id})" 
+                    class="text-red-600 hover:text-red-900 text-sm font-medium">Delete</button>
+          </div>
         </div>
       </div>
     `).join('');
@@ -1550,16 +1550,19 @@ class AdminDashboard {
 
   renderUsersTable(users) {
     const tbody = document.getElementById('usersTableBody');
-    if (!tbody) return;
+    const mobileContainer = document.getElementById('usersCardList');
+    if (!tbody || !mobileContainer) return;
 
     tbody.innerHTML = '';
+    mobileContainer.innerHTML = '';
 
     users.forEach(user => {
-      const row = document.createElement('tr');
       const lastActivity = user.last_activity ? new Date(user.last_activity).toLocaleDateString() : 'Never';
       const firstActivity = user.first_activity ? new Date(user.first_activity).toLocaleDateString() : 'Never';
       const totalPosts = user.community_posts.total_posts || 0;
 
+      // Desktop table row
+      const row = document.createElement('tr');
       row.innerHTML = `
         <td class="px-6 py-4 whitespace-nowrap">
           <div class="flex items-center">
@@ -1612,8 +1615,64 @@ class AdminDashboard {
           `}
         </td>
       `;
-
       tbody.appendChild(row);
+
+      // Mobile card
+      const card = document.createElement('div');
+      card.className = 'px-4 py-4 hover:bg-gray-50';
+      card.innerHTML = `
+        <div class="flex items-center space-x-3">
+          <div class="flex-shrink-0 h-10 w-10">
+            <div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+              <span class="text-sm font-medium text-blue-600">${user.tag_id.slice(-4)}</span>
+            </div>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-gray-900 truncate">${user.tag_id}</p>
+            <p class="text-sm text-gray-500">Last active: ${lastActivity}</p>
+          </div>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-2 text-sm">
+          <div>
+            <span class="text-gray-500">Interactions:</span>
+            <span class="ml-1 font-medium text-gray-900">${user.total_interactions}</span>
+          </div>
+          <div>
+            <span class="text-gray-500">Active days:</span>
+            <span class="ml-1 font-medium text-gray-900">${user.active_days}</span>
+          </div>
+        </div>
+        ${totalPosts > 0 ? `
+          <div class="mt-3 flex flex-wrap gap-2">
+            ${user.community_posts.prayer_count > 0 ? `
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                🙏 ${user.community_posts.prayer_count}
+              </span>
+            ` : ''}
+            ${user.community_posts.praise_count > 0 ? `
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                🎉 ${user.community_posts.praise_count}
+              </span>
+            ` : ''}
+            ${user.community_posts.insight_count > 0 ? `
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                💭 ${user.community_posts.insight_count}
+              </span>
+            ` : ''}
+          </div>
+        ` : ''}
+        <div class="mt-3 pt-3 border-t border-gray-100">
+          ${totalPosts > 0 ? `
+            <button onclick="adminDashboard.viewUserPosts('${user.tag_id}')"
+                    class="text-primary-600 hover:text-primary-900 text-sm font-medium">
+              View Posts (${totalPosts})
+            </button>
+          ` : `
+            <span class="text-sm text-gray-400">No community posts</span>
+          `}
+        </div>
+      `;
+      mobileContainer.appendChild(card);
     });
   }
 
@@ -2151,6 +2210,15 @@ class AdminDashboard {
     }, 5000);
   }
 
+  // Helper function to format tag ID for display
+  formatTagId(tagId) {
+    if (!tagId || tagId.length <= 6) return tagId || 'Unknown';
+    // Remove colons if present (e.g., "04:62:D9:9D:CA:2A:81" -> "04629D9DCA2A81")
+    const cleanId = tagId.replace(/:/g, '');
+    // Show first 2 and last 2 characters
+    return `${cleanId.substring(0, 2)}...${cleanId.substring(cleanId.length - 2)}`;
+  }
+
   // Community Management Functions
   async loadCommunityData() {
     try {
@@ -2169,10 +2237,10 @@ class AdminDashboard {
   renderCommunityData(community) {
     const { prayer_requests, praise_reports, verse_insights, recent_prayers, recent_praise, recent_insights } = community;
     
-    // Update stats
-    document.getElementById('totalPrayerRequests').textContent = prayer_requests.length;
-    document.getElementById('totalPraiseReports').textContent = praise_reports.length;
-    document.getElementById('totalVerseInsights').textContent = (verse_insights || []).length;
+    // Update stats - show count from actual posts displayed
+    document.getElementById('totalPrayerRequests').textContent = (recent_prayers || []).length;
+    document.getElementById('totalPraiseReports').textContent = (recent_praise || []).length;
+    document.getElementById('totalVerseInsights').textContent = (recent_insights || []).length;
 
     // Render recent posts (these have IDs for moderation)
     this.renderAdminPrayerRequests(recent_prayers || []);
@@ -2195,22 +2263,23 @@ class AdminDashboard {
 
 
     container.innerHTML = prayerRequests.map(request => `
-      <div class="px-4 py-4">
-        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
-          <div class="flex-1">
-            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
-              <span class="text-sm font-medium text-gray-900">${request.date}</span>
-              <span class="text-xs text-gray-500">${this.formatDateTime(request.created_at)}</span>
-              ${request.is_hidden ? 
-                '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Hidden</span>' :
-                ''
-              }
-            </div>
-            <p class="text-sm text-gray-700 mb-2">${this.escapeHtml(request.content)}</p>
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-              <span>🙏 ${request.prayer_count || 0} prayers</span>
-              <span>IP: ${request.ip_address}</span>
-            </div>
+      <div class="bg-white border-b border-gray-200 hover:bg-gray-50 transition-colors">
+        <div class="px-4 py-3">
+          <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+            <div class="flex-1">
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
+                <span class="text-sm font-medium text-gray-900">User ${this.formatTagId(request.originating_tag_id)}</span>
+                <span class="text-xs text-gray-500">${this.formatDateTime(request.created_at)}</span>
+                ${request.is_hidden ? 
+                  '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Hidden</span>' :
+                  ''
+                }
+              </div>
+              <p class="text-sm text-gray-700 mb-2">${this.escapeHtml(request.content)}</p>
+              <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                <span>🙏 ${request.prayer_count || 0} prayers</span>
+                <span>IP: ${request.ip_address || 'Unknown'}</span>
+              </div>
           </div>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-2 lg:ml-4">
             ${!request.is_hidden ? 
@@ -2237,22 +2306,23 @@ class AdminDashboard {
     }
 
     container.innerHTML = praiseReports.map(report => `
-      <div class="px-4 py-4">
-        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
-          <div class="flex-1">
-            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
-              <span class="text-sm font-medium text-gray-900">${report.date}</span>
-              <span class="text-xs text-gray-500">${this.formatDateTime(report.created_at)}</span>
-              ${report.is_hidden ? 
-                '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Hidden</span>' :
-                ''
-              }
-            </div>
-            <p class="text-sm text-gray-700 mb-2">${this.escapeHtml(report.content)}</p>
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-              <span>🎉 ${report.celebration_count || 0} celebrations</span>
-              <span>IP: ${report.ip_address}</span>
-            </div>
+      <div class="bg-white border-b border-gray-200 hover:bg-gray-50 transition-colors">
+        <div class="px-4 py-3">
+          <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+            <div class="flex-1">
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
+                <span class="text-sm font-medium text-gray-900">User ${this.formatTagId(report.originating_tag_id)}</span>
+                <span class="text-xs text-gray-500">${this.formatDateTime(report.created_at)}</span>
+                ${report.is_hidden ? 
+                  '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Hidden</span>' :
+                  ''
+                }
+              </div>
+              <p class="text-sm text-gray-700 mb-2">${this.escapeHtml(report.content)}</p>
+              <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                <span>🎉 ${report.celebration_count || 0} celebrations</span>
+                <span>IP: ${report.ip_address || 'Unknown'}</span>
+              </div>
           </div>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-2 lg:ml-4">
             ${!report.is_hidden ? 
@@ -2437,22 +2507,24 @@ class AdminDashboard {
     }
 
     container.innerHTML = verseInsights.map(insight => `
-      <div class="px-4 py-4">
-        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
-          <div class="flex-1">
-            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
-              <span class="text-sm font-medium text-gray-900">${insight.date}</span>
-              <span class="text-xs text-gray-500">${this.formatDateTime(insight.created_at)}</span>
-              ${insight.is_hidden ? 
-                '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Hidden</span>' :
-                ''
-              }
-            </div>
-            <p class="text-sm text-gray-700 mb-2">${this.escapeHtml(insight.content)}</p>
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-              <span>💭 Verse Insight</span>
-              <span>IP: ${insight.ip_address}</span>
-            </div>
+      <div class="bg-white border-b border-gray-200 hover:bg-gray-50 transition-colors">
+        <div class="px-4 py-3">
+          <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+            <div class="flex-1">
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
+                <span class="text-sm font-medium text-gray-900">User ${this.formatTagId(insight.originating_tag_id)}</span>
+                <span class="text-xs text-gray-500">${this.formatDateTime(insight.created_at)}</span>
+                ${insight.verse_reference ? `<span class="text-xs text-blue-600">${insight.verse_reference}</span>` : ''}
+                ${insight.is_hidden ? 
+                  '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Hidden</span>' :
+                  ''
+                }
+              </div>
+              <p class="text-sm text-gray-700 mb-2">${this.escapeHtml(insight.content)}</p>
+              <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                <span>💭 ${insight.heart_count || 0} hearts</span>
+                <span>IP: ${insight.ip_address || 'Unknown'}</span>
+              </div>
           </div>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-2 lg:ml-4">
             ${!insight.is_hidden ? 
@@ -3168,6 +3240,7 @@ class AdminDashboard {
   showElement(elementId) {
     const element = document.getElementById(elementId);
     if (element) {
+      element.classList.remove('hidden');
       element.style.display = 'block';
     }
   }
@@ -3175,6 +3248,7 @@ class AdminDashboard {
   hideElement(elementId) {
     const element = document.getElementById(elementId);
     if (element) {
+      element.classList.add('hidden');
       element.style.display = 'none';
     }
   }

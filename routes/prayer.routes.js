@@ -9,13 +9,34 @@ router.post('/', validateInput.communityContent, validateInput.sanitizeHtml, (re
   const { content, user_token, date } = req.body;
   const ip = req.ip || req.connection.remoteAddress;
   const today = date || new Date().toISOString().split('T')[0];
-  const orgId = req.organizationId || 1;
+  let orgId = req.organization?.id || null;
   
   // Get session attribution from cookies
   const taggedSessionId = req.cookies?.taggedSession;
   const originatingTagId = req.cookies?.originatingTag;
+  const sessionId = req.cookies?.trackingSession;
   
-  console.log(`Prayer request - org: ${req.query.org}, orgId: ${orgId}, taggedSession: ${taggedSessionId}, originatingTag: ${originatingTagId}`);
+  // If no org from middleware, try to resolve from tag cookie
+  const resolveOrgFromTag = (cb) => {
+    if (orgId) return cb();
+    if (!originatingTagId) {
+      orgId = 1; // Default fallback
+      return cb();
+    }
+    
+    db.query(`SELECT organization_id FROM ct_nfc_tags WHERE custom_id = $1`, [originatingTagId], (err, result) => {
+      if (!err && result.rows.length > 0) {
+        orgId = result.rows[0].organization_id;
+        console.log(`🙏 ✅ Resolved org ${orgId} from tag ${originatingTagId}`);
+      } else {
+        orgId = 1; // Default fallback
+      }
+      cb();
+    });
+  };
+  
+  resolveOrgFromTag(() => {
+  console.log(`Prayer request - org: ${req.organization?.subdomain}, orgId: ${orgId}, taggedSession: ${taggedSessionId}, originatingTag: ${originatingTagId}`);
   
   if (!content || content.trim().length === 0) {
     return res.status(400).json({ success: false, error: 'Prayer request content is required' });
@@ -34,14 +55,17 @@ router.post('/', validateInput.communityContent, validateInput.sanitizeHtml, (re
         return res.status(500).json({ success: false, error: 'Database error' });
       }
       
-      // Update session activity timestamp if we have a tagged session
-      if (taggedSessionId) {
-        dbQuery.run(`UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE tagged_session_id = $1`, [taggedSessionId]);
+      // Update session activity timestamp if we have a session
+      if (sessionId) {
+        db.query(`UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE session_id = $1`, [sessionId], (err) => {
+          if (err) console.error('Error updating session timestamp:', err);
+        });
         console.log(`🙏 Prayer request linked to tag session: ${originatingTagId}`);
       }
       
       res.json({ success: true, prayer_request_id: this.lastID });
     });
+  });
 });
 
 // Pray for prayer request
@@ -52,6 +76,7 @@ router.post('/pray', (req, res) => {
   // Get session attribution from cookies
   const taggedSessionId = req.cookies?.taggedSession;
   const originatingTagId = req.cookies?.originatingTag;
+  const sessionId = req.cookies?.trackingSession;
   
   console.log(`Prayer interaction - prayerRequestId: ${prayer_request_id}, taggedSession: ${taggedSessionId}, originatingTag: ${originatingTagId}`);
   
@@ -79,9 +104,11 @@ router.post('/pray', (req, res) => {
             return res.status(500).json({ success: false, error: 'Database error' });
           }
           
-          // Update session activity timestamp if we have a tagged session
-          if (taggedSessionId) {
-            dbQuery.run(`UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE tagged_session_id = $1`, [taggedSessionId]);
+          // Update session activity timestamp if we have a session
+          if (sessionId) {
+            db.query(`UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE session_id = $1`, [sessionId], (err) => {
+              if (err) console.error('Error updating session timestamp:', err);
+            });
             console.log(`🙏 Prayer interaction linked to tag session: ${originatingTagId}`);
           }
           

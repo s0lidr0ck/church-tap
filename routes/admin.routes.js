@@ -105,7 +105,7 @@ router.get('/check-session', (req, res) => {
 
 // Get all verses (admin)
 router.get('/verses', requireOrgAuth, (req, res) => {
-  db.query(`SELECT * FROM ct_verses WHERE organization_id = $1 ORDER BY date DESC`, [req.organizationId], (err, result) => {
+  db.query(`SELECT * FROM ct_verses WHERE organization_id = $1 ORDER BY date DESC`, [req.session.organizationId], (err, result) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -150,7 +150,7 @@ router.post('/verses', requireOrgAuth, upload.single('image'), async (req, res) 
     
     db.query(`INSERT INTO ct_verses (date, content_type, verse_text, image_path, bible_reference, context, tags, published, organization_id)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-      [date, content_type, verse_text, image_path, bible_reference, context, tags, published || 0, req.organizationId],
+      [date, content_type, verse_text, image_path, bible_reference, context, tags, published || 0, req.session.organizationId],
       (err, result) => {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
@@ -190,7 +190,7 @@ router.put('/verses/:id', requireOrgAuth, upload.single('image'), async (req, re
     
     db.query(`UPDATE ct_verses SET date = $1, content_type = $2, verse_text = $3, image_path = $4,
             bible_reference = $5, context = $6, tags = $7, published = $8 WHERE id = $9 AND organization_id = $10`,
-      [date, content_type, verse_text, image_path, bible_reference, context, tags, published, id, req.organizationId],
+      [date, content_type, verse_text, image_path, bible_reference, context, tags, published, id, req.session.organizationId],
       (err, result) => {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
@@ -208,13 +208,13 @@ router.put('/verses/:id', requireOrgAuth, upload.single('image'), async (req, re
 router.delete('/verses/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   
-  db.query(`SELECT image_path FROM ct_verses WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], (err, result) => {
+  db.query(`SELECT image_path FROM ct_verses WHERE id = $1 AND organization_id = $2`, [id, req.session.organizationId], (err, result) => {
     const verse = result.rows[0];
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
     
-    db.query(`DELETE FROM ct_verses WHERE id = $1 AND organization_id = $2`, [id, req.organizationId], (err, result) => {
+    db.query(`DELETE FROM ct_verses WHERE id = $1 AND organization_id = $2`, [id, req.session.organizationId], (err, result) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -237,7 +237,7 @@ router.post('/verses/bulk', requireOrgAuth, (req, res) => {
   }
   
   const placeholders = verse_ids.map((_, index) => `$${index + 1}`).join(',');
-  const params = [...verse_ids, req.organizationId];
+  const params = [...verse_ids, req.session.organizationId];
   
   switch (operation) {
     case 'delete':
@@ -271,7 +271,7 @@ router.post('/verses/bulk', requireOrgAuth, (req, res) => {
       if (!data.tags) {
         return res.status(400).json({ success: false, error: 'Tags required for tag update' });
       }
-      db.query(`UPDATE ct_verses SET tags = $1 WHERE id IN (${placeholders}) AND organization_id = $${verse_ids.length + 2}`, [data.tags, ...verse_ids, req.organizationId], (err, result) => {
+      db.query(`UPDATE ct_verses SET tags = $1 WHERE id IN (${placeholders}) AND organization_id = $${verse_ids.length + 2}`, [data.tags, ...verse_ids, req.session.organizationId], (err, result) => {
         if (err) {
           return res.status(500).json({ success: false, error: 'Database error' });
         }
@@ -352,7 +352,7 @@ router.post('/verses/import', requireOrgAuth, upload.single('csv'), (req, res) =
         
         db.query(`INSERT INTO ct_verses (date, content_type, verse_text, bible_reference, context, tags, published, organization_id)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [date, content_type, verse_text || '', bible_reference || '', context || '', tags || '', published === 'true' ? 1 : 0, req.organizationId],
+          [date, content_type, verse_text || '', bible_reference || '', context || '', tags || '', published === 'true' ? 1 : 0, req.session.organizationId],
           (err, result) => {
             if (err) {
               errors.push(`Row ${index + 1}: ${err.message}`);
@@ -380,7 +380,7 @@ router.post('/verses/import', requireOrgAuth, upload.single('csv'), (req, res) =
 
 // CSV export
 router.get('/verses/export', requireOrgAuth, (req, res) => {
-  db.query(`SELECT date, content_type, verse_text, bible_reference, context, tags, published FROM ct_verses WHERE organization_id = $1 ORDER BY date DESC`, [req.organizationId], (err, result) => {
+  db.query(`SELECT date, content_type, verse_text, bible_reference, context, tags, published FROM ct_verses WHERE organization_id = $1 ORDER BY date DESC`, [req.session.organizationId], (err, result) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -408,7 +408,7 @@ router.get('/verses/export', requireOrgAuth, (req, res) => {
 
 // Verse import settings
 router.get('/verse-import/settings', requireOrgAuth, (req, res) => {
-  const organizationId = req.organizationId;
+  const organizationId = req.session.organizationId;
   
   db.query(
     `SELECT enabled, bible_version, import_time, fallback_versions
@@ -471,7 +471,7 @@ router.get('/verse-import/settings', requireOrgAuth, (req, res) => {
 // Update verse import settings
 router.put('/verse-import/settings', requireOrgAuth, (req, res) => {
   const { enabled, bibleVersion, importTime, fallbackVersions } = req.body;
-  const organizationId = req.organizationId;
+  const organizationId = req.session.organizationId;
   
   db.query(
     `UPDATE CT_verse_import_settings
@@ -502,7 +502,7 @@ router.post('/verse-import/manual', requireOrgAuth, async (req, res) => {
   }
   
   try {
-    const result = await verseImportService.importVerseForDate(req.organizationId, date, version);
+    const result = await verseImportService.importVerseForDate(req.session.organizationId, date, version);
     res.json({ success: true, verse: result });
   } catch (error) {
     console.error('Manual import error:', error);
@@ -519,7 +519,7 @@ router.post('/verse-import/check', requireOrgAuth, async (req, res) => {
   }
   
   try {
-    const result = await verseImportService.checkAndImportMissingVerse(req.organizationId, date);
+    const result = await verseImportService.checkAndImportMissingVerse(req.session.organizationId, date);
     if (result) {
       res.json({ success: true, imported: true, verse: result });
     } else {
@@ -944,7 +944,7 @@ router.get('/analytics', requireOrgAuth, (req, res) => {
 // Get community data (prayer requests, praise reports)
 router.get('/community', requireOrgAuth, (req, res) => {
   const days = parseInt(req.query.days) || 7;
-  const organizationId = req.organizationId;
+  const organizationId = req.session.organizationId;
   
   Promise.all([
     // Prayer requests
@@ -978,9 +978,9 @@ router.get('/community', requireOrgAuth, (req, res) => {
     // Recent prayer requests
     new Promise((resolve, reject) => {
       db.query(`
-        SELECT id, content, prayer_count, created_at, is_hidden
+        SELECT id, content, prayer_count, created_at, is_hidden, ip_address, user_token, date, originating_tag_id
         FROM ct_prayer_requests
-        WHERE organization_id = $1
+        WHERE organization_id = $1 AND created_at >= NOW() - INTERVAL '${days} days'
         ORDER BY created_at DESC
         LIMIT 20
       `, [organizationId], (err, result) => {
@@ -992,9 +992,9 @@ router.get('/community', requireOrgAuth, (req, res) => {
     // Recent praise reports
     new Promise((resolve, reject) => {
       db.query(`
-        SELECT id, content, celebration_count, created_at, is_hidden
+        SELECT id, content, celebration_count, created_at, is_hidden, ip_address, user_token, date, originating_tag_id
         FROM ct_praise_reports
-        WHERE organization_id = $1
+        WHERE organization_id = $1 AND created_at >= NOW() - INTERVAL '${days} days'
         ORDER BY created_at DESC
         LIMIT 20
       `, [organizationId], (err, result) => {
@@ -1009,13 +1009,18 @@ router.get('/community', requireOrgAuth, (req, res) => {
         SELECT
           p.id,
           p.content,
+          p.verse_reference,
           COUNT(i.id) as heart_count,
           p.created_at,
-          p.is_hidden
+          p.is_hidden,
+          p.ip_address,
+          p.user_token,
+          p.date,
+          p.originating_tag_id
         FROM ct_verse_community_posts p
         LEFT JOIN ct_verse_community_interactions i ON p.id = i.post_id
-        WHERE p.organization_id = $1
-        GROUP BY p.id, p.content, p.created_at, p.is_hidden
+        WHERE p.organization_id = $1 AND p.created_at >= NOW() - INTERVAL '${days} days'
+        GROUP BY p.id, p.content, p.verse_reference, p.created_at, p.is_hidden, p.ip_address, p.user_token, p.date, p.originating_tag_id
         ORDER BY p.created_at DESC
         LIMIT 20
       `, [organizationId], (err, result) => {
@@ -1045,7 +1050,7 @@ router.get('/community', requireOrgAuth, (req, res) => {
 
 // Get bracelet requests
 router.get('/bracelet-requests', requireOrgAuth, (req, res) => {
-  const organizationId = req.organizationId;
+  const organizationId = req.session.organizationId;
   
   db.query(`
     SELECT br.*, u.email, u.first_name, u.last_name
@@ -1073,7 +1078,7 @@ router.get('/bracelet-requests', requireOrgAuth, (req, res) => {
 router.put('/bracelet-requests/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   const { status, admin_notes } = req.body;
-  const organizationId = req.organizationId;
+  const organizationId = req.session.organizationId;
   
   db.query(`
     UPDATE ct_bracelet_requests
@@ -1093,7 +1098,7 @@ router.put('/bracelet-requests/:id', requireOrgAuth, (req, res) => {
 router.put('/prayer-request/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   const { action, reason } = req.body; // action: 'hide' or 'unhide'
-  const organizationId = req.organizationId;
+  const organizationId = req.session.organizationId;
   
   if (action === 'hide') {
     db.query(`
@@ -1128,7 +1133,7 @@ router.put('/prayer-request/:id', requireOrgAuth, (req, res) => {
 router.put('/praise-report/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   const { action, reason } = req.body; // action: 'hide' or 'unhide'
-  const organizationId = req.organizationId;
+  const organizationId = req.session.organizationId;
   
   if (action === 'hide') {
     db.query(`
@@ -1163,7 +1168,7 @@ router.put('/praise-report/:id', requireOrgAuth, (req, res) => {
 router.put('/verse-insight/:id', requireOrgAuth, (req, res) => {
   const { id } = req.params;
   const { action, reason } = req.body; // action: 'hide' or 'unhide'
-  const organizationId = req.organizationId;
+  const organizationId = req.session.organizationId;
 
   if (action === 'hide') {
     db.query(`
@@ -1196,26 +1201,32 @@ router.put('/verse-insight/:id', requireOrgAuth, (req, res) => {
 
 // Get user tag data for organization
 router.get('/users', requireOrgAuth, (req, res) => {
-  const organizationId = req.organizationId;
+  const organizationId = req.session.organizationId;
+  console.log('Fetching users for organization:', organizationId);
 
   Promise.all([
     // Get all tag IDs that have interacted with this organization
     new Promise((resolve, reject) => {
       db.query(`
-        SELECT DISTINCT
+        SELECT
           ti.tag_id,
-          ti.ip_address,
+          MAX(ti.ip_address) as ip_address,
           MAX(ti.created_at) as last_activity,
           MIN(ti.created_at) as first_activity,
           COUNT(*) as total_interactions,
           COUNT(DISTINCT DATE(ti.created_at)) as active_days
         FROM tag_interactions ti
         WHERE ti.organization_id = $1
-        GROUP BY ti.tag_id, ti.ip_address
+        GROUP BY ti.tag_id
         ORDER BY last_activity DESC
       `, [organizationId], (err, result) => {
-        if (err) reject(err);
-        else resolve(result.rows || []);
+        if (err) {
+          console.error('Error fetching tag interactions:', err);
+          reject(err);
+        } else {
+          console.log('Tag interactions found:', result.rows.length);
+          resolve(result.rows || []);
+        }
       });
     }),
 
@@ -1270,6 +1281,9 @@ router.get('/users', requireOrgAuth, (req, res) => {
       }
     }));
 
+    console.log('Sending response with', userTags.length, 'tags');
+    console.log('Sample tags:', userTags.slice(0, 3));
+    
     res.json({
       success: true,
       users: userTags,
@@ -1289,7 +1303,7 @@ router.get('/users', requireOrgAuth, (req, res) => {
 // Get detailed posts for a specific tag
 router.get('/users/:tagId/posts', requireOrgAuth, (req, res) => {
   const { tagId } = req.params;
-  const organizationId = req.organizationId;
+  const organizationId = req.session.organizationId;
 
   Promise.all([
     // Prayer requests

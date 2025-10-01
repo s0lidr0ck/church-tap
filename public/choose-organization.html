@@ -565,15 +565,26 @@
           });
 
           if (!response.ok) {
-            throw new Error('Failed to claim bracelet');
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to claim bracelet');
           }
 
+          const data = await response.json();
+          
           // Success - redirect to the tag scanning URL which will load the organization
+          if (data.switched) {
+            console.log(`🔄 Switched to ${displayName}`);
+          } else if (data.already_claimed) {
+            console.log(`✅ Already connected to ${displayName}`);
+          } else {
+            console.log(`✅ Successfully connected to ${displayName}`);
+          }
+          
           window.location.href = `/t/${this.tagId}?claimed=true`;
 
         } catch (error) {
           console.error('Error claiming bracelet:', error);
-          this.showError('Failed to connect bracelet. Please try again.');
+          this.showError(`Failed to connect to ${displayName}. ${error.message || 'Please try again.'}`);
         }
       }
 

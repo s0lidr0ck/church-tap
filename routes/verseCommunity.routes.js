@@ -9,13 +9,34 @@ router.post('/', (req, res) => {
   const { content, verse_reference, user_token, date } = req.body;
   const ip = req.ip || req.connection.remoteAddress;
   const today = date || new Date().toISOString().split('T')[0];
-  const orgId = req.organizationId || 1;
+  let orgId = req.organization?.id || null;
   
   // Get session attribution from cookies
   const taggedSessionId = req.cookies?.taggedSession;
   const originatingTagId = req.cookies?.originatingTag;
+  const sessionId = req.cookies?.trackingSession;
   
-  console.log(`Verse community post - org: ${req.query.org}, orgId: ${orgId}, taggedSession: ${taggedSessionId}, originatingTag: ${originatingTagId}`);
+  // If no org from middleware, try to resolve from tag cookie
+  const resolveOrgFromTag = (cb) => {
+    if (orgId) return cb();
+    if (!originatingTagId) {
+      orgId = 1; // Default fallback
+      return cb();
+    }
+    
+    db.query(`SELECT organization_id FROM ct_nfc_tags WHERE custom_id = $1`, [originatingTagId], (err, result) => {
+      if (!err && result.rows.length > 0) {
+        orgId = result.rows[0].organization_id;
+        console.log(`📖 ✅ Resolved org ${orgId} from tag ${originatingTagId}`);
+      } else {
+        orgId = 1; // Default fallback
+      }
+      cb();
+    });
+  };
+  
+  resolveOrgFromTag(() => {
+  console.log(`Verse community post - org: ${req.organization?.subdomain}, orgId: ${orgId}, taggedSession: ${taggedSessionId}, originatingTag: ${originatingTagId}`);
   
   if (!content || content.trim().length === 0) {
     return res.status(400).json({ success: false, error: 'Post content is required' });
@@ -39,13 +60,16 @@ router.post('/', (req, res) => {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
     
-    // Update session activity timestamp if we have a tagged session
-    if (taggedSessionId) {
-      dbQuery.run(`UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE tagged_session_id = $1`, [taggedSessionId]);
+    // Update session activity timestamp if we have a session
+    if (sessionId) {
+      db.query(`UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE session_id = $1`, [sessionId], (err) => {
+        if (err) console.error('Error updating session timestamp:', err);
+      });
       console.log(`📖 Verse community post linked to tag session: ${originatingTagId}`);
     }
     
     res.json({ success: true, post_id: this.lastID });
+  });
   });
 });
 
@@ -53,7 +77,7 @@ router.post('/', (req, res) => {
 router.post('/heart', (req, res) => {
   const { post_id, user_token } = req.body;
   const ip = req.ip || req.connection.remoteAddress;
-  const orgId = req.organizationId || 1;
+  const orgId = req.organization?.id || 1;
   
   if (!post_id || !user_token) {
     return res.status(400).json({ success: false, error: 'Post ID and user token are required' });
@@ -115,7 +139,7 @@ router.get('/admin', requireOrgAuth, (req, res) => {
     SELECT * FROM ct_verse_community_posts
     WHERE date >= $1 AND organization_id = $2
     ORDER BY date DESC, created_at DESC
-  `, [startDateStr, req.organizationId], (err, result) => {
+  `, [startDateStr, req.session.organizationId], (err, result) => {
     if (err) {
       console.error('Error fetching admin verse community posts:', err);
       return res.status(500).json({ success: false, error: 'Database error' });
@@ -136,7 +160,7 @@ router.put('/admin/:id', requireOrgAuth, (req, res) => {
   dbQuery.run(`
     UPDATE ct_verse_community_posts SET is_approved = $1, is_hidden = $2 
     WHERE id = $3 AND organization_id = $4
-  `, [is_approved ? 1 : 0, is_hidden ? 1 : 0, id, req.organizationId], function(err) {
+  `, [is_approved ? 1 : 0, is_hidden ? 1 : 0, id, req.session.organizationId], function(err) {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -156,7 +180,7 @@ router.delete('/admin/:id', requireOrgAuth, (req, res) => {
   // Delete post (only from this organization)
   dbQuery.run(`
     DELETE FROM ct_verse_community_posts WHERE id = $1 AND organization_id = $2
-  `, [id, req.organizationId], function(err) {
+  `, [id, req.session.organizationId], function(err) {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }

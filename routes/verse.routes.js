@@ -25,15 +25,37 @@ router.get('/random', (req, res) => {
 // Get verse by date
 router.get('/:date', (req, res) => {
   const { date } = req.params;
-  const orgId = req.organization?.id || 1;
+  let orgId = req.organization?.id || null;
+  
+  // If no org from middleware, try to resolve from tag cookie
+  const originatingTagId = req.cookies?.originatingTag;
+  
+  const resolveOrgFromTag = (cb) => {
+    if (orgId) return cb();
+    if (!originatingTagId) {
+      orgId = 1; // Default fallback
+      return cb();
+    }
+    
+    db.query(`SELECT organization_id FROM ct_nfc_tags WHERE custom_id = $1`, [originatingTagId], (err, result) => {
+      if (!err && result.rows.length > 0) {
+        orgId = result.rows[0].organization_id;
+        console.log(`[VERSE DEBUG] ✅ Resolved org ${orgId} from tag ${originatingTagId}`);
+      } else {
+        orgId = 1; // Default fallback
+      }
+      cb();
+    });
+  };
+  
+  resolveOrgFromTag(() => {
+    console.log(`[VERSE DEBUG] Requested date: ${date}`);
+    console.log(`[VERSE DEBUG] Organization context:`, req.organization);
+    console.log(`[VERSE DEBUG] Resolved orgId: ${orgId}`);
+    console.log(`[VERSE DEBUG] Query params:`, req.query);
+    console.log(`[VERSE DEBUG] Host:`, req.get('host'));
 
-  console.log(`[VERSE DEBUG] Requested date: ${date}`);
-  console.log(`[VERSE DEBUG] Organization context:`, req.organization);
-  console.log(`[VERSE DEBUG] Resolved orgId: ${orgId}`);
-  console.log(`[VERSE DEBUG] Query params:`, req.query);
-  console.log(`[VERSE DEBUG] Host:`, req.get('host'));
-
-  db.query(`SELECT * FROM ct_verses WHERE date = $1 AND published = TRUE AND organization_id = $2`, [date, orgId], (err, result) => {
+    db.query(`SELECT * FROM ct_verses WHERE date = $1 AND published = TRUE AND organization_id = $2`, [date, orgId], (err, result) => {
     if (err) {
       console.error('Verse by date error:', err);
       return res.status(500).json({ success: false, error: 'Database error' });
@@ -51,6 +73,7 @@ router.get('/:date', (req, res) => {
       console.log(`[VERSE DEBUG] No verse found for date ${date} and orgId ${orgId}`);
       return res.json({ success: false, message: 'No verse found for this date' });
     }
+  });
   });
 });
 

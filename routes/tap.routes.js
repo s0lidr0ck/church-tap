@@ -142,6 +142,47 @@ router.get('/t/:uid', async (req, res) => {
             hasPendingMembership: hasPendingMembership
           };
 
+          // Set session tracking cookies for analytics
+          const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const taggedSessionId = `tagged_${uid}_${Date.now()}`;
+          
+          res.cookie('trackingSession', sessionId, {
+            maxAge: 24 * 60 * 60 * 1000, // 24 hours
+            httpOnly: false, // Allow frontend access
+            sameSite: 'lax'
+          });
+          
+          res.cookie('originatingTag', uid, {
+            maxAge: 24 * 60 * 60 * 1000, // 24 hours
+            httpOnly: false, // Allow frontend access
+            sameSite: 'lax'
+          });
+          
+          res.cookie('taggedSession', taggedSessionId, {
+            maxAge: 24 * 60 * 60 * 1000, // 24 hours
+            httpOnly: false, // Allow frontend access
+            sameSite: 'lax'
+          });
+          
+          console.log(`🍪 Session cookies set: trackingSession=${sessionId}, originatingTag=${uid}, taggedSession=${taggedSessionId}`);
+          
+          // Create anonymous session record in database
+          const ip = req.ip || req.connection.remoteAddress;
+          const userAgent = req.get('User-Agent');
+          
+          db.query(`
+            INSERT INTO anonymous_sessions 
+            (session_id, organization_id, ip_address, user_agent, first_seen_at, last_seen_at)
+            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT (session_id) DO UPDATE SET last_seen_at = CURRENT_TIMESTAMP
+          `, [sessionId, bracelet.organization_id, ip, userAgent], (sessionErr) => {
+            if (sessionErr) {
+              console.error('Error creating anonymous session:', sessionErr);
+            } else {
+              console.log(`📊 Anonymous session created: ${sessionId}`);
+            }
+          });
+          
           // Serve the main app with organization context injected!
           console.log(`🎯 Serving app for organization: ${bracelet.org_name} (${bracelet.subdomain})`);
           const orgData = {
