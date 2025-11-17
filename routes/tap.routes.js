@@ -104,9 +104,9 @@ router.get('/t/:uid', async (req, res) => {
         // Log the tag interaction in tag_interactions table
         db.query(`
           INSERT INTO tag_interactions (
-            tag_id, session_id, action_type, created_at, url, referrer, user_agent, ip_address, 
-            organization_id, metadata, tagged_session_id
-          ) VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, $9, $10)
+            tag_id, session_id, interaction_type, page_url, referrer, user_agent, ip_address, 
+            organization_id, interaction_data, tagged_session_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         `, [
           uid,
           sessionId,
