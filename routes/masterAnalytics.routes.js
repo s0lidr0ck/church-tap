@@ -1055,6 +1055,88 @@ router.get('/tag-details/:tagId', requireMasterAuth, (req, res) => {
   });
 });
 
+// Debug endpoint to check date ranges and query results
+router.get('/debug-dates', requireMasterAuth, (req, res) => {
+  const { timeframe = '7d' } = req.query;
+  
+  let timeFilter = '';
+  switch(timeframe) {
+    case '24h':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '24 hours'";
+      break;
+    case '7d':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '7 days'";
+      break;
+    case '30d':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '30 days'";
+      break;
+    case '90d':
+      timeFilter = "AND created_at >= NOW() - INTERVAL '90 days'";
+      break;
+  }
+  
+  Promise.all([
+    // Check current server time
+    new Promise((resolve) => {
+      db.query('SELECT NOW() as server_time, NOW() - INTERVAL \'7 days\' as seven_days_ago', [], (err, result) => {
+        if (err) resolve({ error: err.message });
+        else resolve(result.rows[0]);
+      });
+    }),
+    
+    // Check date range of actual data
+    new Promise((resolve) => {
+      db.query(`
+        SELECT 
+          MIN(created_at) as oldest_record,
+          MAX(created_at) as newest_record,
+          COUNT(*) as total_count
+        FROM tag_interactions
+      `, [], (err, result) => {
+        if (err) resolve({ error: err.message });
+        else resolve(result.rows[0]);
+      });
+    }),
+    
+    // Check how many records match the timeframe
+    new Promise((resolve) => {
+      db.query(`
+        SELECT COUNT(*) as matching_count
+        FROM tag_interactions
+        WHERE 1=1 ${timeFilter}
+      `, [], (err, result) => {
+        if (err) resolve({ error: err.message });
+        else resolve({ matching_count: result.rows[0]?.count || 0, timeframe });
+      });
+    }),
+    
+    // Check recent records
+    new Promise((resolve) => {
+      db.query(`
+        SELECT created_at, tag_id, organization_id
+        FROM tag_interactions
+        ORDER BY created_at DESC
+        LIMIT 5
+      `, [], (err, result) => {
+        if (err) resolve({ error: err.message });
+        else resolve({ recent: result.rows || [] });
+      });
+    })
+  ]).then(([serverTime, dataRange, matching, recent]) => {
+    res.json({
+      success: true,
+      debug: {
+        server_time: serverTime,
+        data_date_range: dataRange,
+        matching_timeframe: matching,
+        recent_records: recent
+      }
+    });
+  }).catch(error => {
+    res.status(500).json({ success: false, error: error.message });
+  });
+});
+
 // Debug endpoint to check database state and data
 router.get('/debug-database', requireMasterAuth, (req, res) => {
   console.log('🔍 Debug endpoint called - checking database state...');
