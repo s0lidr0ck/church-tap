@@ -1110,17 +1110,29 @@ router.get('/debug-database', requireMasterAuth, (req, res) => {
     
     // Count ct_nfc_tags and show sample
     new Promise((resolve, reject) => {
-      db.query('SELECT COUNT(*) as count, (SELECT uid, custom_id FROM ct_nfc_tags LIMIT 5) as sample FROM ct_nfc_tags', [], (err, result) => {
+      db.query('SELECT COUNT(*) as count FROM ct_nfc_tags', [], (err, result) => {
         if (err) {
           console.error('Error checking ct_nfc_tags:', err);
           resolve({ count: 0, error: err.message });
         } else {
-          // Also get sample tags
-          db.query('SELECT uid, custom_id, organization_id FROM ct_nfc_tags LIMIT 5', [], (err2, sampleResult) => {
-            resolve({ 
-              count: result.rows[0]?.count || 0,
-              samples: sampleResult?.rows || []
-            });
+          // Also get sample tags - check which columns exist
+          db.query(`
+            SELECT 
+              CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ct_nfc_tags' AND column_name='uid') 
+                   THEN (SELECT COUNT(*) FROM ct_nfc_tags WHERE uid IS NOT NULL) 
+                   ELSE 0 END as uid_count,
+              CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ct_nfc_tags' AND column_name='custom_id') 
+                   THEN (SELECT COUNT(*) FROM ct_nfc_tags WHERE custom_id IS NOT NULL) 
+                   ELSE 0 END as custom_id_count
+          `, [], (err2, sampleResult) => {
+            if (err2) {
+              resolve({ count: result.rows[0]?.count || 0, samples: [], note: 'Could not check columns' });
+            } else {
+              resolve({ 
+                count: result.rows[0]?.count || 0,
+                columnInfo: sampleResult?.rows[0] || {}
+              });
+            }
           });
         }
       });
