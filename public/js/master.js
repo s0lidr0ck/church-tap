@@ -1769,8 +1769,9 @@ class MasterPortal {
       this.initMap();
     }, 100); // Small delay to ensure DOM is ready
     
-    // Load analytics stats
+    // Load analytics stats and sessions
     this.loadAnalyticsStats();
+    this.loadSessionsTable();
   }
 
   // Analytics functionality
@@ -1788,12 +1789,14 @@ class MasterPortal {
       this.currentTimeframe = e.target.value;
       this.loadMapData();
       this.loadAnalyticsStats();
+      this.loadSessionsTable();
     });
     
     document.getElementById('analyticsOrganization').addEventListener('change', (e) => {
       this.currentOrganization = e.target.value;
       this.loadMapData();
       this.loadAnalyticsStats();
+      this.loadSessionsTable();
     });
   }
 
@@ -1906,6 +1909,103 @@ class MasterPortal {
       console.error('Error loading analytics stats:', error);
       this.showPlaceholderAnalytics();
     }
+  }
+
+  async loadSessionsTable() {
+    try {
+      const params = new URLSearchParams({
+        timeframe: this.currentTimeframe || '7d',
+        limit: 50
+      });
+
+      if (this.currentOrganization) {
+        params.append('organization_id', this.currentOrganization);
+      }
+
+      const response = await fetch(`/api/master/analytics/sessions?${params}`);
+      
+      if (response.status === 404 || response.status === 500) {
+        console.log('Sessions endpoint not available');
+        return;
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.sessions) {
+        this.renderSessionsTable(data.sessions);
+      }
+    } catch (error) {
+      console.error('Error loading sessions table:', error);
+    }
+  }
+
+  renderSessionsTable(sessions) {
+    const tbody = document.getElementById('sessionsTable');
+    if (!tbody) {
+      console.log('Sessions table element not found');
+      return;
+    }
+
+    if (sessions.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+            No sessions found for the selected timeframe
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = sessions.map(session => {
+      const location = session.location.city && session.location.country 
+        ? `${session.location.city}, ${session.location.country}` 
+        : (session.location.country || 'Unknown');
+      
+      const sessionIdShort = session.sessionId ? session.sessionId.substring(0, 8) + '...' : 'Unknown';
+      
+      const time = session.lastSeenAt 
+        ? new Date(session.lastSeenAt).toLocaleString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          })
+        : 'Unknown';
+
+      const activitiesBadge = session.activityCount > 0
+        ? `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+             ${session.activityCount}
+           </span>`
+        : `<span class="text-gray-400 text-xs">None</span>`;
+
+      return `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div class="text-sm font-medium text-gray-900">${sessionIdShort}</div>
+            <div class="text-xs text-gray-500">${session.ipAddress}</div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            ${location}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            ${session.tagsScanned} tag${session.tagsScanned !== 1 ? 's' : ''}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm">
+            ${activitiesBadge}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            ${time}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <button onclick="masterPortal.viewSessionDetails('${session.sessionId}')" 
+                    class="text-indigo-600 hover:text-indigo-900">
+              View Details
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
   }
 
   showPlaceholderAnalytics() {
@@ -2235,23 +2335,47 @@ class MasterPortal {
       }
 
       const response = await fetch(`/api/master/analytics/tag-activities/stats?${params}`);
+      
+      if (response.status === 404 || response.status === 500) {
+        console.log('Tag activities stats endpoint not available');
+        // Set placeholder values
+        const totalScansEl = document.getElementById('totalScansCount');
+        if (totalScansEl) totalScansEl.textContent = '--';
+        const uniqueTagsEl = document.getElementById('uniqueTagsCount');
+        if (uniqueTagsEl) uniqueTagsEl.textContent = '--';
+        const activeSessionsEl = document.getElementById('activeSessionsCount');
+        if (activeSessionsEl) activeSessionsEl.textContent = '--';
+        const followupActivitiesEl = document.getElementById('followupActivitiesCount');
+        if (followupActivitiesEl) followupActivitiesEl.textContent = '--';
+        return;
+      }
+      
       const data = await response.json();
       
-      if (data.success) {
+      if (data.success && data.stats) {
         const totalScansEl = document.getElementById('totalScansCount');
-        if (totalScansEl) totalScansEl.textContent = data.stats.totalScans;
+        if (totalScansEl) totalScansEl.textContent = (data.stats.totalScans || 0).toLocaleString();
         
         const uniqueTagsEl = document.getElementById('uniqueTagsCount');
-        if (uniqueTagsEl) uniqueTagsEl.textContent = data.stats.uniqueTags;
+        if (uniqueTagsEl) uniqueTagsEl.textContent = (data.stats.uniqueTags || 0).toLocaleString();
         
         const activeSessionsEl = document.getElementById('activeSessionsCount');
-        if (activeSessionsEl) activeSessionsEl.textContent = data.stats.activeSessions;
+        if (activeSessionsEl) activeSessionsEl.textContent = (data.stats.activeSessions || 0).toLocaleString();
         
         const followupActivitiesEl = document.getElementById('followupActivitiesCount');
-        if (followupActivitiesEl) followupActivitiesEl.textContent = data.stats.followupActivities;
+        if (followupActivitiesEl) followupActivitiesEl.textContent = (data.stats.followupActivities || 0).toLocaleString();
       }
     } catch (error) {
       console.error('Error loading tag activities stats:', error);
+      // Set error placeholders
+      const totalScansEl = document.getElementById('totalScansCount');
+      if (totalScansEl) totalScansEl.textContent = '--';
+      const uniqueTagsEl = document.getElementById('uniqueTagsCount');
+      if (uniqueTagsEl) uniqueTagsEl.textContent = '--';
+      const activeSessionsEl = document.getElementById('activeSessionsCount');
+      if (activeSessionsEl) activeSessionsEl.textContent = '--';
+      const followupActivitiesEl = document.getElementById('followupActivitiesCount');
+      if (followupActivitiesEl) followupActivitiesEl.textContent = '--';
     }
   }
 

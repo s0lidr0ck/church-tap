@@ -381,14 +381,14 @@ router.get('/tag-activities/stats', requireMasterAuth, (req, res) => {
   console.log('Tag activities stats query - timeframe:', timeframe, 'org_id:', organization_id);
 
   Promise.all([
-    // Total interactions
+    // Total scans (renamed from totalInteractions)
     new Promise((resolve, reject) => {
       const query = `SELECT COUNT(*) as count FROM tag_interactions WHERE 1=1 ${timeFilter} ${orgFilter}`;
-      console.log('Total interactions query:', query, 'params:', params);
+      console.log('Total scans query:', query, 'params:', params);
       
       db.query(query, params, (err, result) => {
         if (err) {
-          console.error('Total interactions query error:', err);
+          console.error('Total scans query error:', err);
           reject(err);
         } else {
           resolve(parseInt(result.rows[0]?.count || 0));
@@ -411,14 +411,14 @@ router.get('/tag-activities/stats', requireMasterAuth, (req, res) => {
       });
     }),
     
-    // Unique sessions
+    // Active sessions (renamed from uniqueSessions)
     new Promise((resolve, reject) => {
       const query = `SELECT COUNT(DISTINCT session_id) as count FROM tag_interactions WHERE 1=1 ${timeFilter} ${orgFilter}`;
-      console.log('Unique sessions query:', query, 'params:', params);
+      console.log('Active sessions query:', query, 'params:', params);
       
       db.query(query, params, (err, result) => {
         if (err) {
-          console.error('Unique sessions query error:', err);
+          console.error('Active sessions query error:', err);
           reject(err);
         } else {
           resolve(parseInt(result.rows[0]?.count || 0));
@@ -426,54 +426,156 @@ router.get('/tag-activities/stats', requireMasterAuth, (req, res) => {
       });
     }),
     
-    // Simple engagement rate based on new attribution system
+    // Followup activities - count all follow-up actions
     new Promise((resolve, reject) => {
       const query = `
         SELECT 
-          COUNT(DISTINCT t.session_id) as total_sessions,
-          COUNT(DISTINCT CASE 
-            WHEN EXISTS (
-              SELECT 1 FROM ct_prayer_requests pr WHERE pr.originating_tag_id = t.tag_id
-              UNION ALL
-              SELECT 1 FROM ct_praise_reports rep WHERE rep.originating_tag_id = t.tag_id
-              UNION ALL
-              SELECT 1 FROM ct_verse_community_posts vcp WHERE vcp.originating_tag_id = t.tag_id
-            ) THEN t.session_id 
-          END) as engaged_sessions
-        FROM tag_interactions t
-        WHERE 1=1 ${timeFilter} ${orgFilter}
+          COALESCE((SELECT COUNT(*) FROM ct_prayer_requests pr 
+            WHERE EXISTS (SELECT 1 FROM tag_interactions t WHERE t.tag_id = pr.originating_tag_id AND 1=1 ${timeFilter} ${orgFilter})), 0) +
+          COALESCE((SELECT COUNT(*) FROM ct_prayer_interactions pi 
+            WHERE EXISTS (SELECT 1 FROM tag_interactions t WHERE t.tag_id = pi.originating_tag_id AND 1=1 ${timeFilter} ${orgFilter})), 0) +
+          COALESCE((SELECT COUNT(*) FROM ct_praise_reports prep 
+            WHERE EXISTS (SELECT 1 FROM tag_interactions t WHERE t.tag_id = prep.originating_tag_id AND 1=1 ${timeFilter} ${orgFilter})), 0) +
+          COALESCE((SELECT COUNT(*) FROM ct_celebration_interactions ci 
+            WHERE EXISTS (SELECT 1 FROM tag_interactions t WHERE t.tag_id = ci.originating_tag_id AND 1=1 ${timeFilter} ${orgFilter})), 0) +
+          COALESCE((SELECT COUNT(*) FROM ct_verse_community_posts vcp 
+            WHERE EXISTS (SELECT 1 FROM tag_interactions t WHERE t.tag_id = vcp.originating_tag_id AND 1=1 ${timeFilter} ${orgFilter})), 0) +
+          COALESCE((SELECT COUNT(*) FROM ct_analytics a 
+            WHERE a.action IN ('heart', 'favorite', 'share', 'download')
+            AND EXISTS (SELECT 1 FROM tag_interactions t WHERE t.tag_id = a.originating_tag_id AND 1=1 ${timeFilter} ${orgFilter})), 0)
+          as total_followup_activities
       `;
-      console.log('Engagement rate query:', query, 'params:', params);
+      console.log('Followup activities query:', query, 'params:', params);
       
       db.query(query, params, (err, result) => {
         if (err) {
-          console.error('Engagement rate query error:', err);
+          console.error('Followup activities query error:', err);
           reject(err);
         } else {
-          const row = result.rows[0] || {};
-          const totalSessions = parseInt(row.total_sessions || 0);
-          const engagedSessions = parseInt(row.engaged_sessions || 0);
-          const engagementRate = totalSessions > 0 ? Math.round((engagedSessions / totalSessions) * 100) : 0;
-          console.log('Engagement calculation:', { totalSessions, engagedSessions, engagementRate });
-          resolve(engagementRate);
+          resolve(parseInt(result.rows[0]?.total_followup_activities || 0));
         }
       });
     })
-  ]).then(([totalInteractions, uniqueTags, uniqueSessions, engagementRate]) => {
-    console.log('Tag activities stats result:', { totalInteractions, uniqueTags, uniqueSessions, engagementRate });
+  ]).then(([totalScans, uniqueTags, activeSessions, followupActivities]) => {
+    console.log('Tag activities stats result:', { totalScans, uniqueTags, activeSessions, followupActivities });
     res.json({
       success: true,
       stats: {
-        totalInteractions,
+        totalScans,
         uniqueTags,
-        uniqueSessions,
-        engagementRate
+        activeSessions,
+        followupActivities
       }
     });
   }).catch(error => {
     console.error('Tag activities stats error:', error.message);
     console.error('Stack:', error.stack);
     res.status(500).json({ success: false, error: 'Failed to get tag activities stats' });
+  });
+});
+
+// Get recent sessions for analytics dashboard
+router.get('/sessions', requireMasterAuth, (req, res) => {
+  const { timeframe = '7d', organization_id, limit = 50 } = req.query;
+  
+  let timeFilter = '';
+  switch(timeframe) {
+    case '24h':
+      timeFilter = "AND t.created_at >= NOW() - INTERVAL '24 hours'";
+      break;
+    case '7d':
+      timeFilter = "AND t.created_at >= NOW() - INTERVAL '7 days'";
+      break;
+    case '30d':
+      timeFilter = "AND t.created_at >= NOW() - INTERVAL '30 days'";
+      break;
+    case '90d':
+      timeFilter = "AND t.created_at >= NOW() - INTERVAL '90 days'";
+      break;
+  }
+
+  let orgFilter = '';
+  let params = [];
+  if (organization_id) {
+    orgFilter = 'AND t.organization_id = $1';
+    params = [organization_id];
+  }
+  
+  params.push(parseInt(limit));
+  const limitParam = `$${params.length}`;
+
+  db.query(`
+    WITH session_tags AS (
+      SELECT 
+        t.session_id,
+        s.ip_address,
+        s.country,
+        s.city,
+        s.latitude,
+        s.longitude,
+        s.first_seen_at,
+        s.last_seen_at,
+        o.name as organization_name,
+        o.subdomain,
+        COUNT(DISTINCT t.tag_id) as tags_scanned,
+        COUNT(t.id) as total_interactions,
+        ARRAY_AGG(DISTINCT t.tag_id) as tag_ids,
+        MAX(t.created_at) as latest_interaction
+      FROM tag_interactions t
+      LEFT JOIN anonymous_sessions s ON t.session_id = s.session_id
+      LEFT JOIN ct_organizations o ON t.organization_id = o.id
+      WHERE t.session_id IS NOT NULL ${timeFilter} ${orgFilter}
+      GROUP BY t.session_id, s.ip_address, s.country, s.city, s.latitude, s.longitude, 
+               s.first_seen_at, s.last_seen_at, o.name, o.subdomain
+    )
+    SELECT 
+      st.*,
+      COALESCE((
+        SELECT COUNT(*) FROM (
+          SELECT 1 FROM ct_prayer_requests pr WHERE pr.originating_tag_id = ANY(st.tag_ids)
+          UNION ALL
+          SELECT 1 FROM ct_prayer_interactions pi WHERE pi.originating_tag_id = ANY(st.tag_ids)
+          UNION ALL
+          SELECT 1 FROM ct_praise_reports prep WHERE prep.originating_tag_id = ANY(st.tag_ids)
+          UNION ALL
+          SELECT 1 FROM ct_celebration_interactions ci WHERE ci.originating_tag_id = ANY(st.tag_ids)
+          UNION ALL
+          SELECT 1 FROM ct_verse_community_posts vcp WHERE vcp.originating_tag_id = ANY(st.tag_ids)
+          UNION ALL
+          SELECT 1 FROM ct_analytics a 
+          WHERE a.action IN ('heart', 'favorite', 'share', 'download') 
+            AND a.originating_tag_id = ANY(st.tag_ids)
+        ) activities
+      ), 0) as activity_count
+    FROM session_tags st
+    ORDER BY COALESCE(st.last_seen_at, st.latest_interaction) DESC
+    LIMIT ${limitParam}
+  `, params, (err, result) => {
+    if (err) {
+      console.error('Sessions query error:', err);
+      return res.status(500).json({ success: false, error: 'Failed to get sessions' });
+    }
+
+    const sessions = (result.rows || []).map(row => ({
+      sessionId: row.session_id,
+      ipAddress: row.ip_address || 'Unknown',
+      location: {
+        country: row.country || 'Unknown',
+        city: row.city || 'Unknown',
+        latitude: row.latitude,
+        longitude: row.longitude
+      },
+      organization: row.organization_name || 'Unknown',
+      subdomain: row.subdomain || '',
+      tagsScanned: parseInt(row.tags_scanned || 0),
+      tagIds: row.tag_ids || [],
+      totalInteractions: parseInt(row.total_interactions || 0),
+      activityCount: parseInt(row.activity_count || 0),
+      firstSeenAt: row.first_seen_at,
+      lastSeenAt: row.last_seen_at
+    }));
+
+    res.json({ success: true, sessions });
   });
 });
 
