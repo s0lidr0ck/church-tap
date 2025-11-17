@@ -1958,9 +1958,12 @@ class MasterPortal {
     }
 
     tbody.innerHTML = sessions.map(session => {
-      const location = session.location.city && session.location.country 
-        ? `${session.location.city}, ${session.location.country}` 
-        : (session.location.country || 'Unknown');
+      // Location can be a string or an object
+      const location = typeof session.location === 'string' 
+        ? session.location 
+        : (session.location?.city && session.location?.country 
+            ? `${session.location.city}, ${session.location.country}` 
+            : (session.location?.country || 'Unknown'));
       
       const sessionIdShort = session.sessionId ? session.sessionId.substring(0, 8) + '...' : 'Unknown';
       
@@ -1979,6 +1982,9 @@ class MasterPortal {
            </span>`
         : `<span class="text-gray-400 text-xs">None</span>`;
 
+      // tagsScanned can be an array or a number
+      const tagCount = Array.isArray(session.tagsScanned) ? session.tagsScanned.length : (session.tagCount || session.tagsScanned || 0);
+
       return `
         <tr class="hover:bg-gray-50">
           <td class="px-6 py-4 whitespace-nowrap">
@@ -1989,7 +1995,7 @@ class MasterPortal {
             ${location}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-            ${session.tagsScanned} tag${session.tagsScanned !== 1 ? 's' : ''}
+            ${tagCount} tag${tagCount !== 1 ? 's' : ''}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm">
             ${activitiesBadge}
@@ -2006,6 +2012,106 @@ class MasterPortal {
         </tr>
       `;
     }).join('');
+  }
+
+  async viewSessionDetails(sessionId) {
+    try {
+      const response = await fetch(`/api/master/analytics/sessions?session_id=${sessionId}`);
+      const data = await response.json();
+      
+      if (data.success && data.sessions.length > 0) {
+        const session = data.sessions[0];
+        
+        // Show modal with session details
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
+        modal.innerHTML = `
+          <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+              <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">
+                Session Details
+              </h3>
+              <div class="mt-2 space-y-3">
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <p class="text-sm text-gray-500">Session ID</p>
+                    <p class="text-sm font-medium text-gray-900">${session.sessionId}</p>
+                  </div>
+                  <div>
+                    <p class="text-sm text-gray-500">Organization</p>
+                    <p class="text-sm font-medium text-gray-900">${session.organizationName || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p class="text-sm text-gray-500">Location</p>
+                    <p class="text-sm font-medium text-gray-900">${session.location}</p>
+                  </div>
+                  <div>
+                    <p class="text-sm text-gray-500">Started At</p>
+                    <p class="text-sm font-medium text-gray-900">${new Date(session.firstSeenAt).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p class="text-sm text-gray-500">Last Seen</p>
+                    <p class="text-sm font-medium text-gray-900">${new Date(session.lastSeenAt).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p class="text-sm text-gray-500">Total Interactions</p>
+                    <p class="text-sm font-medium text-gray-900">${session.totalInteractions}</p>
+                  </div>
+                  <div>
+                    <p class="text-sm text-gray-500">Activity Count</p>
+                    <p class="text-sm font-medium text-gray-900">${session.activityCount}</p>
+                  </div>
+                  <div>
+                    <p class="text-sm text-gray-500">IP Address</p>
+                    <p class="text-sm font-medium text-gray-900">${session.ipAddress}</p>
+                  </div>
+                </div>
+                
+                ${session.tagsScanned && session.tagsScanned.length > 0 ? `
+                  <div class="mt-4">
+                    <p class="text-sm text-gray-500 mb-2">Tags Scanned</p>
+                    <div class="bg-gray-50 rounded-md p-3">
+                      ${session.tagsScanned.map(tag => `
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 mr-2 mb-2">
+                          ${tag}
+                        </span>
+                      `).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+                
+                ${session.userAgent ? `
+                  <div class="mt-4">
+                    <p class="text-sm text-gray-500 mb-1">User Agent</p>
+                    <p class="text-xs text-gray-600 bg-gray-50 rounded-md p-2 break-all">${session.userAgent}</p>
+                  </div>
+                ` : ''}
+              </div>
+              <div class="mt-6 flex justify-end">
+                <button onclick="this.closest('.fixed').remove()" 
+                        class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Close modal when clicking outside
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            modal.remove();
+          }
+        });
+      } else {
+        alert('Session details not found');
+      }
+    } catch (error) {
+      console.error('Error loading session details:', error);
+      alert('Failed to load session details');
+    }
   }
 
   showPlaceholderAnalytics() {

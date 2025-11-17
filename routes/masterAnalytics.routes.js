@@ -476,27 +476,35 @@ router.get('/tag-activities/stats', requireMasterAuth, (req, res) => {
 
 // Get recent sessions for analytics dashboard
 router.get('/sessions', requireMasterAuth, (req, res) => {
-  const { timeframe = '7d', organization_id, limit = 50 } = req.query;
+  const { timeframe = '7d', organization_id, session_id, limit = 50 } = req.query;
   
+  // If requesting a specific session, skip time filtering
   let timeFilter = '';
-  switch(timeframe) {
-    case '24h':
-      timeFilter = "AND t.created_at >= NOW() - INTERVAL '24 hours'";
-      break;
-    case '7d':
-      timeFilter = "AND t.created_at >= NOW() - INTERVAL '7 days'";
-      break;
-    case '30d':
-      timeFilter = "AND t.created_at >= NOW() - INTERVAL '30 days'";
-      break;
-    case '90d':
-      timeFilter = "AND t.created_at >= NOW() - INTERVAL '90 days'";
-      break;
+  if (!session_id) {
+    switch(timeframe) {
+      case '24h':
+        timeFilter = "AND t.created_at >= NOW() - INTERVAL '24 hours'";
+        break;
+      case '7d':
+        timeFilter = "AND t.created_at >= NOW() - INTERVAL '7 days'";
+        break;
+      case '30d':
+        timeFilter = "AND t.created_at >= NOW() - INTERVAL '30 days'";
+        break;
+      case '90d':
+        timeFilter = "AND t.created_at >= NOW() - INTERVAL '90 days'";
+        break;
+    }
   }
 
   let orgFilter = '';
+  let sessionFilter = '';
   let params = [];
-  if (organization_id) {
+  
+  if (session_id) {
+    sessionFilter = 'AND t.session_id = $1';
+    params = [session_id];
+  } else if (organization_id) {
     orgFilter = 'AND t.organization_id = $1';
     params = [organization_id];
   }
@@ -509,6 +517,7 @@ router.get('/sessions', requireMasterAuth, (req, res) => {
       SELECT 
         t.session_id,
         s.ip_address,
+        s.user_agent,
         s.country,
         s.city,
         s.latitude,
@@ -524,8 +533,8 @@ router.get('/sessions', requireMasterAuth, (req, res) => {
       FROM tag_interactions t
       LEFT JOIN anonymous_sessions s ON t.session_id = s.session_id
       LEFT JOIN ct_organizations o ON t.organization_id = o.id
-      WHERE t.session_id IS NOT NULL ${timeFilter} ${orgFilter}
-      GROUP BY t.session_id, s.ip_address, s.country, s.city, s.latitude, s.longitude, 
+      WHERE t.session_id IS NOT NULL ${timeFilter} ${orgFilter} ${sessionFilter}
+      GROUP BY t.session_id, s.ip_address, s.user_agent, s.country, s.city, s.latitude, s.longitude, 
                s.first_seen_at, s.last_seen_at, o.name, o.subdomain
     )
     SELECT 
@@ -556,24 +565,33 @@ router.get('/sessions', requireMasterAuth, (req, res) => {
       return res.status(500).json({ success: false, error: 'Failed to get sessions' });
     }
 
-    const sessions = (result.rows || []).map(row => ({
-      sessionId: row.session_id,
-      ipAddress: row.ip_address || 'Unknown',
-      location: {
-        country: row.country || 'Unknown',
-        city: row.city || 'Unknown',
-        latitude: row.latitude,
-        longitude: row.longitude
-      },
-      organization: row.organization_name || 'Unknown',
-      subdomain: row.subdomain || '',
-      tagsScanned: parseInt(row.tags_scanned || 0),
-      tagIds: row.tag_ids || [],
-      totalInteractions: parseInt(row.total_interactions || 0),
-      activityCount: parseInt(row.activity_count || 0),
-      firstSeenAt: row.first_seen_at,
-      lastSeenAt: row.last_seen_at
-    }));
+    const sessions = (result.rows || []).map(row => {
+      const location = row.country && row.city 
+        ? `${row.city}, ${row.country}` 
+        : row.country || row.city || 'Unknown';
+      
+      return {
+        sessionId: row.session_id,
+        ipAddress: row.ip_address || 'Unknown',
+        userAgent: row.user_agent || '',
+        location: location,
+        locationData: {
+          country: row.country || 'Unknown',
+          city: row.city || 'Unknown',
+          latitude: row.latitude,
+          longitude: row.longitude
+        },
+        organizationName: row.organization_name || 'Unknown',
+        organization: row.organization_name || 'Unknown', // Keep for backward compatibility
+        subdomain: row.subdomain || '',
+        tagsScanned: row.tag_ids || [],
+        tagCount: parseInt(row.tags_scanned || 0),
+        totalInteractions: parseInt(row.total_interactions || 0),
+        activityCount: parseInt(row.activity_count || 0),
+        firstSeenAt: row.first_seen_at,
+        lastSeenAt: row.last_seen_at
+      };
+    });
 
     res.json({ success: true, sessions });
   });
