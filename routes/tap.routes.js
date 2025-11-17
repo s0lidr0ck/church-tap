@@ -146,23 +146,18 @@ router.get('/t/:uid', async (req, res) => {
           const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           const taggedSessionId = `tagged_${uid}_${Date.now()}`;
           
-          res.cookie('trackingSession', sessionId, {
+          // Cookie configuration for production HTTPS
+          const cookieOptions = {
             maxAge: 24 * 60 * 60 * 1000, // 24 hours
             httpOnly: false, // Allow frontend access
-            sameSite: 'lax'
-          });
+            sameSite: 'lax',
+            secure: req.secure || req.headers['x-forwarded-proto'] === 'https', // HTTPS only in production
+            path: '/' // Ensure cookies are available site-wide
+          };
           
-          res.cookie('originatingTag', uid, {
-            maxAge: 24 * 60 * 60 * 1000, // 24 hours
-            httpOnly: false, // Allow frontend access
-            sameSite: 'lax'
-          });
-          
-          res.cookie('taggedSession', taggedSessionId, {
-            maxAge: 24 * 60 * 60 * 1000, // 24 hours
-            httpOnly: false, // Allow frontend access
-            sameSite: 'lax'
-          });
+          res.cookie('trackingSession', sessionId, cookieOptions);
+          res.cookie('originatingTag', uid, cookieOptions);
+          res.cookie('taggedSession', taggedSessionId, cookieOptions);
           
           console.log(`🍪 Session cookies set: trackingSession=${sessionId}, originatingTag=${uid}, taggedSession=${taggedSessionId}`);
           

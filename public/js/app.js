@@ -2427,6 +2427,7 @@ class ChurchTapApp {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include cookies in request
         body: JSON.stringify({
           action: action,
           verse_id: verseId,

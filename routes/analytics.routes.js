@@ -14,6 +14,14 @@ router.post('/', (req, res) => {
   let taggedSessionId = req.cookies?.taggedSession;
   let originatingTagId = req.cookies?.originatingTag || originatingTagFromBody;
   const sessionIdCookie = req.cookies?.trackingSession;
+  
+  // Debug cookie reading
+  console.log('📊 Analytics cookies received:', {
+    trackingSession: sessionIdCookie ? 'present' : 'MISSING',
+    originatingTag: originatingTagId ? originatingTagId : 'MISSING',
+    taggedSession: taggedSessionId ? 'present' : 'MISSING',
+    fromBody: originatingTagFromBody ? 'present' : 'none'
+  });
 
   // Note: Attribution is now handled via cookies set during initial tap
   // No need for database fallback since cookies persist the session data
