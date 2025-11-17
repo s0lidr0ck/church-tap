@@ -24,15 +24,33 @@ router.post('/', validateInput.communityContent, validateInput.sanitizeHtml, (re
       return cb();
     }
     
-    db.query(`SELECT organization_id FROM ct_nfc_tags WHERE custom_id = $1 OR uid = $1`, [originatingTagId], (err, result) => {
-      if (!err && result.rows.length > 0) {
-        orgId = result.rows[0].organization_id;
-        console.log(`🎉 ✅ Resolved org ${orgId} from tag ${originatingTagId}`);
-      } else {
-        console.log(`🎉 ❌ Could not resolve org from tag ${originatingTagId}, using fallback`);
-        orgId = 1; // Default fallback
+    // First check ct_bracelet_memberships (for approved bracelets)
+    db.query(`
+      SELECT organization_id 
+      FROM ct_bracelet_memberships 
+      WHERE bracelet_uid = $1 AND status = 'approved'
+    `, [originatingTagId], (err1, membershipResult) => {
+      if (!err1 && membershipResult.rows.length > 0) {
+        orgId = membershipResult.rows[0].organization_id;
+        console.log(`🎉 ✅ Resolved org ${orgId} from bracelet membership for tag ${originatingTagId}`);
+        return cb();
       }
-      cb();
+      
+      // If not found in memberships, check ct_nfc_tags
+      db.query(`
+        SELECT organization_id 
+        FROM ct_nfc_tags 
+        WHERE custom_id = $1 OR uid = $1
+      `, [originatingTagId], (err2, tagResult) => {
+        if (!err2 && tagResult.rows.length > 0) {
+          orgId = tagResult.rows[0].organization_id;
+          console.log(`🎉 ✅ Resolved org ${orgId} from nfc_tags for tag ${originatingTagId}`);
+        } else {
+          console.log(`🎉 ❌ Could not resolve org from tag ${originatingTagId}, using fallback`);
+          orgId = 1; // Default fallback
+        }
+        cb();
+      });
     });
   };
   
