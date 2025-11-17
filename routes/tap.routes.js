@@ -63,8 +63,68 @@ router.get('/t/:uid', async (req, res) => {
         const bracelet = membershipResult.rows[0];
         console.log(`✅ Bracelet claimed to organization: ${bracelet.org_name} (${bracelet.subdomain})`);
 
-        // Record the scan
-        console.log(`📊 Scan recorded for bracelet: ${uid}`);
+        // Set session tracking cookies for analytics
+        const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const taggedSessionId = `tagged_${uid}_${Date.now()}`;
+        
+        // Cookie configuration for production HTTPS
+        const cookieOptions = {
+          maxAge: 24 * 60 * 60 * 1000, // 24 hours
+          httpOnly: false, // Allow frontend access
+          sameSite: 'lax',
+          secure: req.secure || req.headers['x-forwarded-proto'] === 'https', // HTTPS only in production
+          path: '/' // Ensure cookies are available site-wide
+        };
+        
+        res.cookie('trackingSession', sessionId, cookieOptions);
+        res.cookie('originatingTag', uid, cookieOptions);
+        res.cookie('taggedSession', taggedSessionId, cookieOptions);
+        
+        console.log(`🍪 Session cookies set: trackingSession=${sessionId}, originatingTag=${uid}, taggedSession=${taggedSessionId}`);
+        
+        // Create anonymous session record in database
+        const ip = req.ip || req.connection.remoteAddress;
+        const userAgent = req.get('User-Agent');
+        
+        db.query(`
+          INSERT INTO anonymous_sessions (session_id, organization_id, ip_address, user_agent, created_at, last_seen_at, originating_tag_id, tagged_session_id)
+          VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $5, $6)
+          ON CONFLICT (session_id) DO UPDATE SET 
+            last_seen_at = CURRENT_TIMESTAMP,
+            originating_tag_id = COALESCE(anonymous_sessions.originating_tag_id, EXCLUDED.originating_tag_id),
+            tagged_session_id = COALESCE(anonymous_sessions.tagged_session_id, EXCLUDED.tagged_session_id)
+        `, [sessionId, bracelet.organization_id, ip, userAgent, uid, taggedSessionId], (sessionErr) => {
+          if (sessionErr) {
+            console.error('Error creating anonymous session:', sessionErr);
+          } else {
+            console.log(`📊 Anonymous session created: ${sessionId} with tag: ${uid}`);
+          }
+        });
+        
+        // Log the tag interaction in tag_interactions table
+        db.query(`
+          INSERT INTO tag_interactions (
+            tag_id, session_id, action_type, created_at, url, referrer, user_agent, ip_address, 
+            organization_id, metadata, tagged_session_id
+          ) VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, $6, $7, $8, $9, $10)
+        `, [
+          uid,
+          sessionId,
+          'scan',
+          req.protocol + '://' + req.get('host') + req.originalUrl,
+          req.get('Referrer') || req.get('Referer'),
+          userAgent,
+          ip,
+          bracelet.organization_id,
+          JSON.stringify({ action: 'bracelet_scan', uid, timestamp: Date.now() }),
+          taggedSessionId
+        ], (interactionErr) => {
+          if (interactionErr) {
+            console.error('Error creating tag interaction:', interactionErr);
+          } else {
+            console.log(`📊 Tag interaction logged: ${uid} for org ${bracelet.organization_id}`);
+          }
+        });
 
         // Serve the index.html with organization context
         const orgData = {
