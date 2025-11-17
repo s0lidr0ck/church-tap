@@ -172,14 +172,41 @@ router.get('/t/:uid', async (req, res) => {
           
           db.query(`
             INSERT INTO anonymous_sessions 
-            (session_id, organization_id, ip_address, user_agent, first_seen_at, last_seen_at)
-            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            ON CONFLICT (session_id) DO UPDATE SET last_seen_at = CURRENT_TIMESTAMP
-          `, [sessionId, bracelet.organization_id, ip, userAgent], (sessionErr) => {
+            (session_id, organization_id, ip_address, user_agent, first_seen_at, last_seen_at, originating_tag_id, tagged_session_id)
+            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $5, $6)
+            ON CONFLICT (session_id) DO UPDATE SET 
+              last_seen_at = CURRENT_TIMESTAMP,
+              originating_tag_id = COALESCE(anonymous_sessions.originating_tag_id, EXCLUDED.originating_tag_id),
+              tagged_session_id = COALESCE(anonymous_sessions.tagged_session_id, EXCLUDED.tagged_session_id)
+          `, [sessionId, bracelet.organization_id, ip, userAgent, uid, taggedSessionId], (sessionErr) => {
             if (sessionErr) {
               console.error('Error creating anonymous session:', sessionErr);
             } else {
-              console.log(`📊 Anonymous session created: ${sessionId}`);
+              console.log(`📊 Anonymous session created: ${sessionId} with tag: ${uid}`);
+            }
+          });
+          
+          // Create tag interaction record for analytics
+          db.query(`
+            INSERT INTO tag_interactions 
+            (session_id, tag_id, interaction_type, page_url, referrer, user_agent, ip_address, organization_id, interaction_data, tagged_session_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          `, [
+            sessionId,
+            uid,
+            'scan',
+            req.originalUrl || `/t/${uid}`,
+            req.get('Referrer') || req.get('Referer'),
+            userAgent,
+            ip,
+            bracelet.organization_id,
+            JSON.stringify({ action: 'bracelet_scan', uid, timestamp: Date.now() }),
+            taggedSessionId
+          ], (interactionErr) => {
+            if (interactionErr) {
+              console.error('Error creating tag interaction:', interactionErr);
+            } else {
+              console.log(`📊 Tag interaction logged: ${uid} for org ${bracelet.organization_id}`);
             }
           });
           

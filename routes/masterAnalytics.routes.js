@@ -1055,6 +1055,116 @@ router.get('/tag-details/:tagId', requireMasterAuth, (req, res) => {
   });
 });
 
+// Debug endpoint to check database state and data
+router.get('/debug-database', requireMasterAuth, (req, res) => {
+  console.log('🔍 Debug endpoint called - checking database state...');
+  
+  Promise.all([
+    // Count tag_interactions
+    new Promise((resolve, reject) => {
+      db.query('SELECT COUNT(*) as count FROM tag_interactions', [], (err, result) => {
+        if (err) {
+          console.error('Error counting tag_interactions:', err);
+          resolve({ count: 0, error: err.message });
+        } else {
+          resolve({ count: result.rows[0]?.count || 0 });
+        }
+      });
+    }),
+    
+    // Count anonymous_sessions
+    new Promise((resolve, reject) => {
+      db.query('SELECT COUNT(*) as count FROM anonymous_sessions', [], (err, result) => {
+        if (err) {
+          console.error('Error counting anonymous_sessions:', err);
+          resolve({ count: 0, error: err.message });
+        } else {
+          resolve({ count: result.rows[0]?.count || 0 });
+        }
+      });
+    }),
+    
+    // Sample tag_interactions
+    new Promise((resolve, reject) => {
+      db.query('SELECT * FROM tag_interactions ORDER BY created_at DESC LIMIT 5', [], (err, result) => {
+        if (err) {
+          console.error('Error fetching sample tag_interactions:', err);
+          resolve({ samples: [], error: err.message });
+        } else {
+          resolve({ samples: result.rows || [] });
+        }
+      });
+    }),
+    
+    // Sample anonymous_sessions
+    new Promise((resolve, reject) => {
+      db.query('SELECT * FROM anonymous_sessions ORDER BY created_at DESC LIMIT 5', [], (err, result) => {
+        if (err) {
+          console.error('Error fetching sample anonymous_sessions:', err);
+          resolve({ samples: [], error: err.message });
+        } else {
+          resolve({ samples: result.rows || [] });
+        }
+      });
+    }),
+    
+    // Count ct_nfc_tags and show sample
+    new Promise((resolve, reject) => {
+      db.query('SELECT COUNT(*) as count, (SELECT uid, custom_id FROM ct_nfc_tags LIMIT 5) as sample FROM ct_nfc_tags', [], (err, result) => {
+        if (err) {
+          console.error('Error checking ct_nfc_tags:', err);
+          resolve({ count: 0, error: err.message });
+        } else {
+          // Also get sample tags
+          db.query('SELECT uid, custom_id, organization_id FROM ct_nfc_tags LIMIT 5', [], (err2, sampleResult) => {
+            resolve({ 
+              count: result.rows[0]?.count || 0,
+              samples: sampleResult?.rows || []
+            });
+          });
+        }
+      });
+    }),
+    
+    // Check originating_tag_id values in prayer/praise
+    new Promise((resolve, reject) => {
+      db.query(`
+        SELECT 'prayer' as type, COUNT(*) as count, 
+               COUNT(CASE WHEN originating_tag_id IS NOT NULL THEN 1 END) as with_tag_id
+        FROM ct_prayer_requests
+        UNION ALL
+        SELECT 'praise' as type, COUNT(*) as count,
+               COUNT(CASE WHEN originating_tag_id IS NOT NULL THEN 1 END) as with_tag_id
+        FROM ct_praise_reports
+      `, [], (err, result) => {
+        if (err) {
+          console.error('Error checking originating_tag_id:', err);
+          resolve({ error: err.message });
+        } else {
+          resolve({ activity_attribution: result.rows || [] });
+        }
+      });
+    })
+  ]).then(([tagInteractions, anonymousSessions, tagInteractionSamples, sessionSamples, nfcTags, activityAttribution]) => {
+    res.json({
+      success: true,
+      debug: {
+        tag_interactions: tagInteractions,
+        anonymous_sessions: anonymousSessions,
+        nfc_tags: nfcTags,
+        activity_attribution: activityAttribution,
+        samples: {
+          tag_interactions: tagInteractionSamples.samples || [],
+          anonymous_sessions: sessionSamples.samples || []
+        }
+      }
+    });
+  }).catch(error => {
+    console.error('Debug endpoint error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  });
+});
+
 // Debug endpoint to check activity data
 router.get('/debug-activities', requireMasterAuth, (req, res) => {
   // Get recent tag interactions

@@ -24,11 +24,12 @@ router.post('/', (req, res) => {
       return cb();
     }
     
-    db.query(`SELECT organization_id FROM ct_nfc_tags WHERE custom_id = $1`, [originatingTagId], (err, result) => {
+    db.query(`SELECT organization_id FROM ct_nfc_tags WHERE custom_id = $1 OR uid = $1`, [originatingTagId], (err, result) => {
       if (!err && result.rows.length > 0) {
         orgId = result.rows[0].organization_id;
         console.log(`📖 ✅ Resolved org ${orgId} from tag ${originatingTagId}`);
       } else {
+        console.log(`📖 ❌ Could not resolve org from tag ${originatingTagId}, using fallback`);
         orgId = 1; // Default fallback
       }
       cb();
