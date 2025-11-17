@@ -82,23 +82,64 @@ router.get('/t/:uid', async (req, res) => {
         
         console.log(`🍪 Session cookies set: trackingSession=${sessionId}, originatingTag=${uid}, taggedSession=${taggedSessionId}`);
         
-        // Create anonymous session record in database
+        // Create anonymous session record in database with geolocation
         const ip = req.ip || req.connection.remoteAddress;
         const userAgent = req.get('User-Agent');
         
-        db.query(`
-          INSERT INTO anonymous_sessions (session_id, organization_id, ip_address, user_agent, created_at, last_seen_at, originating_tag_id, tagged_session_id)
-          VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $5, $6)
-          ON CONFLICT (session_id) DO UPDATE SET 
-            last_seen_at = CURRENT_TIMESTAMP,
-            originating_tag_id = COALESCE(anonymous_sessions.originating_tag_id, EXCLUDED.originating_tag_id),
-            tagged_session_id = COALESCE(anonymous_sessions.tagged_session_id, EXCLUDED.tagged_session_id)
-        `, [sessionId, bracelet.organization_id, ip, userAgent, uid, taggedSessionId], (sessionErr) => {
-          if (sessionErr) {
-            console.error('Error creating anonymous session:', sessionErr);
-          } else {
-            console.log(`📊 Anonymous session created: ${sessionId} with tag: ${uid}`);
-          }
+        // Get location data from IP (async, don't block session creation)
+        const locationService = require('../services/locationService');
+        locationService.getLocationFromIP(ip).then(location => {
+          db.query(`
+            INSERT INTO anonymous_sessions (
+              session_id, organization_id, ip_address, user_agent, 
+              created_at, last_seen_at, originating_tag_id, tagged_session_id,
+              country, city, latitude, longitude
+            )
+            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $5, $6, $7, $8, $9, $10)
+            ON CONFLICT (session_id) DO UPDATE SET 
+              last_seen_at = CURRENT_TIMESTAMP,
+              originating_tag_id = COALESCE(anonymous_sessions.originating_tag_id, EXCLUDED.originating_tag_id),
+              tagged_session_id = COALESCE(anonymous_sessions.tagged_session_id, EXCLUDED.tagged_session_id),
+              country = COALESCE(anonymous_sessions.country, EXCLUDED.country),
+              city = COALESCE(anonymous_sessions.city, EXCLUDED.city),
+              latitude = COALESCE(anonymous_sessions.latitude, EXCLUDED.latitude),
+              longitude = COALESCE(anonymous_sessions.longitude, EXCLUDED.longitude)
+          `, [
+            sessionId, 
+            bracelet.organization_id, 
+            ip, 
+            userAgent, 
+            uid, 
+            taggedSessionId,
+            location.country,
+            location.city,
+            location.latitude,
+            location.longitude
+          ], (sessionErr) => {
+            if (sessionErr) {
+              console.error('Error creating anonymous session:', sessionErr);
+            } else {
+              const locationStr = location.city && location.country ? `${location.city}, ${location.country}` : 'Unknown';
+              console.log(`📊 Anonymous session created: ${sessionId} with tag: ${uid} from ${locationStr}`);
+            }
+          });
+        }).catch(err => {
+          // Fallback: create session without location data
+          console.error('Location lookup failed, creating session without location:', err);
+          db.query(`
+            INSERT INTO anonymous_sessions (session_id, organization_id, ip_address, user_agent, created_at, last_seen_at, originating_tag_id, tagged_session_id)
+            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $5, $6)
+            ON CONFLICT (session_id) DO UPDATE SET 
+              last_seen_at = CURRENT_TIMESTAMP,
+              originating_tag_id = COALESCE(anonymous_sessions.originating_tag_id, EXCLUDED.originating_tag_id),
+              tagged_session_id = COALESCE(anonymous_sessions.tagged_session_id, EXCLUDED.tagged_session_id)
+          `, [sessionId, bracelet.organization_id, ip, userAgent, uid, taggedSessionId], (sessionErr) => {
+            if (sessionErr) {
+              console.error('Error creating anonymous session:', sessionErr);
+            } else {
+              console.log(`📊 Anonymous session created: ${sessionId} with tag: ${uid} (no location)`);
+            }
+          });
         });
         
         // Log the tag interaction in tag_interactions table
@@ -221,24 +262,63 @@ router.get('/t/:uid', async (req, res) => {
           
           console.log(`🍪 Session cookies set: trackingSession=${sessionId}, originatingTag=${uid}, taggedSession=${taggedSessionId}`);
           
-          // Create anonymous session record in database
+          // Create anonymous session record in database with geolocation
           const ip = req.ip || req.connection.remoteAddress;
           const userAgent = req.get('User-Agent');
           
-          db.query(`
-            INSERT INTO anonymous_sessions 
-            (session_id, organization_id, ip_address, user_agent, first_seen_at, last_seen_at, originating_tag_id, tagged_session_id)
-            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $5, $6)
-            ON CONFLICT (session_id) DO UPDATE SET 
-              last_seen_at = CURRENT_TIMESTAMP,
-              originating_tag_id = COALESCE(anonymous_sessions.originating_tag_id, EXCLUDED.originating_tag_id),
-              tagged_session_id = COALESCE(anonymous_sessions.tagged_session_id, EXCLUDED.tagged_session_id)
-          `, [sessionId, bracelet.organization_id, ip, userAgent, uid, taggedSessionId], (sessionErr) => {
-            if (sessionErr) {
-              console.error('Error creating anonymous session:', sessionErr);
-            } else {
-              console.log(`📊 Anonymous session created: ${sessionId} with tag: ${uid}`);
-            }
+          // Get location data from IP (async, don't block session creation)
+          const locationService = require('../services/locationService');
+          locationService.getLocationFromIP(ip).then(location => {
+            db.query(`
+              INSERT INTO anonymous_sessions 
+              (session_id, organization_id, ip_address, user_agent, first_seen_at, last_seen_at, originating_tag_id, tagged_session_id,
+               country, city, latitude, longitude)
+              VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $5, $6, $7, $8, $9, $10)
+              ON CONFLICT (session_id) DO UPDATE SET 
+                last_seen_at = CURRENT_TIMESTAMP,
+                originating_tag_id = COALESCE(anonymous_sessions.originating_tag_id, EXCLUDED.originating_tag_id),
+                tagged_session_id = COALESCE(anonymous_sessions.tagged_session_id, EXCLUDED.tagged_session_id),
+                country = COALESCE(anonymous_sessions.country, EXCLUDED.country),
+                city = COALESCE(anonymous_sessions.city, EXCLUDED.city),
+                latitude = COALESCE(anonymous_sessions.latitude, EXCLUDED.latitude),
+                longitude = COALESCE(anonymous_sessions.longitude, EXCLUDED.longitude)
+            `, [
+              sessionId, 
+              bracelet.organization_id, 
+              ip, 
+              userAgent, 
+              uid, 
+              taggedSessionId,
+              location.country,
+              location.city,
+              location.latitude,
+              location.longitude
+            ], (sessionErr) => {
+              if (sessionErr) {
+                console.error('Error creating anonymous session:', sessionErr);
+              } else {
+                const locationStr = location.city && location.country ? `${location.city}, ${location.country}` : 'Unknown';
+                console.log(`📊 Anonymous session created: ${sessionId} with tag: ${uid} from ${locationStr}`);
+              }
+            });
+          }).catch(err => {
+            // Fallback: create session without location data
+            console.error('Location lookup failed, creating session without location:', err);
+            db.query(`
+              INSERT INTO anonymous_sessions 
+              (session_id, organization_id, ip_address, user_agent, first_seen_at, last_seen_at, originating_tag_id, tagged_session_id)
+              VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $5, $6)
+              ON CONFLICT (session_id) DO UPDATE SET 
+                last_seen_at = CURRENT_TIMESTAMP,
+                originating_tag_id = COALESCE(anonymous_sessions.originating_tag_id, EXCLUDED.originating_tag_id),
+                tagged_session_id = COALESCE(anonymous_sessions.tagged_session_id, EXCLUDED.tagged_session_id)
+            `, [sessionId, bracelet.organization_id, ip, userAgent, uid, taggedSessionId], (sessionErr) => {
+              if (sessionErr) {
+                console.error('Error creating anonymous session:', sessionErr);
+              } else {
+                console.log(`📊 Anonymous session created: ${sessionId} with tag: ${uid} (no location)`);
+              }
+            });
           });
           
           // Create tag interaction record for analytics

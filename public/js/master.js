@@ -2024,7 +2024,8 @@ class MasterPortal {
         
         // Show modal with session details
         const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
+        modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full'
+        modal.style.zIndex = '9999';
         modal.innerHTML = `
           <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
             <div class="mt-3">
