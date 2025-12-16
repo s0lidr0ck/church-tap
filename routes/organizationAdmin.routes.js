@@ -3,8 +3,49 @@ const { dbQuery } = require('../config/database');
 const { db } = require('../config/database');
 const { requireOrgAuth } = require('../config/middleware');
 const RecurringEventService = require('../services/recurringEventService');
+const { getOrganizationFeatures, updateOrganizationFeatures, getTranslationCatalog } = require('../services/organizationFeaturesService');
+const { parseVerseReference } = require('../services/bibleReferenceParser');
 
 const router = express.Router();
+
+function requireSettingsWriteRole(req, res) {
+  const role = (req.session?.admin?.role || '').toString().toLowerCase();
+  const allowedRoles = new Set(['admin', 'super_admin', 'owner']);
+  if (!allowedRoles.has(role)) {
+    res.status(403).json({ success: false, error: 'Insufficient permissions to update settings', code: 'INSUFFICIENT_ROLE' });
+    return false;
+  }
+  return true;
+}
+
+// ===========================
+// Feature Flags (ct_organization_features) - Admin
+// ===========================
+router.get('/features', requireOrgAuth, async (req, res) => {
+  try {
+    const orgId = req.session.organizationId;
+    const features = await getOrganizationFeatures(orgId);
+    res.json({ success: true, features, translation_catalog: getTranslationCatalog() });
+  } catch (e) {
+    console.error('Error fetching org features:', e);
+    res.status(500).json({ success: false, error: 'Failed to fetch features' });
+  }
+});
+
+router.put('/features', requireOrgAuth, async (req, res) => {
+  try {
+    // Role-based admin authorization: only allowed roles can modify settings.
+    // (Reading is available to any authenticated org admin.)
+    if (!requireSettingsWriteRole(req, res)) return;
+
+    const orgId = req.session.organizationId;
+    const updated = await updateOrganizationFeatures(orgId, req.body || {});
+    res.json({ success: true, features: updated, translation_catalog: getTranslationCatalog() });
+  } catch (e) {
+    console.error('Error updating org features:', e);
+    res.status(500).json({ success: false, error: 'Failed to update features' });
+  }
+});
 
 // Admin: Get all organization links
 router.get('/links', requireOrgAuth, (req, res) => {
@@ -109,8 +150,340 @@ router.delete('/links/:id', requireOrgAuth, (req, res) => {
   );
 });
 
-module.exports = router;
- 
+// ===========================
+// Emergency Scripture Topics - Admin
+// ===========================
+router.get('/topics', requireOrgAuth, async (req, res) => {
+  try {
+    const orgId = req.session.organizationId;
+    const result = await db.query(
+      `SELECT t.*,
+              (SELECT COUNT(*)::int FROM ct_scripture_topic_verses v WHERE v.topic_id = t.id) AS verse_count
+       FROM ct_scripture_topics t
+       WHERE t.organization_id = $1
+       ORDER BY t.sort_order ASC, t.name ASC`,
+      [orgId]
+    );
+    res.json({ success: true, topics: result.rows || [] });
+  } catch (e) {
+    console.error('Error fetching topics:', e);
+    res.status(500).json({ success: false, error: 'Failed to fetch topics' });
+  }
+});
+
+// ===========================
+// Default Topic Templates - Org Admin (enable/disable)
+// ===========================
+router.get('/default-topics', requireOrgAuth, async (req, res) => {
+  try {
+    const orgId = req.session.organizationId;
+    const result = await db.query(
+      `SELECT t.id, t.name, t.description, t.sort_order,
+              COALESCE(s.is_enabled, TRUE) AS is_enabled,
+              (SELECT COUNT(*)::int FROM ct_topic_template_verses v WHERE v.template_id = t.id) AS verse_count
+       FROM ct_topic_templates t
+       LEFT JOIN ct_organization_topic_template_settings s
+         ON s.template_id = t.id AND s.organization_id = $1
+       WHERE t.is_active = TRUE
+       ORDER BY t.sort_order ASC, t.name ASC`,
+      [orgId]
+    );
+    res.json({ success: true, topics: result.rows || [] });
+  } catch (e) {
+    console.error('Error fetching default topics:', e);
+    res.status(500).json({ success: false, error: 'Failed to fetch default topics' });
+  }
+});
+
+router.put('/default-topics/:id', requireOrgAuth, async (req, res) => {
+  try {
+    if (!requireSettingsWriteRole(req, res)) return;
+    const orgId = req.session.organizationId;
+    const templateId = parseInt(req.params.id, 10);
+    const { is_enabled } = req.body || {};
+    if (!templateId) return res.status(400).json({ success: false, error: 'Invalid topic id' });
+    if (typeof is_enabled !== 'boolean') return res.status(400).json({ success: false, error: 'is_enabled must be boolean' });
+
+    // Ensure template exists and active
+    const tpl = await db.query(`SELECT id FROM ct_topic_templates WHERE id = $1 AND is_active = TRUE`, [templateId]);
+    if (!tpl.rows?.length) return res.status(404).json({ success: false, error: 'Topic not found' });
+
+    await db.query(
+      `INSERT INTO ct_organization_topic_template_settings (organization_id, template_id, is_enabled)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (organization_id, template_id) DO UPDATE
+         SET is_enabled = EXCLUDED.is_enabled,
+             updated_at = NOW()`,
+      [orgId, templateId, is_enabled]
+    );
+
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Error updating default topic setting:', e);
+    res.status(500).json({ success: false, error: 'Failed to update default topic setting' });
+  }
+});
+
+router.post('/topics', requireOrgAuth, async (req, res) => {
+  try {
+    if (!requireSettingsWriteRole(req, res)) return;
+    const orgId = req.session.organizationId;
+    const { name, description, sort_order, is_active } = req.body || {};
+    if (!name || !name.toString().trim()) {
+      return res.status(400).json({ success: false, error: 'Topic name is required' });
+    }
+
+    const result = await db.query(
+      `INSERT INTO ct_scripture_topics (organization_id, name, description, sort_order, is_active)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [orgId, name.toString().trim(), description || null, parseInt(sort_order ?? 0, 10) || 0, is_active !== false]
+    );
+
+    res.json({ success: true, topic: result.rows[0] });
+  } catch (e) {
+    console.error('Error creating topic:', e);
+    res.status(500).json({ success: false, error: 'Failed to create topic' });
+  }
+});
+
+router.put('/topics/:id', requireOrgAuth, async (req, res) => {
+  try {
+    if (!requireSettingsWriteRole(req, res)) return;
+    const orgId = req.session.organizationId;
+    const id = parseInt(req.params.id, 10);
+    const { name, description, sort_order, is_active } = req.body || {};
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid topic id' });
+    if (!name || !name.toString().trim()) {
+      return res.status(400).json({ success: false, error: 'Topic name is required' });
+    }
+
+    const result = await db.query(
+      `UPDATE ct_scripture_topics
+       SET name = $1,
+           description = $2,
+           sort_order = $3,
+           is_active = $4,
+           updated_at = NOW()
+       WHERE id = $5 AND organization_id = $6
+       RETURNING *`,
+      [name.toString().trim(), description || null, parseInt(sort_order ?? 0, 10) || 0, is_active !== false, id, orgId]
+    );
+
+    if (!result.rows?.length) return res.status(404).json({ success: false, error: 'Topic not found' });
+    res.json({ success: true, topic: result.rows[0] });
+  } catch (e) {
+    console.error('Error updating topic:', e);
+    res.status(500).json({ success: false, error: 'Failed to update topic' });
+  }
+});
+
+router.delete('/topics/:id', requireOrgAuth, async (req, res) => {
+  try {
+    if (!requireSettingsWriteRole(req, res)) return;
+    const orgId = req.session.organizationId;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid topic id' });
+
+    const result = await db.query(
+      `DELETE FROM ct_scripture_topics WHERE id = $1 AND organization_id = $2`,
+      [id, orgId]
+    );
+
+    if (result.rowCount === 0) return res.status(404).json({ success: false, error: 'Topic not found' });
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Error deleting topic:', e);
+    res.status(500).json({ success: false, error: 'Failed to delete topic' });
+  }
+});
+
+router.get('/topics/:id/verses', requireOrgAuth, async (req, res) => {
+  try {
+    const orgId = req.session.organizationId;
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid topic id' });
+
+    // Ensure topic belongs to org
+    const topic = await db.query(`SELECT id FROM ct_scripture_topics WHERE id = $1 AND organization_id = $2`, [id, orgId]);
+    if (!topic.rows?.length) return res.status(404).json({ success: false, error: 'Topic not found' });
+
+    const result = await db.query(
+      `SELECT id, bible_reference, book_number, chapter, verse_start, verse_end, translation_code, created_at
+       FROM ct_scripture_topic_verses
+       WHERE topic_id = $1
+       ORDER BY created_at DESC`,
+      [id]
+    );
+
+    res.json({ success: true, verses: result.rows || [] });
+  } catch (e) {
+    console.error('Error fetching topic verses:', e);
+    res.status(500).json({ success: false, error: 'Failed to fetch topic verses' });
+  }
+});
+
+router.post('/topics/:id/verses', requireOrgAuth, async (req, res) => {
+  try {
+    if (!requireSettingsWriteRole(req, res)) return;
+    const orgId = req.session.organizationId;
+    const id = parseInt(req.params.id, 10);
+    const { bible_reference, translation_code } = req.body || {};
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid topic id' });
+    if (!bible_reference || !bible_reference.toString().trim()) {
+      return res.status(400).json({ success: false, error: 'bible_reference is required' });
+    }
+
+    const topic = await db.query(`SELECT id FROM ct_scripture_topics WHERE id = $1 AND organization_id = $2`, [id, orgId]);
+    if (!topic.rows?.length) return res.status(404).json({ success: false, error: 'Topic not found' });
+
+    const parsed = parseVerseReference(bible_reference);
+    const result = await db.query(
+      `INSERT INTO ct_scripture_topic_verses (topic_id, bible_reference, book_number, chapter, verse_start, verse_end, translation_code)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [
+        id,
+        parsed.normalized_reference,
+        parsed.book_number,
+        parsed.chapter,
+        parsed.verse_start,
+        parsed.verse_end,
+        translation_code ? translation_code.toString().trim().toUpperCase() : null
+      ]
+    );
+
+    res.json({ success: true, verse: result.rows[0] });
+  } catch (e) {
+    console.error('Error adding topic verse:', e);
+    const msg = (e && e.message) ? e.message : 'Failed to add topic verse';
+    res.status(400).json({ success: false, error: msg });
+  }
+});
+
+router.delete('/topics/:topicId/verses/:verseId', requireOrgAuth, async (req, res) => {
+  try {
+    if (!requireSettingsWriteRole(req, res)) return;
+    const orgId = req.session.organizationId;
+    const topicId = parseInt(req.params.topicId, 10);
+    const verseId = parseInt(req.params.verseId, 10);
+    if (!topicId || !verseId) return res.status(400).json({ success: false, error: 'Invalid id(s)' });
+
+    const topic = await db.query(`SELECT id FROM ct_scripture_topics WHERE id = $1 AND organization_id = $2`, [topicId, orgId]);
+    if (!topic.rows?.length) return res.status(404).json({ success: false, error: 'Topic not found' });
+
+    const result = await db.query(`DELETE FROM ct_scripture_topic_verses WHERE id = $1 AND topic_id = $2`, [verseId, topicId]);
+    if (result.rowCount === 0) return res.status(404).json({ success: false, error: 'Verse not found' });
+
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Error deleting topic verse:', e);
+    res.status(500).json({ success: false, error: 'Failed to delete topic verse' });
+  }
+});
+
+// ===========================
+// Fundraising Goal - Admin
+// ===========================
+router.get('/fundraising', requireOrgAuth, async (req, res) => {
+  try {
+    const orgId = req.session.organizationId;
+    const result = await db.query(
+      `SELECT organization_id, goal_title, goal_amount_cents, current_amount_cents, deadline_date, is_active
+       FROM ct_fundraising_goals
+       WHERE organization_id = $1`,
+      [orgId]
+    );
+    res.json({ success: true, fundraising: result.rows[0] || null });
+  } catch (e) {
+    console.error('Error fetching fundraising goal:', e);
+    res.status(500).json({ success: false, error: 'Failed to fetch fundraising goal' });
+  }
+});
+
+router.put('/fundraising', requireOrgAuth, async (req, res) => {
+  try {
+    if (!requireSettingsWriteRole(req, res)) return;
+    const orgId = req.session.organizationId;
+    const { goal_title, goal_amount_cents, current_amount_cents, deadline_date, is_active } = req.body || {};
+
+    const title = (goal_title || '').toString().trim();
+    const goalCents = parseInt(goal_amount_cents, 10);
+    const currentCents = current_amount_cents === undefined || current_amount_cents === null ? 0 : parseInt(current_amount_cents, 10);
+
+    if (!title) return res.status(400).json({ success: false, error: 'goal_title is required' });
+    if (!Number.isFinite(goalCents) || goalCents <= 0) return res.status(400).json({ success: false, error: 'goal_amount_cents must be > 0' });
+    if (!Number.isFinite(currentCents) || currentCents < 0) return res.status(400).json({ success: false, error: 'current_amount_cents must be >= 0' });
+
+    const result = await db.query(
+      `INSERT INTO ct_fundraising_goals (organization_id, goal_title, goal_amount_cents, current_amount_cents, deadline_date, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (organization_id) DO UPDATE
+         SET goal_title = EXCLUDED.goal_title,
+             goal_amount_cents = EXCLUDED.goal_amount_cents,
+             current_amount_cents = EXCLUDED.current_amount_cents,
+             deadline_date = EXCLUDED.deadline_date,
+             is_active = EXCLUDED.is_active,
+             updated_at = NOW()
+       RETURNING organization_id, goal_title, goal_amount_cents, current_amount_cents, deadline_date, is_active`,
+      [orgId, title, goalCents, currentCents, deadline_date || null, is_active !== false]
+    );
+
+    res.json({ success: true, fundraising: result.rows[0] });
+  } catch (e) {
+    console.error('Error updating fundraising goal:', e);
+    res.status(500).json({ success: false, error: 'Failed to update fundraising goal' });
+  }
+});
+
+// ===========================
+// Worship Playlist - Admin (separate from generic links)
+// ===========================
+router.get('/worship-playlist', requireOrgAuth, async (req, res) => {
+  try {
+    const orgId = req.session.organizationId;
+    const result = await db.query(
+      `SELECT organization_id, title, youtube_url, is_active
+       FROM ct_organization_worship_playlists
+       WHERE organization_id = $1`,
+      [orgId]
+    );
+    res.json({ success: true, playlist: result.rows[0] || null });
+  } catch (e) {
+    console.error('Error fetching worship playlist:', e);
+    res.status(500).json({ success: false, error: 'Failed to fetch worship playlist' });
+  }
+});
+
+router.put('/worship-playlist', requireOrgAuth, async (req, res) => {
+  try {
+    if (!requireSettingsWriteRole(req, res)) return;
+    const orgId = req.session.organizationId;
+    const { title, youtube_url, is_active } = req.body || {};
+
+    const t = (title || 'Worship Playlist').toString().trim() || 'Worship Playlist';
+    const url = (youtube_url || '').toString().trim();
+    if (!url) return res.status(400).json({ success: false, error: 'youtube_url is required' });
+
+    const result = await db.query(
+      `INSERT INTO ct_organization_worship_playlists (organization_id, title, youtube_url, is_active)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (organization_id) DO UPDATE
+         SET title = EXCLUDED.title,
+             youtube_url = EXCLUDED.youtube_url,
+             is_active = EXCLUDED.is_active,
+             updated_at = NOW()
+       RETURNING organization_id, title, youtube_url, is_active`,
+      [orgId, t, url, is_active !== false]
+    );
+
+    res.json({ success: true, playlist: result.rows[0] });
+  } catch (e) {
+    console.error('Error saving worship playlist:', e);
+    res.status(500).json({ success: false, error: 'Failed to save worship playlist' });
+  }
+});
+
 // ===========================
 // Events (CT_events) - Admin
 // ===========================

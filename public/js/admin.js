@@ -5,6 +5,10 @@ class AdminDashboard {
     this.currentEditingVerse = null;
     this.filters = { search: '', type: 'all', status: 'all' };
     this.brand = null;
+
+    // Per-group feature flags (loaded from /api/admin/organization/features)
+    this.featureFlags = null;
+    this.translationCatalog = [];
     
     // PWA install prompt
     this.deferredPrompt = null;
@@ -17,6 +21,30 @@ class AdminDashboard {
     this.setupEventListeners();
     this.checkAuthStatus();
     this.applySavedBrandTheme();
+  }
+
+  normalizeVerseText(text) {
+    if (!text || typeof text !== 'string') return '';
+    return text
+      .replace(/\r\n/g, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  plainTextFromVerseText(text) {
+    const normalized = this.normalizeVerseText(text);
+    return normalized.replace(/\s+/g, ' ').trim();
+  }
+
+  getDisplayTags(tagsString) {
+    if (!tagsString || typeof tagsString !== 'string') return [];
+    const hidden = new Set(['auto-import', 'auto_import', 'autoimport', 'auto imported', 'autoimported']);
+    return tagsString
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean)
+      .filter(t => !hidden.has(t.toLowerCase()));
   }
 
   // ===== Utilities: local datetime handling for datetime-local inputs =====
@@ -111,6 +139,27 @@ class AdminDashboard {
       e.preventDefault();
       this.showTab('links');
     });
+    const topicsNav = document.getElementById('topicsNav');
+    if (topicsNav) {
+      topicsNav.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showTab('topics');
+      });
+    }
+    const fundraisingNav = document.getElementById('fundraisingNav');
+    if (fundraisingNav) {
+      fundraisingNav.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showTab('fundraising');
+      });
+    }
+    const playlistNav = document.getElementById('playlistNav');
+    if (playlistNav) {
+      playlistNav.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showTab('playlist');
+      });
+    }
     const eventsNav = document.getElementById('eventsNav');
     if (eventsNav) {
       eventsNav.addEventListener('click', (e) => {
@@ -505,6 +554,7 @@ class AdminDashboard {
         this.showDashboard();
         this.updateOrganizationInfo();
         this.loadVerses();
+        this.loadFeatureToggles();
       } else {
         this.showLogin();
       }
@@ -651,6 +701,9 @@ class AdminDashboard {
       'users': 'User Management',
       'braceletRequests': 'Bracelet Requests',
       'links': 'Organization Links',
+      'topics': 'Topics',
+      'fundraising': 'Fundraising',
+      'playlist': 'Worship Playlist',
       'verseImport': 'Verse Import',
       'settings': 'Settings'
     };
@@ -669,12 +722,20 @@ class AdminDashboard {
       this.loadBraceletRequests();
     } else if (tabName === 'links') {
       this.loadOrganizationLinks();
+    } else if (tabName === 'topics') {
+      this.loadTopicsAdmin();
+    } else if (tabName === 'fundraising') {
+      this.loadFundraisingAdmin();
+    } else if (tabName === 'playlist') {
+      this.loadWorshipPlaylistAdmin();
     } else if (tabName === 'verseImport') {
       this.loadVerseImportSettings();
     } else if (tabName === 'events') {
       this.loadEvents();
     } else if (tabName === 'cta') {
       this.loadCtas();
+    } else if (tabName === 'settings') {
+      this.loadFeatureToggles();
     }
   }
 
@@ -771,14 +832,14 @@ class AdminDashboard {
                 ${verse.bible_reference || 'No reference'}
               </p>
               ${verse.content_type === 'text' && verse.verse_text ? 
-                `<p class="text-sm text-gray-500 mt-1">${verse.verse_text.substring(0, 100)}${verse.verse_text.length > 100 ? '...' : ''}</p>` :
+                `<p class="text-sm text-gray-500 mt-1">${this.plainTextFromVerseText(verse.verse_text).substring(0, 100)}${this.plainTextFromVerseText(verse.verse_text).length > 100 ? '...' : ''}</p>` :
                 ''
               }
             </div>
             ${verse.tags ? 
               `<div class="mt-2 flex flex-wrap gap-1">
-                ${verse.tags.split(',').map(tag => 
-                  `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">${tag.trim()}</span>`
+                ${this.getDisplayTags(verse.tags).map(tag => 
+                  `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">${tag}</span>`
                 ).join('')}
               </div>` :
               ''
@@ -815,15 +876,15 @@ class AdminDashboard {
         <td class="px-6 py-4 text-sm text-gray-900">
           <div class="max-w-xs">
             ${verse.content_type === 'text' && verse.verse_text ? 
-              `<p class="truncate">${verse.verse_text.substring(0, 80)}${verse.verse_text.length > 80 ? '...' : ''}</p>` :
+              `<p class="truncate">${this.plainTextFromVerseText(verse.verse_text).substring(0, 80)}${this.plainTextFromVerseText(verse.verse_text).length > 80 ? '...' : ''}</p>` :
               '<span class="text-gray-500 italic">Image content</span>'
             }
             ${verse.tags ? 
               `<div class="mt-1 flex flex-wrap gap-1">
-                ${verse.tags.split(',').slice(0, 3).map(tag => 
-                  `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">${tag.trim()}</span>`
+                ${this.getDisplayTags(verse.tags).slice(0, 3).map(tag => 
+                  `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">${tag}</span>`
                 ).join('')}
-                ${verse.tags.split(',').length > 3 ? `<span class="text-xs text-gray-500">+${verse.tags.split(',').length - 3} more</span>` : ''}
+                ${this.getDisplayTags(verse.tags).length > 3 ? `<span class="text-xs text-gray-500">+${this.getDisplayTags(verse.tags).length - 3} more</span>` : ''}
               </div>` :
               ''
             }
@@ -1882,7 +1943,7 @@ class AdminDashboard {
               <span class="text-sm text-gray-500">${verse.bible_reference || 'No reference'}</span>
             </div>
             ${verse.verse_text ? 
-              `<p class="text-sm text-gray-600 mt-1">${verse.verse_text.substring(0, 80)}${verse.verse_text.length > 80 ? '...' : ''}</p>` :
+              `<p class="text-sm text-gray-600 mt-1">${this.plainTextFromVerseText(verse.verse_text).substring(0, 80)}${this.plainTextFromVerseText(verse.verse_text).length > 80 ? '...' : ''}</p>` :
               ''
             }
           </div>
@@ -3250,6 +3311,573 @@ class AdminDashboard {
     if (element) {
       element.classList.add('hidden');
       element.style.display = 'none';
+    }
+  }
+
+  // ===========================
+  // Feature Toggles (Settings tab)
+  // ===========================
+  async loadFeatureToggles() {
+    const loading = document.getElementById('featuresLoading');
+    const form = document.getElementById('featuresForm');
+    const errEl = document.getElementById('featuresError');
+
+    if (!loading || !form) return;
+
+    loading.classList.remove('hidden');
+    form.classList.add('hidden');
+    if (errEl) errEl.classList.add('hidden');
+
+    try {
+      const res = await fetch('/api/admin/organization/features');
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to load feature settings');
+
+      this.featureFlags = data.features || {};
+      this.translationCatalog = data.translation_catalog || [];
+
+      const setChecked = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.checked = value !== false;
+      };
+
+      setChecked('featPrayerRequests', this.featureFlags.prayer_requests_enabled);
+      setChecked('featPraiseReports', this.featureFlags.praise_reports_enabled);
+      setChecked('featInsights', this.featureFlags.insights_enabled);
+      setChecked('featVerseCommentary', this.featureFlags.verse_commentary_enabled);
+      setChecked('featAnonymousPosts', this.featureFlags.anonymous_posts_enabled);
+      setChecked('featGroupCalendar', this.featureFlags.group_calendar_enabled);
+      setChecked('featGroupLinks', this.featureFlags.group_links_enabled);
+
+      this.renderTranslationsGrid();
+      this.wireFeatureToggleButtons();
+
+      loading.classList.add('hidden');
+      form.classList.remove('hidden');
+    } catch (e) {
+      console.error('Error loading feature toggles:', e);
+      loading.classList.add('hidden');
+      if (errEl) {
+        errEl.textContent = e.message || 'Failed to load feature settings';
+        errEl.classList.remove('hidden');
+      }
+    }
+  }
+
+  getEnabledTranslationsForAdmin() {
+    const enabled = this.featureFlags?.enabled_translations;
+    if (enabled === null || enabled === undefined) {
+      return new Set((this.translationCatalog || []).map(t => String(t.code || '').toUpperCase()).filter(Boolean));
+    }
+    if (Array.isArray(enabled)) return new Set(enabled.map(c => String(c).toUpperCase()));
+    return new Set((this.translationCatalog || []).map(t => String(t.code || '').toUpperCase()).filter(Boolean));
+  }
+
+  renderTranslationsGrid() {
+    const grid = document.getElementById('translationsGrid');
+    if (!grid) return;
+
+    const enabled = this.getEnabledTranslationsForAdmin();
+    const catalog = (this.translationCatalog || []).slice().sort((a, b) => String(a.code).localeCompare(String(b.code)));
+
+    grid.innerHTML = catalog.map(t => {
+      const code = String(t.code || '').toUpperCase();
+      const name = t.name || code;
+      const checked = enabled.has(code);
+      return `
+        <label class="flex items-center gap-2 p-2 bg-white rounded border border-gray-200">
+          <input class="translationToggle h-4 w-4" type="checkbox" data-code="${this.escapeHtml(code)}" ${checked ? 'checked' : ''}>
+          <span class="text-xs font-semibold">${this.escapeHtml(code)}</span>
+          <span class="text-xs text-gray-600">${this.escapeHtml(name)}</span>
+        </label>
+      `;
+    }).join('');
+  }
+
+  wireFeatureToggleButtons() {
+    const saveBtn = document.getElementById('saveFeaturesBtn');
+    if (saveBtn && !saveBtn.dataset.wired) {
+      saveBtn.dataset.wired = '1';
+      saveBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.saveFeatureToggles();
+      });
+    }
+
+    const allBtn = document.getElementById('translationsSelectAll');
+    if (allBtn && !allBtn.dataset.wired) {
+      allBtn.dataset.wired = '1';
+      allBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.querySelectorAll('#translationsGrid .translationToggle').forEach(el => { el.checked = true; });
+      });
+    }
+
+    const noneBtn = document.getElementById('translationsSelectNone');
+    if (noneBtn && !noneBtn.dataset.wired) {
+      noneBtn.dataset.wired = '1';
+      noneBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.querySelectorAll('#translationsGrid .translationToggle').forEach(el => { el.checked = false; });
+      });
+    }
+  }
+
+  async saveFeatureToggles() {
+    try {
+      const getChecked = (id) => {
+        const el = document.getElementById(id);
+        return el ? !!el.checked : true;
+      };
+
+      const selectedTranslations = Array.from(document.querySelectorAll('#translationsGrid .translationToggle'))
+        .filter(el => el.checked)
+        .map(el => String(el.dataset.code || '').toUpperCase())
+        .filter(Boolean);
+
+      const allCodes = (this.translationCatalog || []).map(t => String(t.code || '').toUpperCase()).filter(Boolean);
+      const enabledTranslationsPayload = (selectedTranslations.length === allCodes.length) ? null : selectedTranslations;
+
+      const payload = {
+        prayer_requests_enabled: getChecked('featPrayerRequests'),
+        praise_reports_enabled: getChecked('featPraiseReports'),
+        insights_enabled: getChecked('featInsights'),
+        verse_commentary_enabled: getChecked('featVerseCommentary'),
+        anonymous_posts_enabled: getChecked('featAnonymousPosts'),
+        group_calendar_enabled: getChecked('featGroupCalendar'),
+        group_links_enabled: getChecked('featGroupLinks'),
+        enabled_translations: enabledTranslationsPayload
+      };
+
+      const res = await fetch('/api/admin/organization/features', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to save feature settings');
+
+      this.featureFlags = data.features || payload;
+      this.translationCatalog = data.translation_catalog || this.translationCatalog;
+      this.showToast('Feature settings saved', 'success');
+    } catch (e) {
+      console.error('Error saving feature toggles:', e);
+      this.showToast(e.message || 'Failed to save feature settings', 'error');
+    }
+  }
+
+  // ===========================
+  // Topics (Emergency Scripture) - Admin
+  // ===========================
+  async loadTopicsAdmin() {
+    try {
+      // Load default (master) topics for enable/disable
+      const defRes = await fetch('/api/admin/organization/default-topics');
+      const defData = await defRes.json().catch(() => null);
+      this.defaultTopics = defData?.success ? (defData.topics || []) : [];
+      this.renderDefaultTopicsAdmin();
+
+      const res = await fetch('/api/admin/organization/topics');
+      const data = await res.json().catch(() => null);
+      this.topics = data?.success ? (data.topics || []) : [];
+
+      // Wire buttons (once)
+      const createBtn = document.getElementById('createTopicBtn');
+      if (createBtn && !createBtn.dataset.wired) {
+        createBtn.dataset.wired = '1';
+        createBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.createTopicFromForm();
+        });
+      }
+
+      const addVerseBtn = document.getElementById('addTopicVerseBtn');
+      if (addVerseBtn && !addVerseBtn.dataset.wired) {
+        addVerseBtn.dataset.wired = '1';
+        addVerseBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.addTopicVerseFromForm();
+        });
+      }
+
+      this.renderTopicsAdmin();
+
+      // If a topic is already selected, refresh its verses
+      if (this.selectedTopicId) {
+        await this.loadTopicVersesAdmin(this.selectedTopicId);
+      } else {
+        this.renderTopicVersesAdmin([]);
+      }
+    } catch (e) {
+      console.error('Error loading topics:', e);
+      this.topics = [];
+      this.defaultTopics = [];
+      this.renderDefaultTopicsAdmin();
+      this.renderTopicsAdmin();
+      this.renderTopicVersesAdmin([]);
+    }
+  }
+
+  renderDefaultTopicsAdmin() {
+    const noMsg = document.getElementById('noDefaultTopicsMessage');
+    const table = document.getElementById('defaultTopicsTableContainer');
+    const body = document.getElementById('defaultTopicsTableBody');
+    if (!noMsg || !table || !body) return;
+
+    const topics = Array.isArray(this.defaultTopics) ? this.defaultTopics : [];
+    if (topics.length === 0) {
+      noMsg.classList.remove('hidden');
+      table.classList.add('hidden');
+      body.innerHTML = '';
+      return;
+    }
+
+    noMsg.classList.add('hidden');
+    table.classList.remove('hidden');
+
+    body.innerHTML = topics.map(t => `
+      <tr class="hover:bg-gray-50">
+        <td class="px-4 py-3 text-sm font-medium text-gray-900">${this.escapeHtml(t.name)}</td>
+        <td class="px-4 py-3 text-sm text-gray-700">${t.verse_count ?? 0}</td>
+        <td class="px-4 py-3 text-sm text-gray-700">
+          <input type="checkbox" ${t.is_enabled ? 'checked' : ''}
+                 onchange="adminDashboard.setDefaultTopicEnabled(${t.id}, this.checked)"
+                 class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded">
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  async setDefaultTopicEnabled(templateId, enabled) {
+    try {
+      const res = await fetch(`/api/admin/organization/default-topics/${templateId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_enabled: !!enabled })
+      });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.error || 'Failed to update');
+      this.showToast('Default topic updated', 'success');
+      await this.loadTopicsAdmin();
+    } catch (e) {
+      console.error('Error updating default topic:', e);
+      this.showToast(e.message || 'Failed to update default topic', 'error');
+    }
+  }
+
+  renderTopicsAdmin() {
+    const noMsg = document.getElementById('noTopicsMessage');
+    const table = document.getElementById('topicsTableContainer');
+    const body = document.getElementById('topicsTableBody');
+
+    if (!body || !noMsg || !table) return;
+
+    const topics = Array.isArray(this.topics) ? this.topics : [];
+    if (topics.length === 0) {
+      noMsg.classList.remove('hidden');
+      table.classList.add('hidden');
+      body.innerHTML = '';
+      return;
+    }
+
+    noMsg.classList.add('hidden');
+    table.classList.remove('hidden');
+
+    body.innerHTML = topics.map(t => {
+      const isSelected = this.selectedTopicId === t.id;
+      const rowCls = isSelected ? 'bg-blue-50' : 'hover:bg-gray-50';
+      return `
+        <tr class="${rowCls}">
+          <td class="px-4 py-3 text-sm font-medium text-gray-900">
+            <button class="text-left hover:underline" onclick="adminDashboard.selectTopic(${t.id}, '${this.escapeHtml(t.name)}')">
+              ${this.escapeHtml(t.name)}
+            </button>
+          </td>
+          <td class="px-4 py-3 text-sm text-gray-700">${t.verse_count ?? 0}</td>
+          <td class="px-4 py-3 text-right text-sm">
+            <button class="text-red-600 hover:text-red-900 font-medium" onclick="adminDashboard.deleteTopic(${t.id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async createTopicFromForm() {
+    const nameEl = document.getElementById('topicNameInput');
+    const descEl = document.getElementById('topicDescInput');
+    const name = (nameEl?.value || '').trim();
+    const description = (descEl?.value || '').trim();
+
+    if (!name) {
+      this.showToast('Topic name is required', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/organization/topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description })
+      });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.error || 'Failed to create topic');
+
+      if (nameEl) nameEl.value = '';
+      if (descEl) descEl.value = '';
+      this.showToast('Topic created', 'success');
+      await this.loadTopicsAdmin();
+    } catch (e) {
+      console.error('Error creating topic:', e);
+      this.showToast(e.message || 'Failed to create topic', 'error');
+    }
+  }
+
+  async deleteTopic(topicId) {
+    if (!confirm('Delete this topic and all its verses?')) return;
+    try {
+      const res = await fetch(`/api/admin/organization/topics/${topicId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.error || 'Failed to delete topic');
+
+      if (this.selectedTopicId === topicId) {
+        this.selectedTopicId = null;
+        const nameEl = document.getElementById('selectedTopicName');
+        if (nameEl) nameEl.textContent = 'None';
+        this.renderTopicVersesAdmin([]);
+      }
+
+      this.showToast('Topic deleted', 'success');
+      await this.loadTopicsAdmin();
+    } catch (e) {
+      console.error('Error deleting topic:', e);
+      this.showToast(e.message || 'Failed to delete topic', 'error');
+    }
+  }
+
+  async selectTopic(topicId, topicName) {
+    this.selectedTopicId = topicId;
+    const nameEl = document.getElementById('selectedTopicName');
+    if (nameEl) nameEl.textContent = topicName || 'Selected';
+    this.renderTopicsAdmin();
+    await this.loadTopicVersesAdmin(topicId);
+  }
+
+  async loadTopicVersesAdmin(topicId) {
+    try {
+      const res = await fetch(`/api/admin/organization/topics/${topicId}/verses`);
+      const data = await res.json().catch(() => null);
+      const verses = data?.success ? (data.verses || []) : [];
+      this.renderTopicVersesAdmin(verses);
+    } catch (e) {
+      console.error('Error loading topic verses:', e);
+      this.renderTopicVersesAdmin([]);
+    }
+  }
+
+  renderTopicVersesAdmin(verses) {
+    const noMsg = document.getElementById('noTopicVersesMessage');
+    const table = document.getElementById('topicVersesTableContainer');
+    const body = document.getElementById('topicVersesTableBody');
+    if (!noMsg || !table || !body) return;
+
+    if (!this.selectedTopicId) {
+      noMsg.classList.remove('hidden');
+      table.classList.add('hidden');
+      body.innerHTML = '';
+      return;
+    }
+
+    const rows = Array.isArray(verses) ? verses : [];
+    if (rows.length === 0) {
+      noMsg.classList.remove('hidden');
+      table.classList.add('hidden');
+      body.innerHTML = '';
+      return;
+    }
+
+    noMsg.classList.add('hidden');
+    table.classList.remove('hidden');
+
+    body.innerHTML = rows.map(v => `
+      <tr class="hover:bg-gray-50">
+        <td class="px-4 py-3 text-sm text-gray-900">${this.escapeHtml(v.bible_reference)}</td>
+        <td class="px-4 py-3 text-sm text-gray-700">${this.escapeHtml(v.translation_code || '')}</td>
+        <td class="px-4 py-3 text-right text-sm">
+          <button class="text-red-600 hover:text-red-900 font-medium" onclick="adminDashboard.deleteTopicVerse(${this.selectedTopicId}, ${v.id})">Remove</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  async addTopicVerseFromForm() {
+    if (!this.selectedTopicId) {
+      this.showToast('Select a topic first', 'error');
+      return;
+    }
+    const refEl = document.getElementById('topicVerseReference');
+    const trEl = document.getElementById('topicVerseTranslation');
+    const bible_reference = (refEl?.value || '').trim();
+    const translation_code = (trEl?.value || '').trim();
+
+    if (!bible_reference) {
+      this.showToast('Bible reference is required', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/admin/organization/topics/${this.selectedTopicId}/verses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bible_reference, translation_code: translation_code || null })
+      });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.error || 'Failed to add verse');
+
+      if (refEl) refEl.value = '';
+      if (trEl) trEl.value = '';
+      this.showToast('Verse added', 'success');
+      await this.loadTopicsAdmin();
+    } catch (e) {
+      console.error('Error adding topic verse:', e);
+      this.showToast(e.message || 'Failed to add verse', 'error');
+    }
+  }
+
+  async deleteTopicVerse(topicId, verseId) {
+    if (!confirm('Remove this verse from the topic?')) return;
+    try {
+      const res = await fetch(`/api/admin/organization/topics/${topicId}/verses/${verseId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.error || 'Failed to remove verse');
+      this.showToast('Verse removed', 'success');
+      await this.loadTopicsAdmin();
+    } catch (e) {
+      console.error('Error removing topic verse:', e);
+      this.showToast(e.message || 'Failed to remove verse', 'error');
+    }
+  }
+
+  // ===========================
+  // Fundraising - Admin
+  // ===========================
+  async loadFundraisingAdmin() {
+    try {
+      const res = await fetch('/api/admin/organization/fundraising');
+      const data = await res.json().catch(() => null);
+      const f = data?.success ? (data.fundraising || null) : null;
+
+      const titleEl = document.getElementById('fundGoalTitle');
+      const goalEl = document.getElementById('fundGoalAmount');
+      const currEl = document.getElementById('fundCurrentAmount');
+      const deadlineEl = document.getElementById('fundDeadlineDate');
+      const activeEl = document.getElementById('fundIsActive');
+
+      if (titleEl) titleEl.value = f?.goal_title || '';
+      if (goalEl) goalEl.value = f ? ((f.goal_amount_cents || 0) / 100).toFixed(2) : '';
+      if (currEl) currEl.value = f ? ((f.current_amount_cents || 0) / 100).toFixed(2) : '0.00';
+      if (deadlineEl) deadlineEl.value = f?.deadline_date ? String(f.deadline_date).slice(0, 10) : '';
+      if (activeEl) activeEl.checked = f ? (f.is_active !== false) : true;
+
+      const saveBtn = document.getElementById('saveFundraisingBtn');
+      if (saveBtn && !saveBtn.dataset.wired) {
+        saveBtn.dataset.wired = '1';
+        saveBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.saveFundraisingAdmin();
+        });
+      }
+    } catch (e) {
+      console.error('Error loading fundraising goal:', e);
+      this.showToast('Failed to load fundraising goal', 'error');
+    }
+  }
+
+  async saveFundraisingAdmin() {
+    try {
+      const title = (document.getElementById('fundGoalTitle')?.value || '').trim();
+      const goalUsd = parseFloat(document.getElementById('fundGoalAmount')?.value || '0');
+      const currentUsd = parseFloat(document.getElementById('fundCurrentAmount')?.value || '0');
+      const deadline = (document.getElementById('fundDeadlineDate')?.value || '').trim();
+      const is_active = document.getElementById('fundIsActive')?.checked !== false;
+
+      if (!title) throw new Error('Goal title is required');
+      if (!Number.isFinite(goalUsd) || goalUsd <= 0) throw new Error('Goal amount must be > 0');
+      if (!Number.isFinite(currentUsd) || currentUsd < 0) throw new Error('Current amount must be >= 0');
+
+      const goal_amount_cents = Math.round(goalUsd * 100);
+      const current_amount_cents = Math.round(currentUsd * 100);
+
+      const res = await fetch('/api/admin/organization/fundraising', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          goal_title: title,
+          goal_amount_cents,
+          current_amount_cents,
+          deadline_date: deadline || null,
+          is_active
+        })
+      });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.error || 'Failed to save fundraising goal');
+
+      this.showToast('Fundraising goal saved', 'success');
+    } catch (e) {
+      console.error('Error saving fundraising goal:', e);
+      this.showToast(e.message || 'Failed to save fundraising goal', 'error');
+    }
+  }
+
+  // ===========================
+  // Worship Playlist - Admin
+  // ===========================
+  async loadWorshipPlaylistAdmin() {
+    try {
+      const res = await fetch('/api/admin/organization/worship-playlist');
+      const data = await res.json().catch(() => null);
+      const p = data?.success ? (data.playlist || null) : null;
+
+      const titleEl = document.getElementById('playlistTitle');
+      const urlEl = document.getElementById('playlistUrl');
+      const activeEl = document.getElementById('playlistIsActive');
+
+      if (titleEl) titleEl.value = p?.title || 'Worship Playlist';
+      if (urlEl) urlEl.value = p?.youtube_url || '';
+      if (activeEl) activeEl.checked = p ? (p.is_active !== false) : true;
+
+      const saveBtn = document.getElementById('savePlaylistBtn');
+      if (saveBtn && !saveBtn.dataset.wired) {
+        saveBtn.dataset.wired = '1';
+        saveBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.saveWorshipPlaylistAdmin();
+        });
+      }
+    } catch (e) {
+      console.error('Error loading worship playlist:', e);
+      this.showToast('Failed to load playlist', 'error');
+    }
+  }
+
+  async saveWorshipPlaylistAdmin() {
+    try {
+      const title = (document.getElementById('playlistTitle')?.value || 'Worship Playlist').trim() || 'Worship Playlist';
+      const youtube_url = (document.getElementById('playlistUrl')?.value || '').trim();
+      const is_active = document.getElementById('playlistIsActive')?.checked !== false;
+      if (!youtube_url) throw new Error('YouTube URL is required');
+
+      const res = await fetch('/api/admin/organization/worship-playlist', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, youtube_url, is_active })
+      });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.error || 'Failed to save playlist');
+
+      this.showToast('Playlist saved', 'success');
+    } catch (e) {
+      console.error('Error saving worship playlist:', e);
+      this.showToast(e.message || 'Failed to save playlist', 'error');
     }
   }
 }

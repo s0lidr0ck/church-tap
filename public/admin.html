@@ -147,6 +147,27 @@
                 Links
               </a>
 
+              <a href="#" id="topicsNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-md">
+                <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0-6v2m0 16v2m10-10h-2M4 12H2m15.364-7.364-1.414 1.414M8.05 15.95l-1.414 1.414m10.728 0-1.414-1.414M8.05 8.05 6.636 6.636"></path>
+                </svg>
+                Topics
+              </a>
+
+              <a href="#" id="fundraisingNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-md">
+                <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-3.314 0-6 2.686-6 6v6h12v-6c0-3.314-2.686-6-6-6zm0-6v3m-4 2h8"></path>
+                </svg>
+                Fundraising
+              </a>
+
+              <a href="#" id="playlistNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-md">
+                <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z"></path>
+                </svg>
+                Playlist
+              </a>
+
               <a href="#" id="eventsNav" class="nav-item group flex items-center px-3 py-2 text-sm font-medium rounded-md">
                 <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -262,6 +283,27 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
                 </svg>
                 Links
+              </a>
+
+              <a href="#" class="mobile-nav-item group flex items-center px-3 py-3 text-sm font-medium rounded-lg" data-target="topicsContent">
+                <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0-6v2m0 16v2m10-10h-2M4 12H2m15.364-7.364-1.414 1.414M8.05 15.95l-1.414 1.414m10.728 0-1.414-1.414M8.05 8.05 6.636 6.636"></path>
+                </svg>
+                Topics
+              </a>
+
+              <a href="#" class="mobile-nav-item group flex items-center px-3 py-3 text-sm font-medium rounded-lg" data-target="fundraisingContent">
+                <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-3.314 0-6 2.686-6 6v6h12v-6c0-3.314-2.686-6-6-6zm0-6v3m-4 2h8"></path>
+                </svg>
+                Fundraising
+              </a>
+
+              <a href="#" class="mobile-nav-item group flex items-center px-3 py-3 text-sm font-medium rounded-lg" data-target="playlistContent">
+                <svg class="nav-icon mr-3 flex-shrink-0 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z"></path>
+                </svg>
+                Playlist
               </a>
               
               <a href="#" class="mobile-nav-item group flex items-center px-3 py-3 text-sm font-medium rounded-lg" data-target="settingsContent">
@@ -990,6 +1032,189 @@
         </div>
       </div>
 
+      <!-- Topics Tab -->
+      <div id="topicsContent" class="tab-content hidden">
+        <h1 class="sr-only">Topics</h1>
+        <div class="mb-6 flex justify-between items-center">
+          <div>
+            <h2 class="text-2xl font-bold text-gray-900">Emergency Scripture Topics</h2>
+            <p class="text-gray-600">Configure Topics and the verses that can be randomly drawn for each Topic.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="modern-card p-6 lg:col-span-2">
+            <h3 class="text-lg font-medium text-gray-900 mb-2">Default Topics (from Master)</h3>
+            <p class="text-sm text-gray-500 mb-4">Enable/disable default Topics your org wants to use. You can still add custom Topics below.</p>
+
+            <div id="noDefaultTopicsMessage" class="text-center py-6 hidden">
+              <p class="text-gray-500">No default topics available yet.</p>
+            </div>
+
+            <div id="defaultTopicsTableContainer" class="overflow-x-auto hidden">
+              <table class="min-w-full divide-y divide-gray-200 admin-table">
+                <thead>
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider">Topic</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider">Verses</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider">Enabled</th>
+                  </tr>
+                </thead>
+                <tbody id="defaultTopicsTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="modern-card p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Add Topic</h3>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-2">Name</label>
+                <input id="topicNameInput" type="text" class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm" placeholder="e.g., Fear, Hope, Temptation">
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-2">Description (optional)</label>
+                <input id="topicDescInput" type="text" class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm" placeholder="Shown to admins only (optional)">
+              </div>
+              <div class="flex justify-end">
+                <button id="createTopicBtn" class="btn-primary-modern">Create Topic</button>
+              </div>
+            </div>
+
+            <div class="mt-6 border-t pt-6">
+              <h3 class="text-lg font-medium text-gray-900 mb-2">Topics</h3>
+              <p class="text-sm text-gray-500 mb-4">Click a Topic to manage its verses.</p>
+
+              <div id="noTopicsMessage" class="text-center py-8 hidden">
+                <p class="text-gray-500">No topics yet.</p>
+              </div>
+
+              <div id="topicsTableContainer" class="overflow-x-auto hidden">
+                <table class="min-w-full divide-y divide-gray-200 admin-table">
+                  <thead>
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider">Topic</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider">Verses</th>
+                      <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="topicsTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="modern-card p-6">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-lg font-medium text-gray-900">Topic Verses</h3>
+                <p class="text-sm text-gray-500">Selected Topic: <span id="selectedTopicName" class="font-semibold">None</span></p>
+              </div>
+            </div>
+
+            <div class="space-y-3 mb-6">
+              <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-2">Bible Reference</label>
+                <input id="topicVerseReference" type="text" class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm" placeholder="e.g., John 3:16 (single verse only)">
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-2">Translation (optional)</label>
+                <input id="topicVerseTranslation" type="text" class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm" placeholder="e.g., NIV, ESV (defaults to NIV)">
+              </div>
+              <div class="flex justify-end">
+                <button id="addTopicVerseBtn" class="btn-primary-modern">Add Verse</button>
+              </div>
+            </div>
+
+            <div id="noTopicVersesMessage" class="text-center py-8 hidden">
+              <p class="text-gray-500">Select a Topic, then add verses.</p>
+            </div>
+
+            <div id="topicVersesTableContainer" class="overflow-x-auto hidden">
+              <table class="min-w-full divide-y divide-gray-200 admin-table">
+                <thead>
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider">Reference</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider">Translation</th>
+                    <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="topicVersesTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fundraising Tab -->
+      <div id="fundraisingContent" class="tab-content hidden">
+        <h1 class="sr-only">Fundraising</h1>
+        <div class="mb-6">
+          <h2 class="text-2xl font-bold text-gray-900">Fundraising Goal</h2>
+          <p class="text-gray-600">Configure a single fundraising goal for your organization.</p>
+        </div>
+
+        <div class="modern-card p-6 max-w-2xl">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold text-gray-800 mb-2">Goal Title</label>
+              <input id="fundGoalTitle" type="text" class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm" placeholder="e.g., Raise $1000 by Jan 1" />
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-2">Goal Amount (USD)</label>
+                <input id="fundGoalAmount" type="number" min="1" step="0.01" class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm" placeholder="5000.00" />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-2">Current Amount (USD)</label>
+                <input id="fundCurrentAmount" type="number" min="0" step="0.01" class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm" placeholder="0.00" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-800 mb-2">Deadline (optional)</label>
+              <input id="fundDeadlineDate" type="date" class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm" />
+            </div>
+            <div class="flex items-center p-4 bg-white rounded-lg border border-gray-200">
+              <input id="fundIsActive" type="checkbox" class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded" checked>
+              <label for="fundIsActive" class="ml-3 block text-sm font-medium text-gray-800">Active (visible in the app)</label>
+            </div>
+            <div class="flex justify-end">
+              <button id="saveFundraisingBtn" class="btn-primary-modern">Save Fundraising Goal</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Worship Playlist Tab -->
+      <div id="playlistContent" class="tab-content hidden">
+        <h1 class="sr-only">Worship Playlist</h1>
+        <div class="mb-6">
+          <h2 class="text-2xl font-bold text-gray-900">Worship Playlist</h2>
+          <p class="text-gray-600">Configure the in-app worship playlist (separate from generic YouTube links like sermons).</p>
+        </div>
+
+        <div class="modern-card p-6 max-w-2xl">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold text-gray-800 mb-2">Title</label>
+              <input id="playlistTitle" type="text" class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm" placeholder="Worship Playlist" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-800 mb-2">YouTube URL (playlist or video)</label>
+              <input id="playlistUrl" type="url" class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm" placeholder="https://www.youtube.com/playlist?list=..." />
+              <p class="text-xs text-gray-500 mt-2">Tip: use a YouTube playlist link for best experience.</p>
+            </div>
+            <div class="flex items-center p-4 bg-white rounded-lg border border-gray-200">
+              <input id="playlistIsActive" type="checkbox" class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded" checked>
+              <label for="playlistIsActive" class="ml-3 block text-sm font-medium text-gray-800">Active (visible in the app)</label>
+            </div>
+            <div class="flex justify-end">
+              <button id="savePlaylistBtn" class="btn-primary-modern">Save Playlist</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Events Tab -->
       <div id="eventsContent" class="tab-content hidden">
         <h1 class="sr-only">Events</h1>
@@ -1110,6 +1335,86 @@
                 <input id="importThemeInput" type="file" accept="application/json" class="hidden" />
                 Import JSON
               </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="modern-card p-6 mt-6">
+          <div class="mb-4">
+            <h2 class="text-lg font-semibold">Group Feature Toggles</h2>
+            <p class="text-sm text-brand-muted">Turn features on/off for your group. Disabled features are hidden/blocked in the app.</p>
+          </div>
+
+          <div id="featuresLoading" class="text-sm text-gray-500">Loading feature settings...</div>
+          <div id="featuresError" class="hidden text-sm text-red-600 mb-3"></div>
+
+          <div id="featuresForm" class="hidden space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <label class="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                <input id="featPrayerRequests" type="checkbox" class="h-4 w-4">
+                <span class="flex flex-col">
+                  <span class="text-sm font-medium">Prayer Requests</span>
+                  <span class="text-xs text-gray-500">Let members post prayer needs and tap “Pray” on requests.</span>
+                </span>
+              </label>
+              <label class="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                <input id="featPraiseReports" type="checkbox" class="h-4 w-4">
+                <span class="flex flex-col">
+                  <span class="text-sm font-medium">Praise Reports</span>
+                  <span class="text-xs text-gray-500">Let members post celebrations and tap “Celebrate” on reports.</span>
+                </span>
+              </label>
+              <label class="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                <input id="featInsights" type="checkbox" class="h-4 w-4">
+                <span class="flex flex-col">
+                  <span class="text-sm font-medium">Insights</span>
+                  <span class="text-xs text-gray-500">Allow verse insights posts (the “Share Insight” community feature).</span>
+                </span>
+              </label>
+              <label class="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                <input id="featVerseCommentary" type="checkbox" class="h-4 w-4">
+                <span class="flex flex-col">
+                  <span class="text-sm font-medium">Verse Commentary (daily verse)</span>
+                  <span class="text-xs text-gray-500">Show/hide the verse “Context/Commentary” text under the daily verse.</span>
+                </span>
+              </label>
+              <label class="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                <input id="featAnonymousPosts" type="checkbox" class="h-4 w-4">
+                <span class="flex flex-col">
+                  <span class="text-sm font-medium">Anonymous Posts</span>
+                  <span class="text-xs text-gray-500">Allow members to submit posts anonymously (where supported).</span>
+                </span>
+              </label>
+              <label class="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                <input id="featGroupCalendar" type="checkbox" class="h-4 w-4">
+                <span class="flex flex-col">
+                  <span class="text-sm font-medium">Group Calendar</span>
+                  <span class="text-xs text-gray-500">Enable the in-app calendar button and organization events.</span>
+                </span>
+              </label>
+              <label class="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                <input id="featGroupLinks" type="checkbox" class="h-4 w-4">
+                <span class="flex flex-col">
+                  <span class="text-sm font-medium">Group Links</span>
+                  <span class="text-xs text-gray-500">Enable Quick Links (the links button/menu) for your group.</span>
+                </span>
+              </label>
+            </div>
+
+            <div class="pt-2 border-t border-gray-200">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-800">Bible Translations</h3>
+                <div class="flex gap-2">
+                  <button id="translationsSelectAll" class="btn-secondary-modern text-xs">Select all</button>
+                  <button id="translationsSelectNone" class="btn-secondary-modern text-xs">Select none</button>
+                </div>
+              </div>
+              <div id="translationsGrid" class="grid grid-cols-2 md:grid-cols-3 gap-2"></div>
+              <p class="text-xs text-gray-500 mt-2">Controls which translations appear in “View in Translation”. Select none to hide the translation button entirely.</p>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-2">
+              <button id="saveFeaturesBtn" class="btn-primary-modern">Save Feature Settings</button>
             </div>
           </div>
         </div>

@@ -3,11 +3,13 @@ const { dbQuery, db } = require('../config/database');
 const { authenticateUser } = require('../middleware/userAuth');
 const { requireActiveGroupMembership } = require('../middleware/membershipGate');
 const { requireOrgAuth } = require('../config/middleware');
+const { requireOrgFeature } = require('../middleware/featureGate');
+const { getOrganizationFeatures } = require('../services/organizationFeaturesService');
 
 const router = express.Router();
 
 // Submit verse community post
-router.post('/', authenticateUser, requireActiveGroupMembership, (req, res) => {
+router.post('/', authenticateUser, requireActiveGroupMembership, requireOrgFeature('insights', { message: 'Insights are disabled for this group' }), async (req, res) => {
   const { content, verse_reference, date, is_anonymous } = req.body;
   const ip = req.ip || req.connection.remoteAddress;
   const today = date || new Date().toISOString().split('T')[0];
@@ -34,11 +36,22 @@ router.post('/', authenticateUser, requireActiveGroupMembership, (req, res) => {
     return res.status(400).json({ success: false, error: 'Verse reference is required' });
   }
   
+  // Enforce anonymous-posts toggle (server-side)
+  let authorName = (req.userRecord?.display_name || req.userRecord?.first_name || 'Member');
+  try {
+    const features = await getOrganizationFeatures(orgId);
+    const canBeAnonymous = features.anonymous_posts_enabled !== false;
+    authorName = (canBeAnonymous && is_anonymous) ? 'Anonymous' : authorName;
+  } catch (e) {
+    // Fail open if feature lookup fails
+    authorName = is_anonymous ? 'Anonymous' : authorName;
+  }
+
   dbQuery.run(`
     INSERT INTO ct_verse_community_posts
     (verse_reference, date, content, author_name, user_token, ip_address, organization_id, is_approved, tagged_session_id, originating_tag_id)
     VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8, $9)
-  `, [verse_reference, today, content.trim(), is_anonymous ? 'Anonymous' : (req.userRecord?.display_name || req.userRecord?.first_name || 'Member'), userToken, ip, orgId, taggedSessionId, originatingTagId], function(err) {
+  `, [verse_reference, today, content.trim(), authorName, userToken, ip, orgId, taggedSessionId, originatingTagId], function(err) {
     if (err) {
       console.error('Error submitting verse community post:', err);
       return res.status(500).json({ success: false, error: 'Database error' });
@@ -57,7 +70,7 @@ router.post('/', authenticateUser, requireActiveGroupMembership, (req, res) => {
 });
 
 // Heart/like a community post
-router.post('/heart', authenticateUser, requireActiveGroupMembership, (req, res) => {
+router.post('/heart', authenticateUser, requireActiveGroupMembership, requireOrgFeature('insights', { message: 'Insights are disabled for this group' }), (req, res) => {
   const { post_id } = req.body;
   const ip = req.ip || req.connection.remoteAddress;
   const userId = req.user.userId;

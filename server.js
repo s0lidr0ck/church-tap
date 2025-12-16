@@ -9,6 +9,8 @@ const cron = require('node-cron');
 // Import configuration
 const { PORT } = require('./config/constants');
 const { securityHeaders, resolveOrganization } = require('./config/middleware');
+const { optionalUserJwt } = require('./middleware/optionalUserJwt');
+const { resolveActiveOrganization } = require('./middleware/resolveActiveOrganization');
 const createRateLimiter = require('./middleware/rateLimit');
 const { handleValidationError } = require('./middleware/validation');
 const { VerseImportService } = require('./services/verseService');
@@ -67,6 +69,9 @@ app.use(session({
 
 // Organization resolution middleware (must come before routes)
 app.use(resolveOrganization);
+// Optional user auth + org context from active_organization_id (account-driven groups)
+app.use(optionalUserJwt);
+app.use(resolveActiveOrganization);
 
 // Rate limiting setup
 const rateLimiter = createRateLimiter({

@@ -3,11 +3,12 @@ const { dbQuery, db } = require('../config/database');
 const { validateInput } = require('../middleware/validation');
 const { authenticateUser } = require('../middleware/userAuth');
 const { requireActiveGroupMembership } = require('../middleware/membershipGate');
+const { requireOrgFeature } = require('../middleware/featureGate');
 
 const router = express.Router();
 
 // Submit prayer request
-router.post('/', authenticateUser, requireActiveGroupMembership, validateInput.communityContent, validateInput.sanitizeHtml, (req, res) => {
+router.post('/', authenticateUser, requireActiveGroupMembership, requireOrgFeature('prayerRequests', { message: 'Prayer Requests are disabled for this group' }), validateInput.communityContent, validateInput.sanitizeHtml, (req, res) => {
   const { content, date, is_anonymous } = req.body;
   const ip = req.ip || req.connection.remoteAddress;
   const today = date || new Date().toISOString().split('T')[0];
@@ -53,7 +54,7 @@ router.post('/', authenticateUser, requireActiveGroupMembership, validateInput.c
 });
 
 // Pray for prayer request
-router.post('/pray', authenticateUser, requireActiveGroupMembership, (req, res) => {
+router.post('/pray', authenticateUser, requireActiveGroupMembership, requireOrgFeature('prayerRequests', { message: 'Prayer Requests are disabled for this group' }), (req, res) => {
   const { prayer_request_id } = req.body;
   const ip = req.ip || req.connection.remoteAddress;
   const userId = req.user.userId;

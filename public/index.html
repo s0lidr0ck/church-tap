@@ -117,6 +117,38 @@
         <button id="searchBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
           🔍 Search Verses
         </button>
+        <button id="fundraisingBtn" class="hidden w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+          🎯 Fundraising
+        </button>
+        <button id="playlistBtn" class="hidden w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+          📺 Worship Playlist
+        </button>
+
+        <!-- Group/Organization Section (moved up for easy access) -->
+        <div id="groupSection" class="border-t border-gray-200 dark:border-gray-600 pt-3">
+          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-3">
+            Current Group
+          </div>
+
+          <!-- Current Group Name (kept compact; chips show the actual switch options) -->
+          <div id="currentGroupDisplay" class="px-3 mb-2 mx-3">
+            <div class="text-sm font-medium text-gray-700 dark:text-gray-300" id="currentGroupName">Loading...</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">Tap a chip to switch quickly</div>
+          </div>
+
+          <!-- Quick group switch chips (populated by JS) -->
+          <div id="groupQuickList" class="mx-3 mb-2"></div>
+
+          <!-- Switch Group Button -->
+          <button id="changeGroupBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+            🔄 Switch Group
+          </button>
+
+          <!-- Join a Group Button -->
+          <button id="requestGroupBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+            ➕ Join a Group
+          </button>
+        </div>
         
         <!-- Settings & Controls -->
         <div class="border-t border-gray-200 dark:border-gray-600 pt-3">
@@ -149,42 +181,13 @@
             </button>
           </div>
         </div>
-
-        <!-- Group/Organization Section -->
-        <div id="groupSection" class="border-t border-gray-200 dark:border-gray-600 pt-3">
-          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-3">
-            Current Group
-          </div>
-
-          <!-- Current Group Display -->
-          <div id="currentGroupDisplay" class="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg mb-2 mx-3">
-            <div class="flex items-center space-x-2">
-              <span class="text-blue-600 dark:text-blue-400">⛪</span>
-              <div class="flex-1">
-                <div class="text-sm font-medium text-gray-700 dark:text-gray-300" id="currentGroupName">
-                  Loading...
-                </div>
-                <div class="text-xs text-gray-500 dark:text-gray-400">
-                  Your church group
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Switch Group Button -->
-          <button id="changeGroupBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-            🔄 Switch Group
-          </button>
-
-          <!-- Join a Group Button -->
-          <button id="requestGroupBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-            ➕ Join a Group
-          </button>
-        </div>
         
         
         <!-- User-specific menu items -->
         <div id="userMenuItems" class="hidden border-t border-gray-200 dark:border-gray-600 pt-3">
+          <button id="adminPanelBtn" class="hidden w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-indigo-700 dark:text-indigo-300">
+            🛠️ Admin Panel
+          </button>
           <button id="collectionsBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
             📚 My Collections
           </button>
@@ -399,6 +402,13 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h16v16H4V4zM8 8h.01M16 8h.01M8 16h.01M16 16h.01M12 12h.01"></path>
             </svg>
             <span class="text-xs text-gray-600 dark:text-gray-400">Random</span>
+          </button>
+          <!-- Topics Button -->
+          <button id="topicsBtn" class="flex flex-col items-center space-y-1 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation min-w-[60px] min-h-[60px]" aria-label="Browse topics">
+            <svg class="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+            </svg>
+            <span class="text-xs text-gray-600 dark:text-gray-400">Topics</span>
           </button>
         </div>
       </div>

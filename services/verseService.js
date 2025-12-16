@@ -48,6 +48,19 @@ class VerseImportService {
   }
 
   /**
+   * Normalize verse text coming from external APIs.
+   * Some providers return HTML with <br> tags for line breaks.
+   */
+  normalizeImportedVerseText(text) {
+    if (!text || typeof text !== 'string') return text;
+    return text
+      .replace(/\r\n/g, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  /**
    * Map our Bible version codes to bolls.life API translation codes
    */
   getBollsTranslationId(version) {
@@ -147,6 +160,8 @@ class VerseImportService {
         version,
         verseRef.bookName     // Book name for display (e.g., "John")
       );
+
+      const normalizedText = this.normalizeImportedVerseText(verseData.text);
       
       // Insert into database
       const insertResult = await db.query(
@@ -157,10 +172,10 @@ class VerseImportService {
         [
           date,
           'text',
-          verseData.text,
+          normalizedText,
           verseData.reference,
-          `Daily verse automatically imported from ${version}`,
-          `daily, ${version.toLowerCase()}, auto-import`,
+          null,
+          `daily, ${version.toLowerCase()}`,
           true,
           organizationId
         ]
@@ -173,7 +188,7 @@ class VerseImportService {
       return {
         id: importedVerse.id,
         reference: verseData.reference,
-        text: verseData.text,
+        text: normalizedText,
         date: date,
         version: version
       };

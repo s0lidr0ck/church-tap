@@ -1,7 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const { dbQuery, db } = require('../config/database');
 const { JWT_SECRET } = require('../config/constants');
 const { validateInput } = require('../middleware/validation');
@@ -53,14 +52,14 @@ router.post('/register', validateInput.email, validateInput.password, validateIn
 
       // Hash password
       const passwordHash = await bcrypt.hash(password, 12);
-      const verificationToken = crypto.randomBytes(32).toString('hex');
 
       // Create user (Postgres) and return ID
       db.query(
-        `INSERT INTO ct_users (email, password_hash, first_name, last_name, display_name, verification_token)
+        `INSERT INTO ct_users (email, password_hash, first_name, last_name, display_name, organization_id)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id, email, first_name, last_name, display_name, is_verified`,
-        [email.toLowerCase(), passwordHash, firstName || null, lastName || null, displayName || null, verificationToken],
+        // Default org to 1 for now; group membership is tracked separately via ct_user_organization_memberships
+        [email.toLowerCase(), passwordHash, firstName || null, lastName || null, displayName || null, 1],
         async (insertErr, insertResult) => {
           if (insertErr) {
             console.error('Create user error:', insertErr);

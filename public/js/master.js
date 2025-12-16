@@ -736,6 +736,356 @@ class MasterPortal {
       this.loadGlobalAnalytics();
     } else if (tabName === 'tagActivities') {
       this.loadTagActivities();
+    } else if (tabName === 'system') {
+      this.loadDefaultTopicsMaster();
+    }
+  }
+
+  // ===========================
+  // Default Topics (System) - Master
+  // ===========================
+  async loadDefaultTopicsMaster() {
+    try {
+      const res = await fetch('/api/master/topic-templates');
+      const data = await res.json().catch(() => null);
+      this.defaultTopics = data?.success ? (data.topics || []) : [];
+
+      const createBtn = document.getElementById('createMasterTopicBtn');
+      if (createBtn && !createBtn.dataset.wired) {
+        createBtn.dataset.wired = '1';
+        createBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.createDefaultTopicTemplate();
+        });
+      }
+
+      const addVerseBtn = document.getElementById('addMasterTopicVerseBtn');
+      if (addVerseBtn && !addVerseBtn.dataset.wired) {
+        addVerseBtn.dataset.wired = '1';
+        addVerseBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.addDefaultTopicVerse();
+        });
+      }
+
+      // Preview verse button
+      const previewVerseBtn = document.getElementById('masterVersePreviewBtn');
+      if (previewVerseBtn && !previewVerseBtn.dataset.wired) {
+        previewVerseBtn.dataset.wired = '1';
+        previewVerseBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.previewVerse();
+        });
+      }
+
+      // Refresh preview button
+      const refreshPreviewBtn = document.getElementById('masterVersePreviewRefresh');
+      if (refreshPreviewBtn && !refreshPreviewBtn.dataset.wired) {
+        refreshPreviewBtn.dataset.wired = '1';
+        refreshPreviewBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.previewVerse();
+        });
+      }
+
+      // Auto-preview on Enter key in reference field (with debouncing)
+      const refInput = document.getElementById('masterTopicVerseReference');
+      if (refInput && !refInput.dataset.wired) {
+        refInput.dataset.wired = '1';
+        let previewTimeout = null;
+        refInput.addEventListener('input', () => {
+          // Clear existing timeout
+          if (previewTimeout) clearTimeout(previewTimeout);
+          
+          // Hide preview if input is empty
+          const previewContainer = document.getElementById('masterVersePreviewContainer');
+          if (!refInput.value.trim() && previewContainer) {
+            previewContainer.classList.add('hidden');
+            return;
+          }
+          
+          // Debounce preview - show after 1 second of no typing
+          previewTimeout = setTimeout(() => {
+            this.previewVerse();
+          }, 1000);
+        });
+        
+        // Also preview on Enter key
+        refInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            if (previewTimeout) clearTimeout(previewTimeout);
+            this.previewVerse();
+          }
+        });
+      }
+
+      this.renderDefaultTopicsMaster();
+
+      if (this.selectedDefaultTopicId) {
+        await this.loadDefaultTopicVerses(this.selectedDefaultTopicId);
+      } else {
+        this.renderDefaultTopicVerses([]);
+      }
+    } catch (e) {
+      console.error('Error loading default topics (master):', e);
+      this.defaultTopics = [];
+      this.renderDefaultTopicsMaster();
+      this.renderDefaultTopicVerses([]);
+    }
+  }
+
+  renderDefaultTopicsMaster() {
+    const noMsg = document.getElementById('noMasterTopicsMessage');
+    const table = document.getElementById('masterTopicsTableContainer');
+    const body = document.getElementById('masterTopicsTableBody');
+    if (!noMsg || !table || !body) return;
+
+    const topics = Array.isArray(this.defaultTopics) ? this.defaultTopics : [];
+    if (topics.length === 0) {
+      noMsg.classList.remove('hidden');
+      table.classList.add('hidden');
+      body.innerHTML = '';
+      return;
+    }
+
+    noMsg.classList.add('hidden');
+    table.classList.remove('hidden');
+
+    body.innerHTML = topics.map(t => {
+      const isSelected = this.selectedDefaultTopicId === t.id;
+      const rowCls = isSelected ? 'bg-blue-50' : 'hover:bg-gray-50';
+      return `
+        <tr class="${rowCls}">
+          <td class="px-4 py-3 text-sm font-medium text-gray-900">
+            <button class="text-left hover:underline" onclick="masterPortal.selectDefaultTopic(${t.id}, '${this.escapeHtml(t.name)}')">
+              ${this.escapeHtml(t.name)}
+            </button>
+          </td>
+          <td class="px-4 py-3 text-sm text-gray-700">${t.verse_count ?? 0}</td>
+          <td class="px-4 py-3 text-right text-sm">
+            <button class="text-red-600 hover:text-red-900 font-medium" onclick="masterPortal.deleteDefaultTopic(${t.id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async createDefaultTopicTemplate() {
+    const nameEl = document.getElementById('masterTopicNameInput');
+    const descEl = document.getElementById('masterTopicDescInput');
+    const name = (nameEl?.value || '').trim();
+    const description = (descEl?.value || '').trim();
+    if (!name) return this.showToast('Topic name is required', 'error');
+
+    try {
+      const res = await fetch('/api/master/topic-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description })
+      });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.error || 'Failed to create topic');
+      if (nameEl) nameEl.value = '';
+      if (descEl) descEl.value = '';
+      this.showToast('Default topic created', 'success');
+      await this.loadDefaultTopicsMaster();
+    } catch (e) {
+      console.error('Error creating default topic:', e);
+      this.showToast(e.message || 'Failed to create topic', 'error');
+    }
+  }
+
+  async deleteDefaultTopic(templateId) {
+    if (!confirm('Delete this default topic and all its verses?')) return;
+    try {
+      const res = await fetch(`/api/master/topic-templates/${templateId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.error || 'Failed to delete topic');
+
+      if (this.selectedDefaultTopicId === templateId) {
+        this.selectedDefaultTopicId = null;
+        const nameEl = document.getElementById('masterSelectedTopicName');
+        if (nameEl) nameEl.textContent = 'None';
+        this.renderDefaultTopicVerses([]);
+      }
+
+      this.showToast('Default topic deleted', 'success');
+      await this.loadDefaultTopicsMaster();
+    } catch (e) {
+      console.error('Error deleting default topic:', e);
+      this.showToast(e.message || 'Failed to delete topic', 'error');
+    }
+  }
+
+  async selectDefaultTopic(templateId, name) {
+    this.selectedDefaultTopicId = templateId;
+    const nameEl = document.getElementById('masterSelectedTopicName');
+    if (nameEl) nameEl.textContent = name || 'Selected';
+    this.renderDefaultTopicsMaster();
+    await this.loadDefaultTopicVerses(templateId);
+  }
+
+  async loadDefaultTopicVerses(templateId) {
+    try {
+      const res = await fetch(`/api/master/topic-templates/${templateId}/verses`);
+      const data = await res.json().catch(() => null);
+      const verses = data?.success ? (data.verses || []) : [];
+      this.renderDefaultTopicVerses(verses);
+    } catch (e) {
+      console.error('Error loading default topic verses:', e);
+      this.renderDefaultTopicVerses([]);
+    }
+  }
+
+  renderDefaultTopicVerses(verses) {
+    const noMsg = document.getElementById('noMasterTopicVersesMessage');
+    const table = document.getElementById('masterTopicVersesTableContainer');
+    const body = document.getElementById('masterTopicVersesTableBody');
+    if (!noMsg || !table || !body) return;
+
+    if (!this.selectedDefaultTopicId) {
+      noMsg.classList.remove('hidden');
+      table.classList.add('hidden');
+      body.innerHTML = '';
+      return;
+    }
+
+    const rows = Array.isArray(verses) ? verses : [];
+    if (rows.length === 0) {
+      noMsg.classList.remove('hidden');
+      table.classList.add('hidden');
+      body.innerHTML = '';
+      return;
+    }
+
+    noMsg.classList.add('hidden');
+    table.classList.remove('hidden');
+
+    body.innerHTML = rows.map(v => `
+      <tr class="hover:bg-gray-50">
+        <td class="px-4 py-3 text-sm text-gray-900">${this.escapeHtml(v.bible_reference)}</td>
+        <td class="px-4 py-3 text-sm text-gray-700">${this.escapeHtml(v.translation_code || '')}</td>
+        <td class="px-4 py-3 text-right text-sm">
+          <button class="text-red-600 hover:text-red-900 font-medium" onclick="masterPortal.deleteDefaultTopicVerse(${this.selectedDefaultTopicId}, ${v.id})">Remove</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  async previewVerse() {
+    const refEl = document.getElementById('masterTopicVerseReference');
+    const trEl = document.getElementById('masterTopicVerseTranslation');
+    const previewContainer = document.getElementById('masterVersePreviewContainer');
+    const previewContent = document.getElementById('masterVersePreviewContent');
+    
+    if (!refEl || !previewContainer || !previewContent) return;
+    
+    const bible_reference = (refEl.value || '').trim();
+    const translation_code = (trEl?.value || '').trim();
+    
+    if (!bible_reference) {
+      previewContainer.classList.add('hidden');
+      return;
+    }
+
+    // Show loading state
+    previewContainer.classList.remove('hidden');
+    previewContent.innerHTML = '<div class="text-gray-500">Loading preview...</div>';
+
+    try {
+      const res = await fetch('/api/master/topic-templates/preview-verse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bible_reference, translation_code: translation_code || null })
+      });
+      
+      const data = await res.json().catch(() => null);
+      
+      if (!data?.success) {
+        previewContent.innerHTML = `<div class="text-red-600">${this.escapeHtml(data?.error || 'Failed to parse reference')}</div>`;
+        return;
+      }
+
+      const { parsed, verse_text, translation, fetch_error, is_range } = data;
+      
+      let html = '<div class="space-y-2">';
+      
+      // Show parsed reference info
+      html += `<div class="font-semibold text-gray-900">${this.escapeHtml(parsed.normalized_reference)}</div>`;
+      
+      if (is_range) {
+        html += `<div class="text-xs text-gray-600">Range: ${parsed.verse_start}-${parsed.verse_end} (${parsed.verse_end - parsed.verse_start + 1} verses)</div>`;
+      } else {
+        html += `<div class="text-xs text-gray-600">Single verse</div>`;
+      }
+      
+      html += `<div class="text-xs text-gray-500">Translation: ${this.escapeHtml(translation)}</div>`;
+      
+      // Show verse text if available
+      if (verse_text) {
+        html += '<div class="mt-3 pt-3 border-t border-gray-300">';
+        html += '<div class="text-xs font-semibold text-gray-700 mb-1">Verse Text:</div>';
+        html += `<div class="text-sm text-gray-800 whitespace-pre-wrap">${this.escapeHtml(verse_text)}</div>`;
+        html += '</div>';
+      } else if (fetch_error) {
+        html += `<div class="mt-3 pt-3 border-t border-gray-300 text-xs text-amber-600">⚠️ Could not fetch verse text: ${this.escapeHtml(fetch_error)}</div>`;
+      } else {
+        html += '<div class="mt-3 pt-3 border-t border-gray-300 text-xs text-gray-500">Verse text will be fetched when added</div>';
+      }
+      
+      html += '</div>';
+      previewContent.innerHTML = html;
+      
+    } catch (e) {
+      console.error('Error previewing verse:', e);
+      previewContent.innerHTML = `<div class="text-red-600">Error: ${this.escapeHtml(e.message || 'Failed to preview verse')}</div>`;
+    }
+  }
+
+  async addDefaultTopicVerse() {
+    if (!this.selectedDefaultTopicId) return this.showToast('Select a topic first', 'error');
+
+    const refEl = document.getElementById('masterTopicVerseReference');
+    const trEl = document.getElementById('masterTopicVerseTranslation');
+    const bible_reference = (refEl?.value || '').trim();
+    const translation_code = (trEl?.value || '').trim();
+    if (!bible_reference) return this.showToast('Bible reference is required', 'error');
+
+    try {
+      const res = await fetch(`/api/master/topic-templates/${this.selectedDefaultTopicId}/verses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bible_reference, translation_code: translation_code || null })
+      });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.error || 'Failed to add verse');
+      if (refEl) refEl.value = '';
+      if (trEl) trEl.value = '';
+      
+      // Hide preview after successful add
+      const previewContainer = document.getElementById('masterVersePreviewContainer');
+      if (previewContainer) previewContainer.classList.add('hidden');
+      
+      this.showToast('Verse added', 'success');
+      await this.loadDefaultTopicsMaster();
+    } catch (e) {
+      console.error('Error adding default topic verse:', e);
+      this.showToast(e.message || 'Failed to add verse', 'error');
+    }
+  }
+
+  async deleteDefaultTopicVerse(templateId, verseId) {
+    if (!confirm('Remove this verse from the topic?')) return;
+    try {
+      const res = await fetch(`/api/master/topic-templates/${templateId}/verses/${verseId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => null);
+      if (!data?.success) throw new Error(data?.error || 'Failed to remove verse');
+      this.showToast('Verse removed', 'success');
+      await this.loadDefaultTopicsMaster();
+    } catch (e) {
+      console.error('Error removing default topic verse:', e);
+      this.showToast(e.message || 'Failed to remove verse', 'error');
     }
   }
 
@@ -1278,6 +1628,16 @@ class MasterPortal {
 
   formatDate(dateString) {
     return new Date(dateString).toLocaleDateString();
+  }
+
+  escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   showToast(message, type = 'success') {
@@ -3246,3 +3606,4 @@ class MasterPortal {
 
 // Initialize master portal
 const masterPortal = new MasterPortal();
+window.masterPortal = masterPortal;

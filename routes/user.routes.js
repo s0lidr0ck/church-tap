@@ -2,8 +2,47 @@ const express = require('express');
 const { db } = require('../config/database');
 
 const router = express.Router();
-
 const { authenticateUser } = require('../middleware/userAuth');
+
+
+// Return orgs where this user is an org admin (by matching email to ct_admin_users/CT_admin_users)
+router.get('/admin-organizations', authenticateUser, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const userResult = await db.query(`SELECT email FROM ct_users WHERE id = $1`, [userId]);
+    const email = userResult.rows[0]?.email;
+    if (!email) {
+      return res.json({ success: true, organizations: [] });
+    }
+
+    // Handle mixed-case table naming in this codebase by querying the lower-case table first,
+    // then falling back to the CT_* variant if needed.
+    const sqlLower = `
+      SELECT au.organization_id, o.name, o.subdomain, au.role
+      FROM ct_admin_users au
+      JOIN ct_organizations o ON o.id = au.organization_id
+      WHERE LOWER(au.email) = LOWER($1) AND au.is_active = TRUE
+    `;
+
+    let result;
+    try {
+      result = await db.query(sqlLower, [email]);
+    } catch (e) {
+      const sqlUpper = `
+        SELECT au.organization_id, o.name, o.subdomain, au.role
+        FROM CT_admin_users au
+        JOIN CT_organizations o ON o.id = au.organization_id
+        WHERE LOWER(au.email) = LOWER($1) AND au.is_active = TRUE
+      `;
+      result = await db.query(sqlUpper, [email]);
+    }
+
+    return res.json({ success: true, organizations: result.rows || [] });
+  } catch (error) {
+    console.error('Error fetching admin organizations:', error);
+    return res.status(500).json({ success: false, error: 'Database error' });
+  }
+});
 
 // Link a bracelet to the current user's account
 router.post('/link-bracelet', authenticateUser, (req, res) => {

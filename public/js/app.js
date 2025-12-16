@@ -36,20 +36,39 @@ class ChurchTapApp {
     this.currentUser = null;
     this.authToken = null;
     this.membershipContext = null;
+    this.adminOrganizations = null;
+
+    // Per-group feature flags (loaded from /api/organization/features)
+    this.orgFeatures = null;
+    this.translationCatalog = [];
+
+    // Emergency Topics + Fundraising + Playlist helpers
+    this._topics = null;
+    this._fundraising = null;
+    this._playlistLink = null;
     
     // PWA install prompt
     this.deferredPrompt = null;
     this.setupPWAInstall();
     
-    this.init();
+    this.init().catch((error) => {
+      console.error('Init error:', error);
+      this.showCriticalError('Application failed to initialize. Please refresh the page.');
+      this.hideSplashScreen();
+    });
   }
 
-  init() {
+  async init() {
     try {
       this.setupEventListeners();
       this.applyTheme();
       this.applyTextSize();
       this.checkAuthStatus();
+
+      // Load org feature flags early so we can hide/disable UI and skip calls
+      await this.loadOrganizationFeatures();
+      this.applyFeatureTogglesToUI();
+
       this.updateTranslationButtons();
       this.hideSplashScreen();
       
@@ -69,8 +88,16 @@ class ChurchTapApp {
       this.setupSwipeGestures();
       this.checkNotificationPermission();
       this.detectNFCSupport();
-      this.loadOrganizationLinks();
-      this.updateCalendarIndicatorForToday();
+      if (this.isFeatureEnabled('group_links_enabled')) {
+        this.loadOrganizationLinks();
+      }
+      if (this.isFeatureEnabled('group_calendar_enabled')) {
+        this.updateCalendarIndicatorForToday();
+      }
+
+      // Optional: show fundraising button if configured
+      this.loadFundraising().catch(() => {});
+      this.loadWorshipPlaylist().catch(() => {});
       this.initCTA();
       this.updateMenuIndicators();
       this.updateTagSessionUI();
@@ -90,6 +117,125 @@ class ChurchTapApp {
     }
   }
 
+  // ===========================
+  // Organization Feature Flags
+  // ===========================
+  async loadOrganizationFeatures() {
+    try {
+      const res = await fetch(this.withOrg('/api/organization/features'), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (data?.success) {
+        this.orgFeatures = data.features || null;
+        this.translationCatalog = data.translation_catalog || [];
+      } else {
+        this.orgFeatures = null;
+        this.translationCatalog = [];
+      }
+    } catch (e) {
+      console.error('Failed to load organization features:', e);
+      this.orgFeatures = null;
+      this.translationCatalog = [];
+    }
+  }
+
+  isFeatureEnabled(flagName) {
+    // Fail-open: if we can't load flags, keep everything enabled.
+    if (!this.orgFeatures) return true;
+    if (!flagName) return true;
+    return this.orgFeatures[flagName] !== false;
+  }
+
+  getEnabledTranslationCodes() {
+    const enabled = this.orgFeatures?.enabled_translations;
+    const catalogCodes = (this.translationCatalog || []).map(t => String(t.code || '').toUpperCase()).filter(Boolean);
+    if (enabled === null || enabled === undefined) return catalogCodes;
+    if (!Array.isArray(enabled)) return catalogCodes;
+    // Allow empty array => none
+    return enabled.map(c => String(c || '').toUpperCase()).filter(Boolean);
+  }
+
+  applyFeatureTogglesToUI() {
+    // Links
+    if (!this.isFeatureEnabled('group_links_enabled')) {
+      const linksBtn = document.getElementById('linksBtn');
+      if (linksBtn) linksBtn.style.display = 'none';
+      const menu = document.getElementById('quickLinksMenu');
+      if (menu) menu.classList.add('hidden');
+    }
+
+    // Calendar
+    if (!this.isFeatureEnabled('group_calendar_enabled')) {
+      const calBtn = document.getElementById('calendarBtn');
+      if (calBtn) calBtn.style.display = 'none';
+      const indicator = document.getElementById('calendarIndicator');
+      if (indicator) indicator.classList.add('hidden');
+    }
+
+    // Community action buttons
+    if (!this.isFeatureEnabled('prayer_requests_enabled')) {
+      const btn = document.getElementById('submitPrayerBtn');
+      if (btn) btn.style.display = 'none';
+    }
+    if (!this.isFeatureEnabled('praise_reports_enabled')) {
+      const btn = document.getElementById('submitPraiseBtn');
+      if (btn) btn.style.display = 'none';
+    }
+    if (!this.isFeatureEnabled('insights_enabled')) {
+      const btn = document.getElementById('submitInsightBtn');
+      if (btn) btn.style.display = 'none';
+    }
+
+    // Translations: hide "View in Translation" if no translations enabled
+    const enabledTranslations = this.getEnabledTranslationCodes();
+    if (Array.isArray(enabledTranslations) && enabledTranslations.length === 0) {
+      ['textTranslationBtn', 'textTranslationBtnDesktop', 'imageTranslationBtn', 'imageTranslationBtnDesktop'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
+    }
+  }
+
+  escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  normalizeVerseText(text) {
+    if (!text || typeof text !== 'string') return '';
+    return text
+      .replace(/\r\n/g, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  plainTextFromVerseText(text) {
+    const normalized = this.normalizeVerseText(text);
+    return normalized.replace(/\s+/g, ' ').trim();
+  }
+
+  getDisplayTags(tagsString) {
+    if (!tagsString || typeof tagsString !== 'string') return [];
+    const hidden = new Set(['auto-import', 'auto_import', 'autoimport', 'auto imported', 'autoimported']);
+    return tagsString
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean)
+      .filter(t => !hidden.has(t.toLowerCase()));
+  }
+
+  shouldHideContext(context) {
+    if (!context || typeof context !== 'string') return true;
+    const c = context.trim();
+    if (!c) return true;
+    return /^Daily verse automatically imported from\s+/i.test(c);
+  }
+
   async fetchMembershipContext() {
     try {
       const response = await fetch('/api/memberships', { credentials: 'include' });
@@ -102,13 +248,28 @@ class ChurchTapApp {
     }
   }
 
+  async fetchAdminOrganizations() {
+    try {
+      const response = await fetch('/api/user/admin-organizations', { credentials: 'include' });
+      if (!response.ok) return { organizations: [] };
+      const data = await response.json();
+      if (!data.success) return { organizations: [] };
+      return data;
+    } catch (e) {
+      return { organizations: [] };
+    }
+  }
+
   // Build URL with org subdomain hint and extra query params
   withOrg(path, extraParams = {}) {
     // For API calls, use relative URLs so they go to the same server serving the page
     if (path.startsWith('/api/')) {
       // Use URLSearchParams for relative URLs to avoid origin issues
       const params = new URLSearchParams();
-      if (this.orgParam) params.set('org', this.orgParam);
+      // If logged in, org context is derived server-side from active_organization_id.
+      if (this.orgParam && !(this.currentUser && this.membershipContext?.active_organization_id)) {
+        params.set('org', this.orgParam);
+      }
       Object.keys(extraParams || {}).forEach(k => {
         if (extraParams[k] !== undefined && extraParams[k] !== null) {
           params.set(k, extraParams[k]);
@@ -210,9 +371,22 @@ class ChurchTapApp {
       this.requestGroup();
     });
 
+    // Admin panel button (conditionally visible)
+    const adminPanelBtn = document.getElementById('adminPanelBtn');
+    if (adminPanelBtn) {
+      adminPanelBtn.addEventListener('click', () => {
+        window.location.href = '/admin';
+        this.hideQuickMenu();
+      });
+    }
+
     // Main action buttons
     document.getElementById('randomVerseBtn').addEventListener('click', () => {
       this.showRandomVerse();
+    });
+
+    document.getElementById('topicsBtn').addEventListener('click', () => {
+      this.showTopicsWordCloud();
     });
 
     document.getElementById('shareBtn').addEventListener('click', () => {
@@ -227,6 +401,22 @@ class ChurchTapApp {
       this.showVerseSearchModal();
       this.toggleQuickMenu();
     });
+
+    const fundraisingBtn = document.getElementById('fundraisingBtn');
+    if (fundraisingBtn) {
+      fundraisingBtn.addEventListener('click', () => {
+        this.openFundraisingModal();
+        this.toggleQuickMenu();
+      });
+    }
+
+    const playlistBtn = document.getElementById('playlistBtn');
+    if (playlistBtn) {
+      playlistBtn.addEventListener('click', () => {
+        this.openPlaylistModal();
+        this.toggleQuickMenu();
+      });
+    }
 
     document.getElementById('feedbackBtn').addEventListener('click', () => {
       this.openFeedback();
@@ -254,17 +444,26 @@ class ChurchTapApp {
     });
 
     // Community event listeners
-    document.getElementById('submitPrayerBtn').addEventListener('click', () => {
-      this.showPrayerRequestModal();
-    });
+    const submitPrayerBtn = document.getElementById('submitPrayerBtn');
+    if (submitPrayerBtn) {
+      submitPrayerBtn.addEventListener('click', () => {
+        this.showPrayerRequestModal();
+      });
+    }
 
-    document.getElementById('submitPraiseBtn').addEventListener('click', () => {
-      this.showPraiseReportModal();
-    });
+    const submitPraiseBtn = document.getElementById('submitPraiseBtn');
+    if (submitPraiseBtn) {
+      submitPraiseBtn.addEventListener('click', () => {
+        this.showPraiseReportModal();
+      });
+    }
 
-    document.getElementById('submitInsightBtn').addEventListener('click', () => {
-      this.showVerseInsightModal();
-    });
+    const submitInsightBtn = document.getElementById('submitInsightBtn');
+    if (submitInsightBtn) {
+      submitInsightBtn.addEventListener('click', () => {
+        this.showVerseInsightModal();
+      });
+    }
 
     // Authentication event listeners (now in menu)
     const loginBtn = document.getElementById('loginBtn');
@@ -484,12 +683,12 @@ class ChurchTapApp {
     this.hideLoading();
     
     if (verse.content_type === 'text') {
-      document.getElementById('verseText').textContent = verse.verse_text;
+      document.getElementById('verseText').textContent = this.normalizeVerseText(verse.verse_text);
       document.getElementById('verseReference').textContent = verse.bible_reference || '';
       document.getElementById('verseReferenceDesktop').textContent = verse.bible_reference || '';
       
       const contextEl = document.getElementById('verseContext');
-      if (verse.context) {
+      if (this.isFeatureEnabled('verse_commentary_enabled') && verse.context && !this.shouldHideContext(verse.context)) {
         contextEl.textContent = verse.context;
         contextEl.classList.remove('hidden');
       } else {
@@ -507,7 +706,7 @@ class ChurchTapApp {
       document.getElementById('imageReferenceDesktop').textContent = verse.bible_reference || '';
       
       const contextEl = document.getElementById('imageContext');
-      if (verse.context) {
+      if (this.isFeatureEnabled('verse_commentary_enabled') && verse.context && !this.shouldHideContext(verse.context)) {
         contextEl.textContent = verse.context;
         contextEl.classList.remove('hidden');
       } else {
@@ -549,7 +748,7 @@ class ChurchTapApp {
       return;
     }
     
-    const tags = tagsString.split(',').map(tag => tag.trim()).filter(tag => tag);
+    const tags = this.getDisplayTags(tagsString);
     
     if (tags.length === 0) {
       tagsContainer.classList.add('hidden');
@@ -724,13 +923,378 @@ class ChurchTapApp {
     this.loadCommunity(today);
   }
 
+  // ===========================
+  // Emergency Topics + Fundraising + Playlist
+  // ===========================
+  async loadTopics() {
+    try {
+      const res = await fetch(this.withOrg('/api/organization/topics'));
+      const data = await res.json().catch(() => null);
+      this._topics = data?.success ? (data.topics || []) : [];
+    } catch (e) {
+      this._topics = [];
+    }
+    return this._topics;
+  }
+
+  async showTopicsWordCloud() {
+    try {
+      // Show loading state
+      const loadingContent = `
+        <div class="text-center py-8">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <p class="mt-4 text-gray-600 dark:text-gray-400">Loading topics...</p>
+        </div>
+      `;
+      this.showModal('Browse Topics', loadingContent);
+
+      // Fetch topics
+      const topics = await this.loadTopics();
+      
+      if (!topics || topics.length === 0) {
+        const noTopicsContent = `
+          <div class="text-center py-8">
+            <p class="text-gray-600 dark:text-gray-400">No topics available at this time.</p>
+          </div>
+        `;
+        this.showModal('Browse Topics', noTopicsContent);
+        return;
+      }
+
+      // Create word cloud content
+      const wordCloudContent = `
+        <div class="relative">
+          <button id="closeTopicsModal" class="absolute -top-2 -right-2 w-8 h-8 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 transition-colors z-10">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+          
+          <div class="mb-4">
+            <p class="text-sm text-gray-600 dark:text-gray-400 text-center">Tap a topic to get a random verse</p>
+          </div>
+          
+          <div id="topicsWordCloud" class="flex flex-wrap gap-3 justify-center items-center py-4 max-h-[60vh] overflow-y-auto">
+            ${topics.map(topic => {
+              const size = this.getTopicSize(topic, topics);
+              return `
+                <button 
+                  onclick="window.churchTapApp.selectTopicFromWordCloud(${topic.id}, '${this.escapeHtml(topic.name)}', '${topic.source || 'custom'}')"
+                  class="topic-tag px-4 py-2 rounded-full font-medium transition-all hover:scale-105 hover:shadow-lg ${this.getTopicColor(topic)}"
+                  style="font-size: ${size}px;"
+                >
+                  ${this.escapeHtml(topic.name)}
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+
+      this.showModal('Browse Topics', wordCloudContent);
+      
+      // Wire up close button after modal is created
+      setTimeout(() => {
+        const closeBtn = document.getElementById('closeTopicsModal');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.closeModal();
+          });
+        }
+      }, 0);
+    } catch (error) {
+      console.error('Error loading topics word cloud:', error);
+      this.showToast('Failed to load topics');
+      this.closeModal();
+    }
+  }
+
+  getTopicSize(topic, allTopics) {
+    // Base size
+    const baseSize = 14;
+    const minSize = 12;
+    const maxSize = 24;
+    
+    // Sort order affects size (lower sort_order = larger)
+    // Also consider if it's a default topic (usually more important)
+    const sortOrderFactor = topic.sort_order !== undefined ? Math.max(0, 20 - topic.sort_order) : 10;
+    const sourceFactor = topic.source === 'default' ? 1.2 : 1.0;
+    
+    // Calculate size with some randomization for visual interest
+    const calculatedSize = baseSize + (sortOrderFactor * 0.3) * sourceFactor;
+    
+    // Add slight random variation for word cloud effect
+    const randomVariation = (Math.random() - 0.5) * 2;
+    const finalSize = Math.max(minSize, Math.min(maxSize, calculatedSize + randomVariation));
+    
+    return Math.round(finalSize);
+  }
+
+  getTopicColor(topic) {
+    // Different colors for default vs custom topics
+    if (topic.source === 'default') {
+      return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800';
+    } else {
+      return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-800';
+    }
+  }
+
+  async selectTopicFromWordCloud(topicId, topicName, source) {
+    try {
+      // Close the word cloud modal
+      if (this.currentModal) {
+        this.closeModal();
+      }
+      
+      // Show loading
+      this.showToast(`Loading verse from "${topicName}"...`);
+      
+      // Fetch random verse from this topic
+      const url = source === 'default' 
+        ? this.withOrg(`/api/organization/default-topics/${topicId}/random`)
+        : this.withOrg(`/api/organization/topics/${topicId}/random`);
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (!data.success || !data.verse) {
+        throw new Error(data.error || 'Failed to load verse');
+      }
+      
+      const verse = data.verse;
+      const safeVerseTextHtml = this.escapeHtml(this.normalizeVerseText(verse.verse_text)).replace(/\n/g, '<br>');
+      const safeReference = this.escapeHtml(verse.bible_reference || '');
+      const safeTopicName = this.escapeHtml(topicName);
+      
+      // Create modal content for the topic verse
+      const verseContent = `
+        <div class="relative">
+          <button class="absolute -top-2 -right-2 w-8 h-8 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 transition-colors" onclick="app.closeModal()">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+          
+          <div class="text-center space-y-4">
+            <div class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 mb-4">
+              📚 ${safeTopicName}${verse.translation ? ` • ${verse.translation}` : ''}
+            </div>
+            
+            <div class="verse-text text-lg leading-relaxed text-gray-800 dark:text-gray-200 mb-6">
+              ${safeVerseTextHtml}
+            </div>
+            
+            <div class="verse-reference text-base font-semibold text-primary-600 dark:text-primary-400 mb-4">
+              ${safeReference}
+            </div>
+            
+            <div class="flex justify-center flex-wrap gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <button id="shareTopicVerse" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors min-w-[100px] border border-blue-700">
+                📤 Share
+              </button>
+              <button id="getAnotherTopicVerse" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors min-w-[100px] border border-purple-700" style="background-color: #9333ea; border-color: #7e22ce; color: white;">
+                🔄 Another
+              </button>
+              <button id="browseMoreTopics" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors min-w-[100px] border border-gray-700">
+                📋 Browse Topics
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      this.showModal(`Verse from ${safeTopicName}`, verseContent);
+      
+      // Wire up buttons
+      const shareBtn = document.getElementById('shareTopicVerse');
+      if (shareBtn) {
+        shareBtn.addEventListener('click', () => {
+          this.shareTopicVerse(verse);
+        });
+      }
+      
+      document.getElementById('getAnotherTopicVerse')?.addEventListener('click', () => {
+        this.selectTopicFromWordCloud(topicId, topicName, source);
+      });
+      
+      document.getElementById('browseMoreTopics')?.addEventListener('click', () => {
+        this.showTopicsWordCloud();
+      });
+      
+      // Track analytics
+      this.trackAnalytics('topic_verse_viewed', { topicId, topicName });
+      
+    } catch (error) {
+      console.error('Error loading topic verse:', error);
+      this.showToast(error.message || 'Failed to load verse from topic');
+    }
+  }
+
+  async loadFundraising() {
+    try {
+      const res = await fetch(this.withOrg('/api/organization/fundraising'));
+      const data = await res.json().catch(() => null);
+      this._fundraising = data?.success ? (data.fundraising || null) : null;
+    } catch (e) {
+      this._fundraising = null;
+    }
+
+    const btn = document.getElementById('fundraisingBtn');
+    if (btn) {
+      if (this._fundraising) btn.classList.remove('hidden');
+      else btn.classList.add('hidden');
+    }
+
+    return this._fundraising;
+  }
+
+  async loadWorshipPlaylist() {
+    try {
+      const res = await fetch(this.withOrg('/api/organization/worship-playlist'));
+      const data = await res.json().catch(() => null);
+      const p = data?.success ? (data.playlist || null) : null;
+      this._playlistLink = (p && p.youtube_url) ? { title: p.title || 'Worship Playlist', url: p.youtube_url } : null;
+    } catch (e) {
+      this._playlistLink = null;
+    }
+
+    const btn = document.getElementById('playlistBtn');
+    if (btn) {
+      if (this._playlistLink) btn.classList.remove('hidden');
+      else btn.classList.add('hidden');
+    }
+
+    return this._playlistLink;
+  }
+
+  getYoutubeEmbedUrl(rawUrl) {
+    try {
+      const u = new URL(rawUrl);
+      const host = u.hostname.replace(/^www\./, '').toLowerCase();
+      const isYoutube = host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtu.be' || host === 'music.youtube.com';
+      if (!isYoutube) return null;
+
+      const list = u.searchParams.get('list');
+      if (list) return `https://www.youtube-nocookie.com/embed/videoseries?list=${encodeURIComponent(list)}`;
+
+      if (host === 'youtu.be') {
+        const vid = u.pathname.replace('/', '').trim();
+        if (vid) return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(vid)}`;
+      }
+
+      const vid = u.searchParams.get('v');
+      if (vid) return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(vid)}`;
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  openPlaylistModal() {
+    const link = this._playlistLink;
+    if (!link?.url) {
+      this.showToast('No playlist configured');
+      return;
+    }
+
+    const embed = this.getYoutubeEmbedUrl(link.url);
+    const safeTitle = this.escapeHtml(link.title || 'Worship Playlist');
+
+    const body = embed ? `
+      <div class="space-y-4">
+        <div class="text-sm text-gray-600 dark:text-gray-400">${safeTitle}</div>
+        <div class="relative w-full" style="padding-top:56.25%;">
+          <iframe
+            src="${embed}"
+            title="${safeTitle}"
+            class="absolute inset-0 w-full h-full rounded-xl border border-gray-200 dark:border-gray-700"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen>
+          </iframe>
+        </div>
+        <div class="flex justify-end">
+          <button id="openPlaylistExternalBtn" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg text-sm">
+            Open in YouTube
+          </button>
+        </div>
+      </div>
+    ` : `
+      <div class="space-y-4">
+        <div class="text-sm text-gray-600 dark:text-gray-400">${safeTitle}</div>
+        <p class="text-sm text-gray-600 dark:text-gray-400">We couldn’t embed this URL, but you can open it in YouTube:</p>
+        <button id="openPlaylistExternalBtn" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">
+          Open Link
+        </button>
+      </div>
+    `;
+
+    this.showModal('Worship Playlist', body);
+    const openBtn = document.getElementById('openPlaylistExternalBtn');
+    if (openBtn) {
+      openBtn.addEventListener('click', () => {
+        window.open(link.url, '_blank');
+      });
+    }
+    this.trackAnalytics && this.trackAnalytics('playlist_open');
+  }
+
+  openFundraisingModal() {
+    const f = this._fundraising;
+    if (!f) {
+      this.showToast('No fundraiser configured');
+      return;
+    }
+
+    const goal = (f.goal_amount_cents || 0) / 100;
+    const current = (f.current_amount_cents || 0) / 100;
+    const pct = goal > 0 ? Math.min(100, Math.round((current / goal) * 100)) : 0;
+    const deadline = f.deadline_date ? new Date(f.deadline_date).toLocaleDateString() : null;
+
+    const body = `
+      <div class="space-y-4">
+        <div class="text-lg font-semibold text-gray-800 dark:text-gray-200">${this.escapeHtml(f.goal_title)}</div>
+        <div class="text-sm text-gray-600 dark:text-gray-400">${this.escapeHtml(`$${current.toFixed(2)} raised of $${goal.toFixed(2)} (${pct}%)`)}</div>
+        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+          <div class="h-3 bg-green-600" style="width:${pct}%"></div>
+        </div>
+        ${deadline ? `<div class="text-xs text-gray-500 dark:text-gray-400">Deadline: ${this.escapeHtml(deadline)}</div>` : ''}
+      </div>
+    `;
+
+    this.showModal('Fundraising', body);
+    this.trackAnalytics && this.trackAnalytics('fundraising_open');
+  }
+
   async showRandomVerse() {
     try {
+      if (this._topics === null) {
+        await this.loadTopics();
+      }
+
+      const topics = Array.isArray(this._topics) ? this._topics : [];
+      const topicsDropdown = topics.length ? `
+        <div class="mb-4">
+          <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Topic (Emergency Scripture)</label>
+          <select id="topicSelect" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-200">
+            <option value="">Any (Random)</option>
+            ${topics.map(t => `<option value="${this.escapeHtml(`${t.source || 'custom'}:${t.id}`)}">${this.escapeHtml(t.name)}</option>`).join('')}
+          </select>
+        </div>
+      ` : '';
+
       const response = await fetch(this.buildApiUrl('/api/verse/random'));
       const data = await response.json();
       
       if (data.success && data.verse) {
         const verse = data.verse;
+        const safeVerseTextHtml = this.escapeHtml(this.normalizeVerseText(verse.verse_text)).replace(/\n/g, '<br>');
+        const safeReference = this.escapeHtml(verse.bible_reference || '');
+        const safeContextHtml = (this.isFeatureEnabled('verse_commentary_enabled') && verse.context && !this.shouldHideContext(verse.context))
+          ? `<div class="text-sm text-gray-600 dark:text-gray-400 italic">${this.escapeHtml(verse.context)}</div>`
+          : '';
         
         // Create modal content for the random verse
         const verseContent = `
@@ -745,16 +1309,17 @@ class ChurchTapApp {
               <div class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 mb-4">
                 🎲 Random Verse${verse.source === 'bolls.life' ? ` • ${verse.translation}` : ''}
               </div>
+              ${topicsDropdown}
             
             <div class="verse-text text-lg leading-relaxed text-gray-800 dark:text-gray-200 mb-6">
-              ${verse.verse_text}
+              ${safeVerseTextHtml}
             </div>
             
             <div class="verse-reference text-base font-semibold text-primary-600 dark:text-primary-400 mb-4">
-              ${verse.bible_reference}
+              ${safeReference}
             </div>
             
-            ${verse.context ? `<div class="text-sm text-gray-600 dark:text-gray-400 italic">${verse.context}</div>` : ''}
+            ${safeContextHtml}
             
               <div class="flex justify-center space-x-4 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button id="shareRandomVerse" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
@@ -769,6 +1334,87 @@ class ChurchTapApp {
         `;
         
         this.showModal('Random Verse', verseContent);
+
+        const topicSelect = document.getElementById('topicSelect');
+        if (topicSelect) {
+          topicSelect.addEventListener('change', async () => {
+            const raw = (topicSelect.value || '').toString().trim();
+            if (!raw) return;
+            const [source, idStr] = raw.split(':');
+            const topicId = parseInt(idStr, 10);
+            if (!topicId) return;
+
+            try {
+              const url = (source === 'default')
+                ? this.withOrg(`/api/organization/default-topics/${topicId}/random`)
+                : this.withOrg(`/api/organization/topics/${topicId}/random`);
+              const res = await fetch(url);
+              const tData = await res.json().catch(() => null);
+              if (tData?.success && tData.verse) {
+                this.closeModal();
+                const v2 = tData.verse;
+                const safeVerseTextHtml2 = this.escapeHtml(this.normalizeVerseText(v2.verse_text)).replace(/\n/g, '<br>');
+                const safeReference2 = this.escapeHtml(v2.bible_reference || '');
+
+                const badge = `🆘 ${this.escapeHtml(tData.topic?.name || 'Topic')}${v2.source === 'bolls.life' ? ` • ${v2.translation}` : ''}`;
+
+                const content2 = `
+                  <div class="relative">
+                    <button class="absolute -top-2 -right-2 w-8 h-8 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 transition-colors" onclick="app.closeModal()">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                      </svg>
+                    </button>
+                    <div class="text-center space-y-4">
+                      <div class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 mb-4">
+                        ${badge}
+                      </div>
+                      ${topicsDropdown}
+                      <div class="verse-text text-lg leading-relaxed text-gray-800 dark:text-gray-200 mb-6">
+                        ${safeVerseTextHtml2}
+                      </div>
+                      <div class="verse-reference text-base font-semibold text-primary-600 dark:text-primary-400 mb-4">
+                        ${safeReference2}
+                      </div>
+                      <div class="flex justify-center space-x-4 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <button id="shareRandomVerse" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+                          📤 Share
+                        </button>
+                        <button id="getAnotherRandom" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors">
+                          🎲 Another
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                `;
+
+                this.showModal('Emergency Scripture', content2);
+
+                const topicSelect2 = document.getElementById('topicSelect');
+                if (topicSelect2) topicSelect2.value = raw;
+
+                document.getElementById('shareRandomVerse')?.addEventListener('click', () => this.shareRandomVerse(v2));
+                document.getElementById('getAnotherRandom')?.addEventListener('click', () => {
+                  this.closeModal();
+                  // Go back through the base modal so the dropdown stays in sync
+                  this.showRandomVerse().then(() => {
+                    const ts = document.getElementById('topicSelect');
+                    if (ts) {
+                      ts.value = raw;
+                      ts.dispatchEvent(new Event('change'));
+                    }
+                  });
+                });
+
+                this.trackAnalytics && this.trackAnalytics('topic_verse', topicId);
+              } else {
+                this.showToast(tData?.error || 'Failed to load topic verse');
+              }
+            } catch (e) {
+              this.showToast('Failed to load topic verse');
+            }
+          });
+        }
         
         // Add event listeners for modal buttons
         document.getElementById('shareRandomVerse').addEventListener('click', () => {
@@ -792,7 +1438,7 @@ class ChurchTapApp {
   shareRandomVerse(verse) {
     const shareData = {
       title: 'Random Bible Verse',
-      text: `${verse.verse_text}\n\n— ${verse.bible_reference}`,
+      text: `${this.normalizeVerseText(verse.verse_text)}\n\n— ${verse.bible_reference}`,
       url: window.location.origin
     };
 
@@ -805,6 +1451,37 @@ class ChurchTapApp {
     } else {
       this.fallbackShareRandomVerse(shareData);
     }
+  }
+
+  shareTopicVerse(verse) {
+    const shareData = {
+      title: 'Bible Verse',
+      text: `${this.normalizeVerseText(verse.verse_text)}\n\n— ${verse.bible_reference}`,
+      url: window.location.origin
+    };
+
+    if (navigator.share) {
+      navigator.share(shareData).catch(error => {
+        if (error.name !== 'AbortError') {
+          this.fallbackShareTopicVerse(shareData);
+        }
+      });
+    } else {
+      this.fallbackShareTopicVerse(shareData);
+    }
+  }
+
+  fallbackShareTopicVerse(shareData) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareData.text).then(() => {
+        this.showToast('📋 Verse copied to clipboard!');
+      }).catch(() => {
+        this.showToast('Failed to copy to clipboard');
+      });
+    } else {
+      this.showToast('📋 ' + shareData.text);
+    }
+    this.trackAnalytics('share_topic_verse');
   }
 
   fallbackShareRandomVerse(shareData) {
@@ -975,7 +1652,7 @@ class ChurchTapApp {
     const shareData = {
       title: 'Church Tap',
       text: this.currentVerse.content_type === 'text' 
-        ? `"${this.currentVerse.verse_text}" - ${this.currentVerse.bible_reference || 'Bible'}`
+        ? `"${this.plainTextFromVerseText(this.currentVerse.verse_text)}" - ${this.currentVerse.bible_reference || 'Bible'}`
         : `From ${this.currentVerse.bible_reference || 'Bible'}`,
       url: `${window.location.origin}/verse/${this.currentVerse.date}`
     };
@@ -1137,14 +1814,25 @@ class ChurchTapApp {
       const searchResultsList = document.getElementById('searchResultsList');
       
       if (data.success && data.verses.length > 0) {
-        searchResultsList.innerHTML = data.verses.map(verse => `
-          <div class="p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors" onclick="app.goToDate('${verse.date}')">
-            <div class="font-medium text-sm text-primary-600 dark:text-primary-400 mb-1">${verse.bible_reference}</div>
-            <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">${verse.date}</div>
-            ${verse.verse_text ? `<div class="text-sm text-gray-800 dark:text-gray-200 line-clamp-2">${verse.verse_text.substring(0, 100)}${verse.verse_text.length > 100 ? '...' : ''}</div>` : ''}
-            ${verse.tags ? `<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">${verse.tags}</div>` : ''}
-          </div>
-        `).join('');
+        searchResultsList.innerHTML = data.verses.map(verse => {
+          const safeRef = this.escapeHtml(verse.bible_reference || '');
+          const safeDate = this.escapeHtml(verse.date || '');
+          const preview = verse.verse_text ? this.plainTextFromVerseText(verse.verse_text) : '';
+          const safePreview = preview
+            ? this.escapeHtml(preview.substring(0, 100) + (preview.length > 100 ? '...' : ''))
+            : '';
+          const displayTags = this.getDisplayTags(verse.tags);
+          const safeTags = displayTags.length ? this.escapeHtml(displayTags.join(', ')) : '';
+
+          return `
+            <div class="p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors" onclick="app.goToDate('${this.escapeHtml(verse.date)}')">
+              <div class="font-medium text-sm text-primary-600 dark:text-primary-400 mb-1">${safeRef}</div>
+              <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">${safeDate}</div>
+              ${safePreview ? `<div class="text-sm text-gray-800 dark:text-gray-200 line-clamp-2">${safePreview}</div>` : ''}
+              ${safeTags ? `<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">${safeTags}</div>` : ''}
+            </div>
+          `;
+        }).join('');
         
         searchResults.classList.remove('hidden');
       } else {
@@ -1219,16 +1907,22 @@ class ChurchTapApp {
   }
 
   showModal(title, content) {
+    // Close any existing modal first
+    if (this.currentModal) {
+      this.closeModal();
+    }
+    
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
     modal.innerHTML = `
-      <div class="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6">
+      <div class="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 relative">
         <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">${title}</h3>
         ${content}
       </div>
     `;
     
     modal.addEventListener('click', (e) => {
+      // Only close if clicking the backdrop (the modal container itself), not the content
       if (e.target === modal) {
         this.closeModal();
       }
@@ -1281,7 +1975,8 @@ class ChurchTapApp {
       let url = path;
       let hasParams = path.includes('?');
       
-      if (this.orgParam) {
+      // If logged in, org context is derived server-side from active_organization_id.
+      if (this.orgParam && !(this.currentUser && this.membershipContext?.active_organization_id)) {
         const separator = hasParams ? '&' : '?';
         url += `${separator}org=${this.orgParam}`;
         hasParams = true;
@@ -1297,6 +1992,20 @@ class ChurchTapApp {
       console.error('Error in buildApiUrl:', error);
       return path;
     }
+  }
+
+  async refreshForActiveGroupChange() {
+    // Ensure we stop forcing old orgParam once account-driven groups are active.
+    if (this.currentUser && this.membershipContext?.active_organization_id) {
+      this.orgParam = null;
+    }
+
+    // Refresh UI + data that depends on org context.
+    this.updateGroupDisplay();
+    await this.loadVerse(this.currentDate).catch(() => null);
+    await this.loadOrganizationLinks?.();
+    await this.initCTA?.();
+    await this.loadCommunity(this.currentDate).catch(() => null);
   }
 
   getUserPreferredTranslation() {
@@ -1531,17 +2240,30 @@ class ChurchTapApp {
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
     
-    const availableTranslations = [
-      { code: 'NASB', name: 'New American Standard Bible' },
-      { code: 'ESV', name: 'English Standard Version' },
-      { code: 'NIV', name: 'New International Version' },
-      { code: 'NLT', name: 'New Living Translation' },
-      { code: 'KJV', name: 'King James Version' },
-      { code: 'MSG', name: 'The Message' },
-      { code: 'CSB', name: 'Christian Standard Bible' },
-      { code: 'ASV', name: 'American Standard Version' },
-      { code: 'WEB', name: 'World English Bible' }
-    ];
+    const catalog = (this.translationCatalog && this.translationCatalog.length > 0)
+      ? this.translationCatalog
+      : [
+          { code: 'NASB', name: 'New American Standard Bible' },
+          { code: 'ESV', name: 'English Standard Version' },
+          { code: 'NIV', name: 'New International Version' },
+          { code: 'NLT', name: 'New Living Translation' },
+          { code: 'KJV', name: 'King James Version' },
+          { code: 'MSG', name: 'The Message' },
+          { code: 'CSB', name: 'Christian Standard Bible' },
+          { code: 'AMP', name: 'Amplified Bible' },
+          { code: 'ASV', name: 'American Standard Version' },
+          { code: 'WEB', name: 'World English Bible' }
+        ];
+
+    const enabledSet = new Set(this.getEnabledTranslationCodes().map(c => String(c).toUpperCase()));
+    const availableTranslations = catalog
+      .map(t => ({ code: String(t.code || '').toUpperCase(), name: t.name || String(t.code || '').toUpperCase() }))
+      .filter(t => enabledSet.has(t.code));
+
+    if (availableTranslations.length === 0) {
+      this.showToast('Bible translations are disabled for this group.');
+      return;
+    }
 
     const translationOptions = availableTranslations.map(trans => `
       <button onclick="app.fetchTranslation('${reference}', '${trans.code}'); this.closest('.fixed').remove();" 
@@ -1754,15 +2476,20 @@ class ChurchTapApp {
       this.recentlyViewed.splice(existing, 1);
     }
     
+    const normalizedVerseText = verse.content_type === 'text' ? this.normalizeVerseText(verse.verse_text) : verse.verse_text;
+    const previewText = verse.content_type === 'text'
+      ? this.plainTextFromVerseText(verse.verse_text)
+      : (verse.bible_reference || '');
+
     this.recentlyViewed.unshift({
       id: verse.id,
       date: verse.date,
       bible_reference: verse.bible_reference,
       preview: verse.content_type === 'text' 
-        ? verse.verse_text.substring(0, 50) + '...'
+        ? (previewText.substring(0, 50) + (previewText.length > 50 ? '...' : ''))
         : verse.bible_reference,
       content_type: verse.content_type,
-      verse_text: verse.verse_text,
+      verse_text: normalizedVerseText,
       image_path: verse.image_path,
       context: verse.context,
       tags: verse.tags
@@ -1815,7 +2542,7 @@ class ChurchTapApp {
               </div>
               <div class="text-sm text-gray-800 dark:text-gray-200 mb-2">
                 ${verse.content_type === 'text' 
-                  ? (verse.verse_text ? verse.verse_text.substring(0, 80) + '...' : 'Text verse')
+                  ? (verse.verse_text ? (app.plainTextFromVerseText(verse.verse_text).substring(0, 80) + (app.plainTextFromVerseText(verse.verse_text).length > 80 ? '...' : '')) : 'Text verse')
                   : verse.bible_reference || 'Image verse'
                 }
               </div>
@@ -1823,7 +2550,10 @@ class ChurchTapApp {
                 <div class="text-xs text-gray-500 dark:text-gray-400">
                   ${new Date(verse.date).toLocaleDateString()}
                 </div>
-                ${verse.tags ? `<div class="text-xs text-primary-500 dark:text-primary-400">${verse.tags.split(',')[0]}</div>` : ''}
+                ${verse.tags ? (() => {
+                  const t = app.getDisplayTags(verse.tags);
+                  return t.length ? `<div class="text-xs text-primary-500 dark:text-primary-400">${app.escapeHtml(t[0])}</div>` : '';
+                })() : ''}
               </div>
             </div>
             <div class="ml-3 text-lg">
@@ -2201,7 +2931,7 @@ class ChurchTapApp {
           </div>
           <div class="text-sm text-gray-800 dark:text-gray-200 leading-relaxed mb-2">
             ${verse.content_type === 'text' 
-              ? (verse.verse_text ? verse.verse_text.substring(0, 120) + '...' : 'Text verse')
+              ? (verse.verse_text ? (app.plainTextFromVerseText(verse.verse_text).substring(0, 120) + (app.plainTextFromVerseText(verse.verse_text).length > 120 ? '...' : '')) : 'Text verse')
               : (verse.bible_reference || 'Image verse')
             }
           </div>
@@ -2212,8 +2942,8 @@ class ChurchTapApp {
           ` : ''}
           ${verse.tags ? `
             <div class="flex flex-wrap gap-1 mt-1">
-              ${verse.tags.split(',').slice(0, 3).map(tag => 
-                `<span class="px-2 py-0.5 bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 text-xs rounded-full">${tag.trim()}</span>`
+              ${app.getDisplayTags(verse.tags).slice(0, 3).map(tag => 
+                `<span class="px-2 py-0.5 bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 text-xs rounded-full">${app.escapeHtml(tag)}</span>`
               ).join('')}
             </div>
           ` : ''}
@@ -2848,13 +3578,19 @@ class ChurchTapApp {
   }
 
   displayCommunity(community) {
-    const { prayer_requests, praise_reports, verse_insights } = community;
+    const prayerEnabled = this.isFeatureEnabled('prayer_requests_enabled');
+    const praiseEnabled = this.isFeatureEnabled('praise_reports_enabled');
+    const insightsEnabled = this.isFeatureEnabled('insights_enabled');
+
+    const prayer_requests = prayerEnabled ? community.prayer_requests : [];
+    const praise_reports = praiseEnabled ? community.praise_reports : [];
+    const verse_insights = insightsEnabled ? community.verse_insights : [];
     
     document.getElementById('loadingCommunity').classList.add('hidden');
     document.getElementById('communitySection').classList.remove('hidden');
     
     // Display prayer requests
-    if (prayer_requests && prayer_requests.length > 0) {
+    if (prayerEnabled && prayer_requests && prayer_requests.length > 0) {
       this.displayPrayerRequests(prayer_requests);
       document.getElementById('prayerRequestsSection').classList.remove('hidden');
     } else {
@@ -2862,7 +3598,7 @@ class ChurchTapApp {
     }
     
     // Display verse insights
-    if (verse_insights && verse_insights.length > 0) {
+    if (insightsEnabled && verse_insights && verse_insights.length > 0) {
       this.displayVerseInsights(verse_insights);
       document.getElementById('verseInsightsSection').classList.remove('hidden');
     } else {
@@ -2870,7 +3606,7 @@ class ChurchTapApp {
     }
     
     // Display praise reports
-    if (praise_reports && praise_reports.length > 0) {
+    if (praiseEnabled && praise_reports && praise_reports.length > 0) {
       this.displayPraiseReports(praise_reports);
       document.getElementById('praiseReportsSection').classList.remove('hidden');
     } else {
@@ -2986,12 +3722,11 @@ class ChurchTapApp {
   }
 
   showPrayerRequestModal() {
+    const allowAnonymous = this.isFeatureEnabled('anonymous_posts_enabled');
     this.showModal('Submit Prayer Request', `
       <form id="prayerRequestForm" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-            Share your prayer request anonymously:
-          </label>
+          <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Prayer request</label>
           <textarea 
             id="prayerRequestText" 
             rows="4" 
@@ -3004,6 +3739,12 @@ class ChurchTapApp {
             <span id="prayerCharCount">0</span>/500 characters
           </div>
         </div>
+        ${allowAnonymous ? `
+          <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input id="prayerAnonymous" type="checkbox" class="h-4 w-4" checked>
+            Post anonymously
+          </label>
+        ` : ''}
         <div class="flex space-x-3">
           <button type="submit" class="btn-primary flex-1">🙏 Submit Prayer Request</button>
           <button type="button" onclick="window.churchTapApp.closeModal()" class="btn-secondary">Cancel</button>
@@ -3021,12 +3762,14 @@ class ChurchTapApp {
     // Form submission
     document.getElementById('prayerRequestForm').addEventListener('submit', (e) => {
       e.preventDefault();
-      this.submitPrayerRequest(textarea.value);
+      const isAnonymous = allowAnonymous ? !!document.getElementById('prayerAnonymous')?.checked : false;
+      this.submitPrayerRequest(textarea.value, isAnonymous);
     });
   }
 
   showVerseInsightModal() {
     const verseReference = this.currentVerse?.bible_reference || 'Today\'s Verse';
+    const allowAnonymous = this.isFeatureEnabled('anonymous_posts_enabled');
     
     this.showModal('Share Verse Insight', `
       <form id="verseInsightForm" class="space-y-4">
@@ -3046,8 +3789,14 @@ class ChurchTapApp {
             <span id="insightCharCount">0</span>/500 characters
           </div>
         </div>
+        ${allowAnonymous ? `
+          <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input id="insightAnonymous" type="checkbox" class="h-4 w-4" checked>
+            Post anonymously
+          </label>
+        ` : ''}
         <div class="text-xs text-gray-500">
-          Insights are shared anonymously and will appear after moderation.
+          Insights will appear after moderation.
         </div>
         <div class="flex space-x-3">
           <button type="submit" class="flex-1 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center space-x-2" style="background-color: #2563eb !important;">💭 Share Insight</button>
@@ -3068,12 +3817,14 @@ class ChurchTapApp {
       e.preventDefault();
       const content = textarea.value.trim();
       if (content) {
-        this.submitVerseInsight(content, verseReference);
+        const isAnonymous = allowAnonymous ? !!document.getElementById('insightAnonymous')?.checked : false;
+        this.submitVerseInsight(content, verseReference, isAnonymous);
       }
     });
   }
 
   showPraiseReportModal() {
+    const allowAnonymous = this.isFeatureEnabled('anonymous_posts_enabled');
     this.showModal('Submit Praise Report', `
       <form id="praiseReportForm" class="space-y-4">
         <div>
@@ -3092,6 +3843,12 @@ class ChurchTapApp {
             <span id="praiseCharCount">0</span>/500 characters
           </div>
         </div>
+        ${allowAnonymous ? `
+          <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input id="praiseAnonymous" type="checkbox" class="h-4 w-4" checked>
+            Post anonymously
+          </label>
+        ` : ''}
         <div class="flex space-x-3">
           <button type="submit" class="btn-primary flex-1">🎉 Submit Praise Report</button>
           <button type="button" onclick="window.churchTapApp.closeModal()" class="btn-secondary">Cancel</button>
@@ -3109,11 +3866,12 @@ class ChurchTapApp {
     // Form submission
     document.getElementById('praiseReportForm').addEventListener('submit', (e) => {
       e.preventDefault();
-      this.submitPraiseReport(textarea.value);
+      const isAnonymous = allowAnonymous ? !!document.getElementById('praiseAnonymous')?.checked : false;
+      this.submitPraiseReport(textarea.value, isAnonymous);
     });
   }
 
-  async submitPrayerRequest(content) {
+  async submitPrayerRequest(content, is_anonymous = false) {
     try {
       const response = await fetch(this.buildApiUrl('/api/prayer-request'), {
         method: 'POST',
@@ -3123,7 +3881,8 @@ class ChurchTapApp {
         body: JSON.stringify({
           content: content,
           user_token: this.userToken,
-          date: this.currentDate
+          date: this.currentDate,
+          is_anonymous: !!is_anonymous
         })
       });
       
@@ -3143,7 +3902,7 @@ class ChurchTapApp {
     }
   }
 
-  async submitVerseInsight(content, verseReference) {
+  async submitVerseInsight(content, verseReference, is_anonymous = false) {
     try {
       const response = await fetch(this.buildApiUrl('/api/verse-community'), {
         method: 'POST',
@@ -3154,7 +3913,8 @@ class ChurchTapApp {
           content,
           verse_reference: verseReference,
           user_token: this.userToken,
-          date: this.currentDate || new Date().toISOString().split('T')[0]
+          date: this.currentDate || new Date().toISOString().split('T')[0],
+          is_anonymous: !!is_anonymous
         })
       });
       
@@ -3174,7 +3934,7 @@ class ChurchTapApp {
     }
   }
 
-  async submitPraiseReport(content) {
+  async submitPraiseReport(content, is_anonymous = false) {
     try {
       const response = await fetch(this.buildApiUrl('/api/praise-report'), {
         method: 'POST',
@@ -3184,7 +3944,8 @@ class ChurchTapApp {
         body: JSON.stringify({
           content: content,
           user_token: this.userToken,
-          date: this.currentDate
+          date: this.currentDate,
+          is_anonymous: !!is_anonymous
         })
       });
       
@@ -3346,6 +4107,7 @@ class ChurchTapApp {
           this.updateUIForLoggedInUser();
           // Load memberships + active group for group switcher/community gating UI
           this.membershipContext = await this.fetchMembershipContext();
+          this.adminOrganizations = await this.fetchAdminOrganizations();
           this.updateGroupDisplay();
         } else {
           this.updateUIForLoggedOutUser();
@@ -4675,6 +5437,9 @@ class ChurchTapApp {
   updateGroupDisplay() {
     const currentGroupName = document.getElementById('currentGroupName');
     const groupSection = document.getElementById('groupSection');
+    const groupQuickList = document.getElementById('groupQuickList');
+    const changeGroupBtn = document.getElementById('changeGroupBtn');
+    const adminPanelBtn = document.getElementById('adminPanelBtn');
 
     if (currentGroupName) {
       const activeOrgId = this.membershipContext?.active_organization_id;
@@ -4691,6 +5456,87 @@ class ChurchTapApp {
       }
 
       if (groupSection) groupSection.style.display = 'block';
+    }
+
+    // Toggle admin panel link: show only if user is an admin of the active group
+    if (adminPanelBtn) {
+      if (!this.currentUser) {
+        adminPanelBtn.classList.add('hidden');
+      } else {
+        const activeOrgId = this.membershipContext?.active_organization_id;
+        const adminOrgs = this.adminOrganizations?.organizations || [];
+        const isAdminOfActive = !!activeOrgId && adminOrgs.some(o => Number(o.organization_id) === Number(activeOrgId));
+        adminPanelBtn.classList.toggle('hidden', !isAdminOfActive);
+      }
+    }
+
+    // Render quick switch list (up to 5 groups)
+    if (groupQuickList) {
+      if (!this.currentUser) {
+        groupQuickList.innerHTML = '';
+        if (changeGroupBtn) changeGroupBtn.style.display = '';
+        return;
+      }
+
+      const memberships = (this.membershipContext?.memberships || [])
+        .filter(m => m.status === 'active' || m.status === 'pending');
+
+      // Hide "Switch Group" button when chips cover all groups (<= 5)
+      if (changeGroupBtn) {
+        changeGroupBtn.style.display = memberships.length > 5 ? '' : 'none';
+      }
+
+      const activeOrgId = this.membershipContext?.active_organization_id;
+      const top = memberships.slice(0, 5);
+
+      if (top.length === 0) {
+        groupQuickList.innerHTML = `
+          <button class="w-full btn-secondary text-sm" onclick="window.location.href='/choose-organization'">
+            👥 Join a group
+          </button>
+        `;
+        if (changeGroupBtn) changeGroupBtn.style.display = 'none';
+        return;
+      }
+
+      // Chip row: horizontal scroll with snap
+      const chips = top.map(m => {
+        const isActive = activeOrgId && Number(m.organization_id) === Number(activeOrgId);
+        const pending = m.status === 'pending';
+
+        const badge = pending
+          ? `<span class="ml-1 inline-block w-2 h-2 rounded-full bg-yellow-400" aria-label="Pending"></span>`
+          : '';
+
+        const cls = isActive
+          ? 'inline-flex items-center px-3 py-2 rounded-full bg-blue-600 text-white text-sm font-medium whitespace-nowrap'
+          : 'inline-flex items-center px-3 py-2 rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium whitespace-nowrap hover:bg-gray-50 dark:hover:bg-gray-600';
+
+        const onclick = isActive ? '' : `onclick="window.churchTapApp.switchActiveGroup(${m.organization_id})"`;
+
+        return `
+          <button class="${cls} snap-start" ${onclick} ${isActive ? 'disabled' : ''} title="${this.escapeHtml(m.organization_name)}">
+            ${this.escapeHtml(m.organization_name)}
+            ${badge}
+          </button>
+        `;
+      }).join('');
+
+      const moreChip = memberships.length > 5
+        ? `
+          <button class="inline-flex items-center px-3 py-2 rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium whitespace-nowrap hover:bg-gray-50 dark:hover:bg-gray-600 snap-start"
+                  onclick="window.churchTapApp.showGroupSwitcherModal()">
+            More…
+          </button>
+        `
+        : '';
+
+      groupQuickList.innerHTML = `
+        <div class="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory" style="-webkit-overflow-scrolling: touch;">
+          ${chips}
+          ${moreChip}
+        </div>
+      `;
     }
   }
 
@@ -4779,9 +5625,8 @@ class ChurchTapApp {
       if (!data.success) throw new Error(data.error || 'Failed to switch group');
 
       this.membershipContext = await this.fetchMembershipContext();
-      this.updateGroupDisplay();
       this.closeModal();
-      this.loadCommunity(this.currentDate);
+      await this.refreshForActiveGroupChange();
       this.showToast('Group switched');
     } catch (e) {
       console.error('Switch group error:', e);
@@ -4803,9 +5648,8 @@ class ChurchTapApp {
       if (!data.success) throw new Error(data.error || 'Failed to leave group');
 
       this.membershipContext = await this.fetchMembershipContext();
-      this.updateGroupDisplay();
       this.closeModal();
-      this.loadCommunity(this.currentDate);
+      await this.refreshForActiveGroupChange();
       this.showToast('Left group');
     } catch (e) {
       console.error('Leave group error:', e);

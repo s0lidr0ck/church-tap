@@ -259,6 +259,19 @@ router.post('/scan/:custom_id', (req, res) => {
     const sessionId = req.cookies?.trackingSession || `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const ip = req.ip || req.connection.remoteAddress;
     const userAgent = req.get('User-Agent');
+
+    // Ensure anonymous_sessions exists for this sessionId (required by FK on tag_interactions.session_id)
+    db.query(`
+      INSERT INTO anonymous_sessions (session_id, ip_address, user_agent, first_seen_at, last_seen_at, total_interactions)
+      VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)
+      ON CONFLICT (session_id) DO UPDATE SET
+        last_seen_at = CURRENT_TIMESTAMP,
+        total_interactions = anonymous_sessions.total_interactions + 1
+    `, [sessionId, ip, userAgent], (sessionErr) => {
+      if (sessionErr) {
+        console.error('Error ensuring anonymous session for NFC scan:', sessionErr);
+      }
+    });
     
     // Get tag info including organization details
     db.query(`

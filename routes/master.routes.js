@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { db } = require('../config/database');
 const { requireMasterAuth } = require('../config/middleware');
+const { parseVerseReference } = require('../services/bibleReferenceParser');
 
 const router = express.Router();
 
@@ -780,6 +781,212 @@ router.post('/organization-requests/:id/deny', requireMasterAuth, (req, res) => 
     
     res.json({ success: true });
   });
+});
+
+// ===========================
+// Default Topic Templates (Master-managed)
+// ===========================
+router.get('/topic-templates', requireMasterAuth, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT t.*,
+              (SELECT COUNT(*)::int FROM ct_topic_template_verses v WHERE v.template_id = t.id) AS verse_count
+       FROM ct_topic_templates t
+       ORDER BY t.sort_order ASC, t.name ASC`
+    );
+    res.json({ success: true, topics: result.rows || [] });
+  } catch (e) {
+    console.error('Error fetching topic templates:', e);
+    res.status(500).json({ success: false, error: 'Failed to fetch default topics' });
+  }
+});
+
+router.post('/topic-templates', requireMasterAuth, async (req, res) => {
+  try {
+    const { name, description, sort_order, is_active } = req.body || {};
+    if (!name || !name.toString().trim()) {
+      return res.status(400).json({ success: false, error: 'Name is required' });
+    }
+    const result = await db.query(
+      `INSERT INTO ct_topic_templates (name, description, sort_order, is_active)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [name.toString().trim(), description || null, parseInt(sort_order ?? 0, 10) || 0, is_active !== false]
+    );
+    res.json({ success: true, topic: result.rows[0] });
+  } catch (e) {
+    console.error('Error creating topic template:', e);
+    res.status(500).json({ success: false, error: 'Failed to create default topic' });
+  }
+});
+
+router.put('/topic-templates/:id', requireMasterAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { name, description, sort_order, is_active } = req.body || {};
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid id' });
+    if (!name || !name.toString().trim()) {
+      return res.status(400).json({ success: false, error: 'Name is required' });
+    }
+    const result = await db.query(
+      `UPDATE ct_topic_templates
+       SET name = $1, description = $2, sort_order = $3, is_active = $4, updated_at = NOW()
+       WHERE id = $5
+       RETURNING *`,
+      [name.toString().trim(), description || null, parseInt(sort_order ?? 0, 10) || 0, is_active !== false, id]
+    );
+    if (!result.rows?.length) return res.status(404).json({ success: false, error: 'Topic not found' });
+    res.json({ success: true, topic: result.rows[0] });
+  } catch (e) {
+    console.error('Error updating topic template:', e);
+    res.status(500).json({ success: false, error: 'Failed to update default topic' });
+  }
+});
+
+router.delete('/topic-templates/:id', requireMasterAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid id' });
+    const result = await db.query(`DELETE FROM ct_topic_templates WHERE id = $1`, [id]);
+    if (result.rowCount === 0) return res.status(404).json({ success: false, error: 'Topic not found' });
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Error deleting topic template:', e);
+    res.status(500).json({ success: false, error: 'Failed to delete default topic' });
+  }
+});
+
+router.get('/topic-templates/:id/verses', requireMasterAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid id' });
+
+    const tpl = await db.query(`SELECT id FROM ct_topic_templates WHERE id = $1`, [id]);
+    if (!tpl.rows?.length) return res.status(404).json({ success: false, error: 'Topic not found' });
+
+    const result = await db.query(
+      `SELECT id, bible_reference, book_number, chapter, verse_start, verse_end, translation_code, created_at
+       FROM ct_topic_template_verses
+       WHERE template_id = $1
+       ORDER BY created_at DESC`,
+      [id]
+    );
+    res.json({ success: true, verses: result.rows || [] });
+  } catch (e) {
+    console.error('Error fetching topic template verses:', e);
+    res.status(500).json({ success: false, error: 'Failed to fetch verses' });
+  }
+});
+
+router.post('/topic-templates/:id/verses', requireMasterAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { bible_reference, translation_code } = req.body || {};
+    if (!id) return res.status(400).json({ success: false, error: 'Invalid id' });
+    if (!bible_reference || !bible_reference.toString().trim()) {
+      return res.status(400).json({ success: false, error: 'bible_reference is required' });
+    }
+
+    const tpl = await db.query(`SELECT id FROM ct_topic_templates WHERE id = $1`, [id]);
+    if (!tpl.rows?.length) return res.status(404).json({ success: false, error: 'Topic not found' });
+
+    const parsed = parseVerseReference(bible_reference);
+    const result = await db.query(
+      `INSERT INTO ct_topic_template_verses (template_id, bible_reference, book_number, chapter, verse_start, verse_end, translation_code)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [
+        id,
+        parsed.normalized_reference,
+        parsed.book_number,
+        parsed.chapter,
+        parsed.verse_start,
+        parsed.verse_end,
+        translation_code ? translation_code.toString().trim().toUpperCase() : null
+      ]
+    );
+
+    res.json({ success: true, verse: result.rows[0] });
+  } catch (e) {
+    console.error('Error adding topic template verse:', e);
+    res.status(400).json({ success: false, error: e?.message || 'Failed to add verse' });
+  }
+});
+
+router.delete('/topic-templates/:templateId/verses/:verseId', requireMasterAuth, async (req, res) => {
+  try {
+    const templateId = parseInt(req.params.templateId, 10);
+    const verseId = parseInt(req.params.verseId, 10);
+    if (!templateId || !verseId) return res.status(400).json({ success: false, error: 'Invalid id(s)' });
+
+    const result = await db.query(
+      `DELETE FROM ct_topic_template_verses WHERE id = $1 AND template_id = $2`,
+      [verseId, templateId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ success: false, error: 'Verse not found' });
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Error deleting topic template verse:', e);
+    res.status(500).json({ success: false, error: 'Failed to delete verse' });
+  }
+});
+
+// Preview/validate verse reference
+router.post('/topic-templates/preview-verse', requireMasterAuth, async (req, res) => {
+  try {
+    const { bible_reference, translation_code } = req.body || {};
+    if (!bible_reference || !bible_reference.toString().trim()) {
+      return res.status(400).json({ success: false, error: 'Bible reference is required' });
+    }
+
+    // Parse the reference
+    const parsed = parseVerseReference(bible_reference);
+    
+    // Optionally fetch the verse text
+    const translation = (translation_code || 'NIV').toString().trim().toUpperCase();
+    let verseText = null;
+    let fetchError = null;
+
+    try {
+      const start = parsed.verse_start;
+      const end = parsed.verse_end;
+      const maxVerses = 30;
+      
+      if ((end - start + 1) <= maxVerses) {
+        const parts = [];
+        for (let v = start; v <= end; v++) {
+          const apiUrl = `https://bolls.life/get-verse/${encodeURIComponent(translation)}/${parsed.book_number}/${parsed.chapter}/${v}/`;
+          const resp = await fetch(apiUrl);
+          if (!resp.ok) throw new Error('Failed to fetch verse from provider');
+          const data = await resp.json();
+          const text = (data?.text || data?.verse_text || '').toString().trim();
+          parts.push((start === end) ? text : `${v}. ${text}`);
+        }
+        verseText = parts.join('\n');
+      }
+    } catch (err) {
+      fetchError = err.message;
+      console.error('Error fetching verse text:', err);
+    }
+
+    res.json({
+      success: true,
+      parsed: {
+        normalized_reference: parsed.normalized_reference,
+        book_number: parsed.book_number,
+        chapter: parsed.chapter,
+        verse_start: parsed.verse_start,
+        verse_end: parsed.verse_end,
+        is_range: parsed.verse_end !== parsed.verse_start
+      },
+      verse_text: verseText,
+      translation: translation,
+      fetch_error: fetchError
+    });
+  } catch (e) {
+    console.error('Error previewing verse:', e);
+    res.status(400).json({ success: false, error: e?.message || 'Failed to parse verse reference' });
+  }
 });
 
 module.exports = router;

@@ -727,8 +727,96 @@
 
             <div id="systemMasterContent" class="tab-content hidden">
               <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-8">⚙️ System Settings</h1>
-              <div class="modern-card p-6">
-                <p class="text-gray-600">System settings coming soon...</p>
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="modern-card p-6">
+                  <h3 class="text-lg font-medium text-gray-900 mb-2">Default Topics (Emergency Scripture)</h3>
+                  <p class="text-sm text-gray-600 mb-4">Create reusable default Topics that organizations can enable/disable. Supports verse ranges like <span class="font-mono">John 3:16-18</span>.</p>
+
+                  <div class="space-y-3">
+                    <div>
+                      <label class="block text-sm font-semibold text-gray-800 mb-2">Topic Name</label>
+                      <input id="masterTopicNameInput" type="text" class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="e.g., Fear, Hope, Temptation">
+                    </div>
+                    <div>
+                      <label class="block text-sm font-semibold text-gray-800 mb-2">Description (optional)</label>
+                      <input id="masterTopicDescInput" type="text" class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Optional internal note">
+                    </div>
+                    <div class="flex justify-end">
+                      <button id="createMasterTopicBtn" class="btn-primary-modern">Create Default Topic</button>
+                    </div>
+                  </div>
+
+                  <div class="mt-6 border-t pt-6">
+                    <h4 class="text-md font-semibold text-gray-900 mb-3">Default Topics</h4>
+                    <div id="noMasterTopicsMessage" class="text-center py-6 hidden">
+                      <p class="text-gray-500">No default topics yet.</p>
+                    </div>
+                    <div id="masterTopicsTableContainer" class="overflow-x-auto hidden">
+                      <table class="min-w-full divide-y divide-gray-200 admin-table">
+                        <thead>
+                          <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider">Topic</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider">Verses</th>
+                            <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody id="masterTopicsTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="modern-card p-6">
+                  <div class="mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">Default Topic Verses</h3>
+                    <p class="text-sm text-gray-500">Selected Topic: <span id="masterSelectedTopicName" class="font-semibold">None</span></p>
+                  </div>
+
+                  <div class="space-y-3 mb-6">
+                    <div>
+                      <label class="block text-sm font-semibold text-gray-800 mb-2">Bible Reference (single or range)</label>
+                      <input id="masterTopicVerseReference" type="text" class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="e.g., John 3:16-18">
+                      <p class="mt-1 text-xs text-gray-500">Supports single verses (John 3:16) or ranges (John 3:16-18)</p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-semibold text-gray-800 mb-2">Translation (optional)</label>
+                      <input id="masterTopicVerseTranslation" type="text" class="block w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="e.g., NIV, ESV (defaults to NIV)">
+                    </div>
+                    
+                    <!-- Verse Preview Section -->
+                    <div id="masterVersePreviewContainer" class="hidden border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-sm font-semibold text-gray-800">Preview</h4>
+                        <button id="masterVersePreviewRefresh" class="text-xs text-blue-600 hover:text-blue-800">Refresh</button>
+                      </div>
+                      <div id="masterVersePreviewContent" class="text-sm">
+                        <!-- Preview content will be inserted here -->
+                      </div>
+                    </div>
+                    
+                    <div class="flex justify-end gap-2">
+                      <button id="masterVersePreviewBtn" class="btn-secondary">Preview Verse</button>
+                      <button id="addMasterTopicVerseBtn" class="btn-primary-modern">Add Verse</button>
+                    </div>
+                  </div>
+
+                  <div id="noMasterTopicVersesMessage" class="text-center py-6 hidden">
+                    <p class="text-gray-500">Select a Topic, then add verses.</p>
+                  </div>
+
+                  <div id="masterTopicVersesTableContainer" class="overflow-x-auto hidden">
+                    <table class="min-w-full divide-y divide-gray-200 admin-table">
+                      <thead>
+                        <tr>
+                          <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider">Reference</th>
+                          <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider">Translation</th>
+                          <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody id="masterTopicVersesTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
 
