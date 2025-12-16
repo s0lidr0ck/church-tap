@@ -1,36 +1,16 @@
 const express = require('express');
 const { dbQuery, db } = require('../config/database');
+const { authenticateUser } = require('../middleware/userAuth');
+const { requireActiveGroupMembership } = require('../middleware/membershipGate');
 
 const router = express.Router();
 
 // Get community content for a specific date
-router.get('/:date', (req, res) => {
+router.get('/:date', authenticateUser, requireActiveGroupMembership, (req, res) => {
   const { date } = req.params;
-  let orgId = req.organization?.id || null;
-  
-  // If no org from middleware, try to resolve from tag cookie
-  const originatingTagId = req.cookies?.originatingTag;
-  
-  const resolveOrgFromTag = (cb) => {
-    if (orgId) return cb();
-    if (!originatingTagId) {
-      orgId = 1; // Default fallback
-      return cb();
-    }
-    
-    db.query(`SELECT organization_id FROM ct_nfc_tags WHERE custom_id = $1`, [originatingTagId], (err, result) => {
-      if (!err && result.rows.length > 0) {
-        orgId = result.rows[0].organization_id;
-        console.log(`📋 ✅ Resolved org ${orgId} from tag ${originatingTagId}`);
-      } else {
-        orgId = 1; // Default fallback
-      }
-      cb();
-    });
-  };
-  
-  resolveOrgFromTag(() => {
-    console.log(`📋 Community wall request - date: ${date}, org: ${req.organization?.subdomain}, orgId: ${orgId}`);
+  const orgId = req.activeOrganizationId;
+
+  console.log(`📋 Community wall request - date: ${date}, activeOrgId: ${orgId}, userId: ${req.user?.userId}`);
   
   // Get prayer requests for the date
   const getPrayerRequests = new Promise((resolve, reject) => {
@@ -74,7 +54,6 @@ router.get('/:date', (req, res) => {
       console.error('Error fetching community content:', err);
       res.status(500).json({ success: false, error: 'Database error' });
     });
-  });
 });
 
 module.exports = router;

@@ -73,6 +73,11 @@
 
         <!-- Right Controls -->
         <div class="flex items-center space-x-2">
+          <!-- Not right now -->
+          <button id="notNowBtn" class="px-3 py-2 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation min-h-[44px]" aria-label="Not right now">
+            Not right now
+          </button>
+
           <!-- Back Button -->
           <button onclick="history.back()" class="p-3 rounded-lg bg-white/80 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Go back">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -249,6 +254,7 @@
   <script>
     class OrganizationChooser {
       constructor() {
+        // tagId is legacy; joining groups is now account-driven
         this.tagId = this.getTagIdFromUrl();
         this.organizations = [];
         this.filteredOrganizations = [];
@@ -259,19 +265,29 @@
           sortBy: 'name' // name, distance
         };
 
-        if (!this.tagId) {
-          this.showError('No bracelet ID provided. Please scan your bracelet again.');
-          return;
-        }
-
         this.initializeUI();
         this.setupEventListeners();
-        this.loadOrganizations();
+        this.requireLoginThenLoad();
       }
 
       getTagIdFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
         return urlParams.get('uid');
+      }
+
+      async requireLoginThenLoad() {
+        try {
+          const response = await fetch('/api/auth/me', { credentials: 'include' });
+          const data = await response.json();
+          if (!data.success) {
+            // Must be logged in to join a group
+            window.location.href = '/?joinGroup=1';
+            return;
+          }
+          this.loadOrganizations();
+        } catch (e) {
+          window.location.href = '/?joinGroup=1';
+        }
       }
 
       initializeUI() {
@@ -283,6 +299,14 @@
       }
 
       setupEventListeners() {
+        // Not right now button
+        const notNowBtn = document.getElementById('notNowBtn');
+        if (notNowBtn) {
+          notNowBtn.addEventListener('click', () => {
+            window.location.href = '/';
+          });
+        }
+
         // Search input
         const searchInput = document.getElementById('searchInput');
         searchInput.addEventListener('input', (e) => {
@@ -324,7 +348,7 @@
 
         // Request organization button
         document.getElementById('requestOrgBtn').addEventListener('click', () => {
-          window.location.href = `/request-organization?uid=${this.tagId}`;
+          window.location.href = `/request-organization?uid=${this.tagId || 'no_uid'}`;
         });
 
         // Filter modal backdrop
@@ -516,7 +540,7 @@
 
         return `
           <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer transition-colors group"
-               onclick="organizationChooser.selectOrganization('${org.subdomain}', '${org.name.replace(/'/g, '\\\'')}')"
+               onclick="organizationChooser.selectOrganization(event, ${org.id}, '${org.name.replace(/'/g, '\\\'')}')"
                data-org-id="${org.id}">
             <div class="flex items-start justify-between">
               <div class="flex-1 min-w-0">
@@ -550,10 +574,10 @@
         `;
       }
 
-      async selectOrganization(subdomain, displayName) {
+      async selectOrganization(evt, organizationId, displayName) {
         try {
           // Show loading state
-          const orgCard = event.currentTarget;
+          const orgCard = evt.currentTarget;
           orgCard.innerHTML = `
             <div class="text-center py-4">
               <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -561,39 +585,33 @@
             </div>
           `;
 
-          // Make request to associate bracelet with organization
-          const response = await fetch('/api/bracelets/claim', {
+          // Join group (account-driven). This also sets active_organization_id.
+          const response = await fetch('/api/memberships/join', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-              tag_id: this.tagId,
-              organization_short_name: subdomain
-            })
+            credentials: 'include',
+            body: JSON.stringify({ organization_id: organizationId })
           });
 
           if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to claim bracelet');
+            throw new Error(errorData.error || 'Failed to join group');
           }
 
           const data = await response.json();
           
-          // Success - redirect to the tag scanning URL which will load the organization
-          if (data.switched) {
-            console.log(`🔄 Switched to ${displayName}`);
-          } else if (data.already_claimed) {
-            console.log(`✅ Already connected to ${displayName}`);
-          } else {
-            console.log(`✅ Successfully connected to ${displayName}`);
+          if (!data.success) {
+            throw new Error(data.error || 'Failed to join group');
           }
-          
-          window.location.href = `/t/${this.tagId}?claimed=true`;
+
+          console.log(`✅ Joined group: ${displayName} (${data.membership?.status || 'active'})`);
+          window.location.href = '/';
 
         } catch (error) {
-          console.error('Error claiming bracelet:', error);
-          this.showError(`Failed to connect to ${displayName}. ${error.message || 'Please try again.'}`);
+          console.error('Error joining group:', error);
+          this.showError(`Failed to join ${displayName}. ${error.message || 'Please try again.'}`);
         }
       }
 

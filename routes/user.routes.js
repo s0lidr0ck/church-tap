@@ -3,31 +3,19 @@ const { db } = require('../config/database');
 
 const router = express.Router();
 
-// User Authentication Middleware (same as in auth.routes.js)
-const jwt = require('jsonwebtoken');
-const { JWT_SECRET } = require('../config/constants');
-
-const authenticateUser = (req, res, next) => {
-  const token = req.header('Authorization')?.replace('Bearer ', '') || req.cookies?.authToken;
-  
-  if (!token) {
-    return res.status(401).json({ success: false, error: 'Access denied. No token provided.' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ success: false, error: 'Invalid token.' });
-  }
-};
+const { authenticateUser } = require('../middleware/userAuth');
 
 // Link a bracelet to the current user's account
 router.post('/link-bracelet', authenticateUser, (req, res) => {
-  try {
+  // Deprecated: bracelets are linked automatically on /t/:uid (tap) or immediately after login/register
+  return res.status(410).json({
+    success: false,
+    error: 'Deprecated. Tap your bracelet to link it to your account.',
+    code: 'ENDPOINT_DEPRECATED'
+  });
+  /* try {
     const { bracelet_uid, is_primary, nickname } = req.body;
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     if (!bracelet_uid) {
       return res.status(400).json({ success: false, error: 'Bracelet UID is required' });
@@ -85,7 +73,7 @@ router.post('/link-bracelet', authenticateUser, (req, res) => {
   } catch (error) {
     console.error('Error in link-bracelet:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
-  }
+  } */
 });
 
 // Helper function to link bracelet
@@ -112,7 +100,7 @@ function linkBracelet(userId, braceletUid, isPrimary, nickname, res) {
 // Get user's linked bracelets
 router.get('/bracelets', authenticateUser, (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     db.query(`
       SELECT 
@@ -153,7 +141,7 @@ router.get('/bracelets', authenticateUser, (req, res) => {
 router.get('/bracelet/:uid/linked', authenticateUser, (req, res) => {
   try {
     const { uid } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     db.query(`
       SELECT id, is_primary, nickname FROM ct_user_bracelets 
@@ -178,34 +166,11 @@ router.get('/bracelet/:uid/linked', authenticateUser, (req, res) => {
 
 // Unlink a bracelet from the user's account
 router.delete('/bracelet/:uid/unlink', authenticateUser, (req, res) => {
-  try {
-    const { uid } = req.params;
-    const userId = req.user.id;
-
-    db.query(`
-      DELETE FROM ct_user_bracelets 
-      WHERE user_id = $1 AND bracelet_uid = $2
-      RETURNING id
-    `, [userId, uid], (err, result) => {
-      if (err) {
-        console.error('Error unlinking bracelet:', err);
-        return res.status(500).json({ success: false, error: 'Database error' });
-      }
-
-      if (result.rowCount === 0) {
-        return res.status(404).json({ success: false, error: 'Bracelet link not found' });
-      }
-
-      console.log(`🔓 Bracelet ${uid} unlinked from user ${userId}`);
-      res.json({
-        success: true,
-        message: 'Bracelet unlinked successfully'
-      });
-    });
-  } catch (error) {
-    console.error('Error in unlink bracelet:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
+  return res.status(410).json({
+    success: false,
+    error: 'Unlinking bracelets is disabled. Please contact support if you need help.',
+    code: 'ENDPOINT_DEPRECATED'
+  });
 });
 
 // Update bracelet settings (nickname, primary status)
@@ -213,7 +178,7 @@ router.put('/bracelet/:uid', authenticateUser, (req, res) => {
   try {
     const { uid } = req.params;
     const { nickname, is_primary } = req.body;
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     // If setting as primary, clear other primary bracelets first
     if (is_primary) {

@@ -5,25 +5,35 @@ const crypto = require('crypto');
 const { dbQuery, db } = require('../config/database');
 const { JWT_SECRET } = require('../config/constants');
 const { validateInput } = require('../middleware/validation');
+const { authenticateUser } = require('../middleware/userAuth');
 
 const router = express.Router();
 
-// User Authentication Middleware
-const authenticateUser = (req, res, next) => {
-  const token = req.header('Authorization')?.replace('Bearer ', '') || req.cookies?.authToken;
-  
-  if (!token) {
-    return res.status(401).json({ success: false, error: 'Access denied. No token provided.' });
+async function linkPendingBraceletToUser(userId, pendingBraceletUid) {
+  if (!pendingBraceletUid) return { linked: false };
+
+  // If already linked, ensure it belongs to this user; otherwise block linking.
+  const existing = await db.query(
+    `SELECT user_id FROM ct_user_bracelets WHERE bracelet_uid = $1`,
+    [pendingBraceletUid]
+  );
+
+  if (existing.rows.length > 0) {
+    const ownerId = existing.rows[0].user_id;
+    if (Number(ownerId) === Number(userId)) {
+      return { linked: true, already_linked: true };
+    }
+    return { linked: false, conflict: true, owner_user_id: ownerId };
   }
 
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ success: false, error: 'Invalid token.' });
-  }
-};
+  await db.query(
+    `INSERT INTO ct_user_bracelets (user_id, bracelet_uid, is_primary, nickname)
+     VALUES ($1, $2, FALSE, NULL)`,
+    [userId, pendingBraceletUid]
+  );
+
+  return { linked: true, already_linked: false };
+}
 
 // User registration
 router.post('/register', validateInput.email, validateInput.password, validateInput.sanitizeHtml, async (req, res) => {
@@ -45,52 +55,66 @@ router.post('/register', validateInput.email, validateInput.password, validateIn
       const passwordHash = await bcrypt.hash(password, 12);
       const verificationToken = crypto.randomBytes(32).toString('hex');
 
-      // Create user
-      dbQuery.run(`INSERT INTO ct_users (email, password_hash, first_name, last_name, display_name, verification_token)
-              VALUES ($1, $2, $3, $4, $5, $6)`,
-        [email.toLowerCase(), passwordHash, firstName, lastName, displayName, verificationToken],
-        function(err) {
-          if (err) {
+      // Create user (Postgres) and return ID
+      db.query(
+        `INSERT INTO ct_users (email, password_hash, first_name, last_name, display_name, verification_token)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, email, first_name, last_name, display_name, is_verified`,
+        [email.toLowerCase(), passwordHash, firstName || null, lastName || null, displayName || null, verificationToken],
+        async (insertErr, insertResult) => {
+          if (insertErr) {
+            console.error('Create user error:', insertErr);
             return res.status(500).json({ success: false, error: 'Failed to create user' });
           }
 
-          const userId = this.lastID;
+          const userRow = insertResult.rows[0];
+          const userId = userRow.id;
 
-          // Create default user preferences
-          dbQuery.run(`INSERT INTO ct_user_preferences (user_id) VALUES ($1)`, [userId], (err) => {
-            if (err) {
-              console.error('Error creating user preferences:', err);
-            }
+          // Create default user preferences (best-effort)
+          db.query(`INSERT INTO ct_user_preferences (user_id) VALUES ($1)`, [userId], (prefErr) => {
+            if (prefErr) console.error('Error creating user preferences:', prefErr);
           });
+
+          // Auto-link bracelet if this device recently tapped one
+          const pendingBraceletUid = req.cookies?.pendingBraceletUid;
+          let braceletLink = { linked: false };
+          try {
+            braceletLink = await linkPendingBraceletToUser(userId, pendingBraceletUid);
+          } catch (braceletErr) {
+            console.error('Error linking pending bracelet on register:', braceletErr);
+          } finally {
+            res.clearCookie('pendingBraceletUid');
+          }
 
           // Generate JWT token
           const token = jwt.sign(
-            { userId: userId, email: email.toLowerCase() },
+            { userId: userId, email: userRow.email },
             JWT_SECRET,
             { expiresIn: '30d' }
           );
 
-          // Set cookie
           res.cookie('authToken', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
           });
 
-          res.json({
+          return res.json({
             success: true,
             user: {
               id: userId,
-              email: email.toLowerCase(),
-              firstName,
-              lastName,
-              displayName,
-              isVerified: false
+              email: userRow.email,
+              firstName: userRow.first_name,
+              lastName: userRow.last_name,
+              displayName: userRow.display_name,
+              isVerified: userRow.is_verified
             },
             token,
-            requiresOnboarding: true
+            requiresOnboarding: true,
+            bracelet_link: braceletLink
           });
-        });
+        }
+      );
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -141,6 +165,17 @@ router.post('/login', validateInput.email, validateInput.password, async (req, r
         maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
       });
 
+      // Auto-link bracelet if this device recently tapped one
+      const pendingBraceletUid = req.cookies?.pendingBraceletUid;
+      let braceletLink = { linked: false };
+      try {
+        braceletLink = await linkPendingBraceletToUser(user.id, pendingBraceletUid);
+      } catch (braceletErr) {
+        console.error('Error linking pending bracelet on login:', braceletErr);
+      } finally {
+        res.clearCookie('pendingBraceletUid');
+      }
+
       // Check if user has completed onboarding
       db.query(`SELECT * FROM ct_user_preferences WHERE user_id = $1`, [user.id], (err, result) => {
         const prefs = result.rows[0];
@@ -157,7 +192,8 @@ router.post('/login', validateInput.email, validateInput.password, async (req, r
             isVerified: user.is_verified
           },
           token,
-          requiresOnboarding
+          requiresOnboarding,
+          bracelet_link: braceletLink
         });
       });
     });

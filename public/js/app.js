@@ -15,6 +15,7 @@ class ChurchTapApp {
     
     // Get organization and tag parameters from URL or injected context
     const urlParams = new URLSearchParams(window.location.search);
+    this.joinGroupRequested = urlParams.get('joinGroup') === '1';
 
     // Check for injected NFC context first, then fall back to URL parameters
     if (window.nfcOrgContext) {
@@ -34,6 +35,7 @@ class ChurchTapApp {
     this.userInteractions = JSON.parse(localStorage.getItem('userInteractions') || '{}');
     this.currentUser = null;
     this.authToken = null;
+    this.membershipContext = null;
     
     // PWA install prompt
     this.deferredPrompt = null;
@@ -72,10 +74,31 @@ class ChurchTapApp {
       this.initCTA();
       this.updateMenuIndicators();
       this.updateTagSessionUI();
+
+      // If we were redirected here specifically to join a group, prompt login first (then we route to Join Group page).
+      if (this.joinGroupRequested) {
+        setTimeout(() => {
+          if (!this.currentUser) {
+            this.showLoginModal();
+          }
+        }, 250);
+      }
     } catch (error) {
       console.error('Init error:', error);
       this.showCriticalError('Application failed to initialize. Please refresh the page.');
       this.hideSplashScreen();
+    }
+  }
+
+  async fetchMembershipContext() {
+    try {
+      const response = await fetch('/api/memberships', { credentials: 'include' });
+      if (!response.ok) return null;
+      const data = await response.json();
+      if (!data.success) return null;
+      return data;
+    } catch (e) {
+      return null;
     }
   }
 
@@ -2737,7 +2760,28 @@ class ChurchTapApp {
   // Community Functions
   async loadCommunity(date) {
     try {
-      const response = await fetch(this.buildApiUrl(`/api/community/${date}`));
+      const response = await fetch(this.buildApiUrl(`/api/community/${date}`), {
+        credentials: 'include'
+      });
+
+      // Option B: community is locked unless logged-in + active membership.
+      if (response.status === 401) {
+        this.showCommunityLocked('LOGIN_REQUIRED');
+        return;
+      }
+      if (response.status === 403) {
+        const errData = await response.json().catch(() => null);
+        const code = errData?.code || 'FORBIDDEN';
+        if (code === 'NO_ACTIVE_GROUP') {
+          this.showCommunityLocked('NO_ACTIVE_GROUP');
+        } else if (code === 'MEMBERSHIP_PENDING') {
+          this.showCommunityLocked('MEMBERSHIP_PENDING');
+        } else {
+          this.showCommunityLocked('NOT_A_MEMBER');
+        }
+        return;
+      }
+
       const data = await response.json();
       
       if (data.success) {
@@ -2751,6 +2795,39 @@ class ChurchTapApp {
       console.error('Error loading community:', error);
       this.showEmptyCommunity();
     }
+  }
+
+  showCommunityLocked(reason) {
+    document.getElementById('loadingCommunity').classList.add('hidden');
+    document.getElementById('communitySection').classList.remove('hidden');
+    document.getElementById('prayerRequestsSection').classList.add('hidden');
+    document.getElementById('praiseReportsSection').classList.add('hidden');
+    document.getElementById('verseInsightsSection').classList.add('hidden');
+
+    const emptyEl = document.getElementById('emptyCommunity');
+    emptyEl.classList.remove('hidden');
+
+    const messageMap = {
+      LOGIN_REQUIRED: 'Sign in to join a group and access community features.',
+      NO_ACTIVE_GROUP: 'Join a group to access community features.',
+      MEMBERSHIP_PENDING: 'Your membership is pending approval. Community will unlock once approved.',
+      NOT_A_MEMBER: 'Join a group to access community features.',
+      FORBIDDEN: 'Community is locked. Join a group to continue.'
+    };
+
+    const msg = messageMap[reason] || messageMap.FORBIDDEN;
+
+    emptyEl.innerHTML = `
+      <div class="text-center py-8">
+        <div class="text-5xl mb-4">🔒</div>
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Community Locked</h3>
+        <p class="text-gray-600 dark:text-gray-400 mb-6">${msg}</p>
+        <div class="space-y-3 max-w-xs mx-auto">
+          <button class="w-full btn-primary" onclick="window.churchTapApp.showLoginModal()">Sign in / Create account</button>
+          <button class="w-full btn-secondary" onclick="window.location.href='/choose-organization'">Join a group</button>
+        </div>
+      </div>
+    `;
   }
 
   updateCommunityHeader(date) {
@@ -3267,6 +3344,9 @@ class ChurchTapApp {
         if (data.success) {
           this.currentUser = data.user;
           this.updateUIForLoggedInUser();
+          // Load memberships + active group for group switcher/community gating UI
+          this.membershipContext = await this.fetchMembershipContext();
+          this.updateGroupDisplay();
         } else {
           this.updateUIForLoggedOutUser();
         }
@@ -3471,12 +3551,16 @@ class ChurchTapApp {
         this.authToken = data.token;
         this.closeModal();
         this.updateUIForLoggedInUser();
-        
-        if (data.requiresOnboarding) {
-          this.showOnboardingModal();
-        } else {
-          this.showToast('Welcome back! 🙏');
+
+        // Default post-login flow: if user has no active group, send them to Join Group picker.
+        const membershipContext = await this.fetchMembershipContext();
+        const activeOrgId = membershipContext?.active_organization_id;
+        if (!activeOrgId) {
+          window.location.href = '/choose-organization';
+          return;
         }
+
+        this.showToast('Welcome back! 🙏');
       } else {
         errorEl.textContent = data.error || 'Login failed';
         errorEl.classList.remove('hidden');
@@ -3520,7 +3604,9 @@ class ChurchTapApp {
         this.closeModal();
         this.updateUIForLoggedInUser();
         this.showToast('Account created! Welcome! ✨');
-        this.showOnboardingModal();
+
+        // Default post-register flow: send them to Join Group picker (with a Not right now option).
+        window.location.href = '/choose-organization';
       } else {
         errorEl.textContent = data.error || 'Registration failed';
         errorEl.classList.remove('hidden');
@@ -4591,53 +4677,140 @@ class ChurchTapApp {
     const groupSection = document.getElementById('groupSection');
 
     if (currentGroupName) {
-      // Check for injected context first, then try to get from organization param
-      if (window.nfcOrgContext && window.nfcOrgContext.organization) {
-        currentGroupName.textContent = window.nfcOrgContext.organization.name;
-        groupSection.style.display = 'block';
-      } else if (this.orgParam) {
-        // Try to get organization name from a cached lookup or default display
-        currentGroupName.textContent = this.orgParam.toUpperCase();
-        groupSection.style.display = 'block';
-      } else {
+      const activeOrgId = this.membershipContext?.active_organization_id;
+      const memberships = this.membershipContext?.memberships || [];
+      const active = activeOrgId ? memberships.find(m => Number(m.organization_id) === Number(activeOrgId)) : null;
+
+      if (active) {
+        const suffix = active.status === 'pending' ? ' (Pending)' : '';
+        currentGroupName.textContent = `${active.organization_name}${suffix}`;
+      } else if (this.currentUser) {
         currentGroupName.textContent = 'No Group Selected';
-        groupSection.style.display = 'block';
+      } else {
+        currentGroupName.textContent = 'Guest';
       }
+
+      if (groupSection) groupSection.style.display = 'block';
     }
   }
 
   // Handle change group button click
   changeGroup() {
-    // Get the current tag ID to pass to the chooser
-    const tagId = this.tagIdParam || this.currentTagId;
-
-    if (tagId) {
-      // Navigate to the organization chooser with the current tag ID
-      window.location.href = `/choose-organization?uid=${tagId}`;
-    } else {
-      // If no tag ID, show a message or navigate to a general chooser
-      this.showToast('No NFC tag session found. Please scan an NFC tag first.');
-    }
-
-    // Hide menu after action
+    this.showGroupSwitcherModal();
     this.hideQuickMenu();
   }
 
   // Handle request group button click
   requestGroup() {
-    // Get the current tag ID to pass to the chooser page
-    const tagId = this.tagIdParam || this.currentTagId;
-
-    if (tagId) {
-      // Navigate to the organization chooser which has request functionality
-      window.location.href = `/choose-organization?uid=${tagId}`;
-    } else {
-      // If no tag ID, show a message or navigate to a general chooser
-      this.showToast('No NFC tag session found. Please scan an NFC tag first.');
-    }
+    // Group discovery is now account-driven (bracelets are optional).
+    window.location.href = '/choose-organization';
 
     // Hide menu after action
     this.hideQuickMenu();
+  }
+
+  async showGroupSwitcherModal() {
+    if (!this.currentUser) {
+      this.showLoginModal();
+      return;
+    }
+
+    // Refresh memberships when opening switcher so it’s always current
+    this.membershipContext = await this.fetchMembershipContext();
+    const memberships = this.membershipContext?.memberships || [];
+    const activeOrgId = this.membershipContext?.active_organization_id;
+
+    if (!memberships.length) {
+      this.showModal('Switch Group', `
+        <div class="space-y-4">
+          <p class="text-sm text-gray-600 dark:text-gray-400">You haven’t joined any groups yet.</p>
+          <button class="w-full btn-primary" onclick="window.location.href='/choose-organization'">Join a group</button>
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.closeModal()">Not right now</button>
+        </div>
+      `);
+      return;
+    }
+
+    const rowsHtml = memberships.map(m => {
+      const isActive = activeOrgId && Number(m.organization_id) === Number(activeOrgId);
+      const statusBadge =
+        m.status === 'active' ? '' :
+        m.status === 'pending' ? `<span class="text-xs px-2 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">Pending</span>` :
+        `<span class="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">${m.status}</span>`;
+
+      const switchDisabled = isActive ? 'disabled' : '';
+      const switchBtnClass = isActive ? 'btn-secondary opacity-60 cursor-default' : 'btn-primary';
+
+      return `
+        <div class="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div class="min-w-0">
+            <div class="flex items-center space-x-2">
+              <div class="font-medium text-gray-900 dark:text-white truncate">${this.escapeHtml(m.organization_name)}</div>
+              ${statusBadge}
+              ${isActive ? `<span class="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">Active</span>` : ''}
+            </div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 truncate">@${this.escapeHtml(m.organization_subdomain || '')}</div>
+          </div>
+          <div class="flex items-center space-x-2 ml-3">
+            <button class="${switchBtnClass}" ${switchDisabled} onclick="window.churchTapApp.switchActiveGroup(${m.organization_id})">Switch</button>
+            <button class="btn-secondary" onclick="window.churchTapApp.leaveGroup(${m.organization_id})">Leave</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    this.showModal('Switch Group', `
+      <div class="space-y-4">
+        <div class="space-y-2">${rowsHtml}</div>
+        <button class="w-full btn-secondary" onclick="window.location.href='/choose-organization'">Join another group</button>
+      </div>
+    `);
+  }
+
+  async switchActiveGroup(organizationId) {
+    try {
+      const response = await fetch('/api/memberships/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ organization_id: organizationId })
+      });
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || 'Failed to switch group');
+
+      this.membershipContext = await this.fetchMembershipContext();
+      this.updateGroupDisplay();
+      this.closeModal();
+      this.loadCommunity(this.currentDate);
+      this.showToast('Group switched');
+    } catch (e) {
+      console.error('Switch group error:', e);
+      this.showToast(e.message || 'Failed to switch group', 'error');
+    }
+  }
+
+  async leaveGroup(organizationId) {
+    if (!confirm('Leave this group? You can rejoin later if it is open.')) return;
+
+    try {
+      const response = await fetch('/api/memberships/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ organization_id: organizationId })
+      });
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || 'Failed to leave group');
+
+      this.membershipContext = await this.fetchMembershipContext();
+      this.updateGroupDisplay();
+      this.closeModal();
+      this.loadCommunity(this.currentDate);
+      this.showToast('Left group');
+    } catch (e) {
+      console.error('Leave group error:', e);
+      this.showToast(e.message || 'Failed to leave group', 'error');
+    }
   }
 
   async loadBraceletInfo() {
@@ -4763,9 +4936,9 @@ class ChurchTapApp {
           </div>
         ` : `
           <div class="mt-4 pt-3 border-t border-blue-200 dark:border-blue-700">
-            <button onclick="window.location.href = '/choose-organization?uid=${tagId}'" 
+            <button onclick="window.location.href = '/choose-organization'" 
                     class="w-full btn-primary text-sm">
-              ✨ Claim Bracelet
+              👥 Join a Group
             </button>
           </div>
         `}
@@ -4799,9 +4972,9 @@ class ChurchTapApp {
           This bracelet hasn't been claimed to an organization yet.
         </p>
         
-        <button onclick="window.location.href = '/choose-organization?uid=${tagId}'" 
+        <button onclick="window.location.href = '/choose-organization'" 
                 class="w-full btn-primary text-sm">
-          ✨ Choose Organization
+          👥 Join a Group
         </button>
       </div>
     `;
@@ -4831,15 +5004,14 @@ class ChurchTapApp {
             <span class="font-medium text-gray-900 dark:text-white">Important</span>
           </div>
           <p class="text-sm text-gray-600 dark:text-gray-400">
-            Changing organizations will reassign your bracelet. This action may require approval 
-            from the new organization.
+            Groups are now account-based. Choose a group to join or switch.
           </p>
         </div>
         
         <div class="space-y-3">
-          <button onclick="window.location.href = '/choose-organization?uid=${tagId}'" 
+          <button onclick="window.location.href = '/choose-organization'" 
                   class="w-full btn-primary">
-            🔄 Choose New Organization
+            🔄 Choose Group
           </button>
           
           <button onclick="window.churchTapApp.closeModal()" 
@@ -4853,15 +5025,13 @@ class ChurchTapApp {
 
   async isBraceletLinked(tagId) {
     // Check if this bracelet is already linked to the current user account
-    if (!this.currentUser || !this.authToken) {
+    if (!this.currentUser) {
       return false;
     }
 
     try {
       const response = await fetch(`/api/user/bracelet/${tagId}/linked`, {
-        headers: {
-          'Authorization': `Bearer ${this.authToken}`
-        }
+        credentials: 'include'
       });
 
       if (response.ok) {
@@ -4876,37 +5046,7 @@ class ChurchTapApp {
   }
 
   async linkBraceletToAccount(tagId) {
-    if (!this.currentUser) {
-      this.showToast('Please login first to link your bracelet');
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/user/link-bracelet', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.authToken}`
-        },
-        body: JSON.stringify({
-          bracelet_uid: tagId,
-          is_primary: true // Mark as primary since it's the one they're using
-        })
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        this.showToast('✅ Bracelet linked to your account!');
-        // Refresh the bracelet info to show the linked status
-        this.loadBraceletInfo();
-      } else {
-        this.showToast(`❌ ${data.error || 'Failed to link bracelet'}`);
-      }
-    } catch (error) {
-      console.error('Error linking bracelet:', error);
-      this.showToast('❌ Connection error. Please try again.');
-    }
+    this.showToast('To link a bracelet, just tap it while you are signed in.');
   }
 
   async checkAndUpdateLinkStatus(tagId) {

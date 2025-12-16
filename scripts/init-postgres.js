@@ -1,4 +1,4 @@
-// Applies migrations/postgres/000_init.sql against DATABASE_URL
+// Applies all migrations in migrations/postgres/*.sql against DATABASE_URL (idempotent)
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
@@ -10,22 +10,20 @@ async function main() {
     throw new Error('DATABASE_URL is required');
   }
 
-  const sqlPath = path.join(__dirname, '..', 'migrations', 'postgres', '000_init.sql');
-  const sql = fs.readFileSync(sqlPath, 'utf8');
-
-  // Split on semicolons while keeping statements simple; allow dollar-quoted bodies as-is
-  // For our schema, straightforward split is sufficient
-  const statements = sql
-    .split(/;\s*\n/)
-    .map(s => s.trim())
-    .filter(Boolean);
+  const migrationsDir = path.join(__dirname, '..', 'migrations', 'postgres');
+  const files = fs.readdirSync(migrationsDir)
+    .filter(f => f.endsWith('.sql'))
+    .sort();
 
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
   try {
     await client.query('BEGIN');
-    for (const stmt of statements) {
-      await client.query(stmt);
+    for (const file of files) {
+      const sqlPath = path.join(migrationsDir, file);
+      const sql = fs.readFileSync(sqlPath, 'utf8');
+      await client.query(sql);
+      console.log(`✅ Applied: ${file}`);
     }
     await client.query('COMMIT');
     console.log('✅ Postgres schema initialized.');

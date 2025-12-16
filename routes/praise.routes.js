@@ -1,61 +1,26 @@
 const express = require('express');
 const { dbQuery, db } = require('../config/database');
 const { validateInput } = require('../middleware/validation');
+const { authenticateUser } = require('../middleware/userAuth');
+const { requireActiveGroupMembership } = require('../middleware/membershipGate');
 
 const router = express.Router();
 
 // Submit praise report
-router.post('/', validateInput.communityContent, validateInput.sanitizeHtml, (req, res) => {
-  const { content, user_token, date } = req.body;
+router.post('/', authenticateUser, requireActiveGroupMembership, validateInput.communityContent, validateInput.sanitizeHtml, (req, res) => {
+  const { content, date, is_anonymous } = req.body;
   const ip = req.ip || req.connection.remoteAddress;
   const today = date || new Date().toISOString().split('T')[0];
-  let orgId = req.organization?.id || null;
+  const orgId = req.activeOrganizationId;
+  const userId = req.user.userId;
+  const userToken = `user_${userId}`;
   
   // Get session attribution from cookies
   const taggedSessionId = req.cookies?.taggedSession;
   const originatingTagId = req.cookies?.originatingTag;
   const sessionId = req.cookies?.trackingSession;
-  
-  // If no org from middleware, try to resolve from tag cookie
-  const resolveOrgFromTag = (cb) => {
-    if (orgId) return cb();
-    if (!originatingTagId) {
-      orgId = 1; // Default fallback
-      return cb();
-    }
-    
-    // First check ct_bracelet_memberships (for approved bracelets)
-    db.query(`
-      SELECT organization_id 
-      FROM ct_bracelet_memberships 
-      WHERE bracelet_uid = $1 AND status = 'approved'
-    `, [originatingTagId], (err1, membershipResult) => {
-      if (!err1 && membershipResult.rows.length > 0) {
-        orgId = membershipResult.rows[0].organization_id;
-        console.log(`🎉 ✅ Resolved org ${orgId} from bracelet membership for tag ${originatingTagId}`);
-        return cb();
-      }
-      
-      // If not found in memberships, check ct_nfc_tags
-      db.query(`
-        SELECT organization_id 
-        FROM ct_nfc_tags 
-        WHERE custom_id = $1 OR uid = $1
-      `, [originatingTagId], (err2, tagResult) => {
-        if (!err2 && tagResult.rows.length > 0) {
-          orgId = tagResult.rows[0].organization_id;
-          console.log(`🎉 ✅ Resolved org ${orgId} from nfc_tags for tag ${originatingTagId}`);
-        } else {
-          console.log(`🎉 ❌ Could not resolve org from tag ${originatingTagId}, using fallback`);
-          orgId = 1; // Default fallback
-        }
-        cb();
-      });
-    });
-  };
-  
-  resolveOrgFromTag(() => {
-  console.log(`Praise report - org: ${req.organization?.subdomain}, orgId: ${orgId}, taggedSession: ${taggedSessionId}, originatingTag: ${originatingTagId}`);
+
+  console.log(`Praise report - userId: ${userId}, orgId: ${orgId}, anonymous: ${!!is_anonymous}, taggedSession: ${taggedSessionId}, originatingTag: ${originatingTagId}`);
   
   if (!content || content.trim().length === 0) {
     return res.status(400).json({ success: false, error: 'Praise report content is required' });
@@ -65,10 +30,11 @@ router.post('/', validateInput.communityContent, validateInput.sanitizeHtml, (re
     return res.status(400).json({ success: false, error: 'Praise report too long (max 500 characters)' });
   }
   
+  // Note: we keep user_token stable for anti-spam/uniqueness, even if the UI displays the post as anonymous.
   dbQuery.run(`INSERT INTO ct_praise_reports
     (date, content, user_token, ip_address, organization_id, is_approved, tagged_session_id, originating_tag_id)
     VALUES ($1, $2, $3, $4, $5, TRUE, $6, $7)`,
-    [today, content.trim(), user_token, ip, orgId, taggedSessionId, originatingTagId], function(err) {
+    [today, content.trim(), userToken, ip, orgId, taggedSessionId, originatingTagId], function(err) {
       if (err) {
         console.error('Error submitting praise report:', err);
         return res.status(500).json({ success: false, error: 'Database error' });
@@ -84,28 +50,30 @@ router.post('/', validateInput.communityContent, validateInput.sanitizeHtml, (re
       
       res.json({ success: true, praise_report_id: this.lastID });
     });
-  });
 });
 
 // Celebrate praise report
-router.post('/celebrate', (req, res) => {
-  const { praise_report_id, user_token } = req.body;
+router.post('/celebrate', authenticateUser, requireActiveGroupMembership, (req, res) => {
+  const { praise_report_id } = req.body;
   const ip = req.ip || req.connection.remoteAddress;
+  const userId = req.user.userId;
+  const userToken = `user_${userId}`;
+  const orgId = req.activeOrganizationId;
   
   // Get session attribution from cookies
   const taggedSessionId = req.cookies?.taggedSession;
   const originatingTagId = req.cookies?.originatingTag;
   const sessionId = req.cookies?.trackingSession;
   
-  console.log(`Celebration interaction - praiseReportId: ${praise_report_id}, taggedSession: ${taggedSessionId}, originatingTag: ${originatingTagId}`);
+  console.log(`Celebration interaction - userId: ${userId}, orgId: ${orgId}, praiseReportId: ${praise_report_id}, taggedSession: ${taggedSessionId}, originatingTag: ${originatingTagId}`);
   
-  if (!praise_report_id || !user_token) {
+  if (!praise_report_id) {
     return res.status(400).json({ success: false, error: 'Missing required fields' });
   }
   
   // Check if user already celebrated this report
   db.query(`SELECT id FROM ct_celebration_interactions WHERE praise_report_id = $1 AND user_token = $2`,
-    [praise_report_id, user_token], (err, result) => {
+    [praise_report_id, userToken], (err, result) => {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }
@@ -118,7 +86,7 @@ router.post('/celebrate', (req, res) => {
       dbQuery.run(`INSERT INTO ct_celebration_interactions
         (praise_report_id, user_token, ip_address, tagged_session_id, originating_tag_id)
         VALUES ($1, $2, $3, $4, $5)`,
-        [praise_report_id, user_token, ip, taggedSessionId, originatingTagId], function(err) {
+        [praise_report_id, userToken, ip, taggedSessionId, originatingTagId], function(err) {
           if (err) {
             return res.status(500).json({ success: false, error: 'Database error' });
           }

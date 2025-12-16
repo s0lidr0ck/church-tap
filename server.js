@@ -37,6 +37,7 @@ const sessionRoutes = require('./routes/session.routes');
 const tapRoutes = require('./routes/tap.routes');
 const userRoutes = require('./routes/user.routes');
 const braceletsRoutes = require('./routes/bracelets.routes');
+const membershipsRoutes = require('./routes/memberships.routes');
 
 // Initialize Express app
 const app = express();
@@ -110,6 +111,7 @@ app.use('/api/master/analytics', masterAnalyticsRoutes);
 app.use('/api/session', sessionRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/bracelets', braceletsRoutes);
+app.use('/api/memberships', membershipsRoutes);
 
 // Tap routes - must come before static routes to handle /t/<uid>
 app.use('/', tapRoutes);

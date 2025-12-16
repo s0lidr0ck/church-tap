@@ -1,61 +1,26 @@
 const express = require('express');
 const { dbQuery, db } = require('../config/database');
+const { authenticateUser } = require('../middleware/userAuth');
+const { requireActiveGroupMembership } = require('../middleware/membershipGate');
 const { requireOrgAuth } = require('../config/middleware');
 
 const router = express.Router();
 
 // Submit verse community post
-router.post('/', (req, res) => {
-  const { content, verse_reference, user_token, date } = req.body;
+router.post('/', authenticateUser, requireActiveGroupMembership, (req, res) => {
+  const { content, verse_reference, date, is_anonymous } = req.body;
   const ip = req.ip || req.connection.remoteAddress;
   const today = date || new Date().toISOString().split('T')[0];
-  let orgId = req.organization?.id || null;
+  const orgId = req.activeOrganizationId;
+  const userId = req.user.userId;
+  const userToken = `user_${userId}`;
   
   // Get session attribution from cookies
   const taggedSessionId = req.cookies?.taggedSession;
   const originatingTagId = req.cookies?.originatingTag;
   const sessionId = req.cookies?.trackingSession;
-  
-  // If no org from middleware, try to resolve from tag cookie
-  const resolveOrgFromTag = (cb) => {
-    if (orgId) return cb();
-    if (!originatingTagId) {
-      orgId = 1; // Default fallback
-      return cb();
-    }
-    
-    // First check ct_bracelet_memberships (for approved bracelets)
-    db.query(`
-      SELECT organization_id 
-      FROM ct_bracelet_memberships 
-      WHERE bracelet_uid = $1 AND status = 'approved'
-    `, [originatingTagId], (err1, membershipResult) => {
-      if (!err1 && membershipResult.rows.length > 0) {
-        orgId = membershipResult.rows[0].organization_id;
-        console.log(`📖 ✅ Resolved org ${orgId} from bracelet membership for tag ${originatingTagId}`);
-        return cb();
-      }
-      
-      // If not found in memberships, check ct_nfc_tags
-      db.query(`
-        SELECT organization_id 
-        FROM ct_nfc_tags 
-        WHERE custom_id = $1 OR uid = $1
-      `, [originatingTagId], (err2, tagResult) => {
-        if (!err2 && tagResult.rows.length > 0) {
-          orgId = tagResult.rows[0].organization_id;
-          console.log(`📖 ✅ Resolved org ${orgId} from nfc_tags for tag ${originatingTagId}`);
-        } else {
-          console.log(`📖 ❌ Could not resolve org from tag ${originatingTagId}, using fallback`);
-          orgId = 1; // Default fallback
-        }
-        cb();
-      });
-    });
-  };
-  
-  resolveOrgFromTag(() => {
-  console.log(`Verse community post - org: ${req.organization?.subdomain}, orgId: ${orgId}, taggedSession: ${taggedSessionId}, originatingTag: ${originatingTagId}`);
+
+  console.log(`Verse community post - userId: ${userId}, orgId: ${orgId}, anonymous: ${!!is_anonymous}, taggedSession: ${taggedSessionId}, originatingTag: ${originatingTagId}`);
   
   if (!content || content.trim().length === 0) {
     return res.status(400).json({ success: false, error: 'Post content is required' });
@@ -73,7 +38,7 @@ router.post('/', (req, res) => {
     INSERT INTO ct_verse_community_posts
     (verse_reference, date, content, author_name, user_token, ip_address, organization_id, is_approved, tagged_session_id, originating_tag_id)
     VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8, $9)
-  `, [verse_reference, today, content.trim(), 'Anonymous', user_token, ip, orgId, taggedSessionId, originatingTagId], function(err) {
+  `, [verse_reference, today, content.trim(), is_anonymous ? 'Anonymous' : (req.userRecord?.display_name || req.userRecord?.first_name || 'Member'), userToken, ip, orgId, taggedSessionId, originatingTagId], function(err) {
     if (err) {
       console.error('Error submitting verse community post:', err);
       return res.status(500).json({ success: false, error: 'Database error' });
@@ -89,24 +54,25 @@ router.post('/', (req, res) => {
     
     res.json({ success: true, post_id: this.lastID });
   });
-  });
 });
 
 // Heart/like a community post
-router.post('/heart', (req, res) => {
-  const { post_id, user_token } = req.body;
+router.post('/heart', authenticateUser, requireActiveGroupMembership, (req, res) => {
+  const { post_id } = req.body;
   const ip = req.ip || req.connection.remoteAddress;
-  const orgId = req.organization?.id || 1;
+  const userId = req.user.userId;
+  const userToken = `user_${userId}`;
+  const orgId = req.activeOrganizationId;
   
-  if (!post_id || !user_token) {
-    return res.status(400).json({ success: false, error: 'Post ID and user token are required' });
+  if (!post_id) {
+    return res.status(400).json({ success: false, error: 'Post ID is required' });
   }
   
   // Check if user already hearted this post
   db.query(`
     SELECT id FROM ct_verse_community_interactions
     WHERE post_id = $1 AND user_token = $2
-  `, [post_id, user_token], (err, result) => {
+  `, [post_id, userToken], (err, result) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
@@ -119,7 +85,7 @@ router.post('/heart', (req, res) => {
     dbQuery.run(`
       INSERT INTO ct_verse_community_interactions (post_id, user_token, ip_address)
       VALUES ($1, $2, $3)
-    `, [post_id, user_token, ip], function(err) {
+    `, [post_id, userToken, ip], function(err) {
       if (err) {
         return res.status(500).json({ success: false, error: 'Database error' });
       }

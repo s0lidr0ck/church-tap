@@ -2,6 +2,8 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { db } = require('../config/database');
+const jwt = require('jsonwebtoken');
+const { JWT_SECRET } = require('../config/constants');
 
 const router = express.Router();
 
@@ -42,326 +44,98 @@ router.get('/t/:uid', async (req, res) => {
   console.log(`🏷️ Bracelet tap detected: ${uid}`);
   
   try {
-    // First check for approved bracelet memberships
-    const membershipQuery = `
-      SELECT
-        bm.organization_id, bm.bracelet_uid as custom_id,
-        o.subdomain, o.custom_domain, o.name as org_name
-      FROM ct_bracelet_memberships bm
-      LEFT JOIN CT_organizations o ON bm.organization_id = o.id
-      WHERE bm.bracelet_uid = $1 AND bm.status = 'approved'
-    `;
+    // Always set session tracking cookies for analytics
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const taggedSessionId = `tagged_${uid}_${Date.now()}`;
 
-    db.query(membershipQuery, [uid], (err, membershipResult) => {
-      if (err) {
-        console.error('Error looking up bracelet membership:', err);
-        return res.status(500).send('Internal server error');
-      }
+    const cookieOptions = {
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      httpOnly: false, // allow frontend access for analytics attribution
+      sameSite: 'lax',
+      secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+      path: '/'
+    };
 
-      if (membershipResult.rows.length > 0) {
-        // Found in bracelet memberships
-        const bracelet = membershipResult.rows[0];
-        console.log(`✅ Bracelet claimed to organization: ${bracelet.org_name} (${bracelet.subdomain})`);
+    res.cookie('trackingSession', sessionId, cookieOptions);
+    res.cookie('originatingTag', uid, cookieOptions);
+    res.cookie('taggedSession', taggedSessionId, cookieOptions);
 
-        // Set session tracking cookies for analytics
-        const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const taggedSessionId = `tagged_${uid}_${Date.now()}`;
-        
-        // Cookie configuration for production HTTPS
-        const cookieOptions = {
-          maxAge: 24 * 60 * 60 * 1000, // 24 hours
-          httpOnly: false, // Allow frontend access
-          sameSite: 'lax',
-          secure: req.secure || req.headers['x-forwarded-proto'] === 'https', // HTTPS only in production
-          path: '/' // Ensure cookies are available site-wide
-        };
-        
-        res.cookie('trackingSession', sessionId, cookieOptions);
-        res.cookie('originatingTag', uid, cookieOptions);
-        res.cookie('taggedSession', taggedSessionId, cookieOptions);
-        
-        console.log(`🍪 Session cookies set: trackingSession=${sessionId}, originatingTag=${uid}, taggedSession=${taggedSessionId}`);
-        
-        // Create anonymous session record in database with geolocation
-        const ip = req.ip || req.connection.remoteAddress;
-        const userAgent = req.get('User-Agent');
-        
-        // Get location data from IP (async, don't block session creation)
-        const locationService = require('../services/locationService');
-        locationService.getLocationFromIP(ip).then(location => {
-          db.query(`
-            INSERT INTO anonymous_sessions (
-              session_id, organization_id, ip_address, user_agent, 
-              created_at, last_seen_at, originating_tag_id, tagged_session_id,
-              country, city, latitude, longitude
-            )
-            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $5, $6, $7, $8, $9, $10)
-            ON CONFLICT (session_id) DO UPDATE SET 
-              last_seen_at = CURRENT_TIMESTAMP,
-              originating_tag_id = COALESCE(anonymous_sessions.originating_tag_id, EXCLUDED.originating_tag_id),
-              tagged_session_id = COALESCE(anonymous_sessions.tagged_session_id, EXCLUDED.tagged_session_id),
-              country = COALESCE(anonymous_sessions.country, EXCLUDED.country),
-              city = COALESCE(anonymous_sessions.city, EXCLUDED.city),
-              latitude = COALESCE(anonymous_sessions.latitude, EXCLUDED.latitude),
-              longitude = COALESCE(anonymous_sessions.longitude, EXCLUDED.longitude)
-          `, [
-            sessionId, 
-            bracelet.organization_id, 
-            ip, 
-            userAgent, 
-            uid, 
-            taggedSessionId,
-            location.country,
-            location.city,
-            location.latitude,
-            location.longitude
-          ], (sessionErr) => {
-            if (sessionErr) {
-              console.error('Error creating anonymous session:', sessionErr);
-            } else {
-              const locationStr = location.city && location.country ? `${location.city}, ${location.country}` : 'Unknown';
-              console.log(`📊 Anonymous session created: ${sessionId} with tag: ${uid} from ${locationStr}`);
-            }
-          });
-        }).catch(err => {
-          // Fallback: create session without location data
-          console.error('Location lookup failed, creating session without location:', err);
-          db.query(`
-            INSERT INTO anonymous_sessions (session_id, organization_id, ip_address, user_agent, created_at, last_seen_at, originating_tag_id, tagged_session_id)
-            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $5, $6)
-            ON CONFLICT (session_id) DO UPDATE SET 
-              last_seen_at = CURRENT_TIMESTAMP,
-              originating_tag_id = COALESCE(anonymous_sessions.originating_tag_id, EXCLUDED.originating_tag_id),
-              tagged_session_id = COALESCE(anonymous_sessions.tagged_session_id, EXCLUDED.tagged_session_id)
-          `, [sessionId, bracelet.organization_id, ip, userAgent, uid, taggedSessionId], (sessionErr) => {
-            if (sessionErr) {
-              console.error('Error creating anonymous session:', sessionErr);
-            } else {
-              console.log(`📊 Anonymous session created: ${sessionId} with tag: ${uid} (no location)`);
-            }
-          });
-        });
-        
-        // Log the tag interaction in tag_interactions table
-        db.query(`
-          INSERT INTO tag_interactions (
-            tag_id, session_id, interaction_type, page_url, referrer, user_agent, ip_address, 
-            organization_id, interaction_data, tagged_session_id
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        `, [
-          uid,
-          sessionId,
-          'scan',
-          req.protocol + '://' + req.get('host') + req.originalUrl,
-          req.get('Referrer') || req.get('Referer'),
-          userAgent,
-          ip,
-          bracelet.organization_id,
-          JSON.stringify({ action: 'bracelet_scan', uid, timestamp: Date.now() }),
-          taggedSessionId
-        ], (interactionErr) => {
-          if (interactionErr) {
-            console.error('Error creating tag interaction:', interactionErr);
-          } else {
-            console.log(`📊 Tag interaction logged: ${uid} for org ${bracelet.organization_id}`);
-          }
-        });
-
-        // Serve the index.html with organization context
-        const orgData = {
-          id: bracelet.organization_id,
-          name: bracelet.org_name,
-          subdomain: bracelet.subdomain
-        };
-        return serveHtmlWithOrgContext(res, orgData, uid);
-      }
-
-      // If not found in memberships, check NFC tags
-      const tagQuery = `
-        SELECT nt.*, o.subdomain, o.custom_domain, o.name as org_name
-        FROM ct_nfc_tags nt
-        LEFT JOIN CT_organizations o ON nt.organization_id = o.id
-        WHERE nt.custom_id = $1
-      `;
-
-      db.query(tagQuery, [uid], (err, result) => {
-        if (err) {
-          console.error('Error looking up bracelet:', err);
-          return res.status(500).send('Internal server error');
-        }
-
-        if (result.rows.length === 0) {
-        console.log(`❌ Bracelet not found: ${uid}, redirecting to organization chooser`);
-        // Redirect unknown bracelets to the organization chooser
-        return res.redirect(`/choose-organization?uid=${uid}`);
-      }
-      
-      const bracelet = result.rows[0];
-      
-      // Update scan count and last scanned time
-      db.query(`
-        UPDATE ct_nfc_tags SET 
-          last_scanned_at = NOW(),
-          scan_count = scan_count + 1
-        WHERE custom_id = $1
-      `, [uid], (updateErr) => {
-        if (updateErr) {
-          console.error('Error updating scan count:', updateErr);
-        } else {
-          console.log(`📊 Scan recorded for bracelet: ${uid}`);
-        }
-      });
-      
-      // Check if bracelet is claimed to an organization
-      if (bracelet.organization_id && bracelet.subdomain) {
-        console.log(`✅ Bracelet claimed to organization: ${bracelet.org_name} (${bracelet.subdomain})`);
-        
-        // Check if there's a pending membership
-        db.query(`
-          SELECT status FROM ct_bracelet_memberships 
-          WHERE bracelet_uid = $1 AND organization_id = $2 
-          ORDER BY created_at DESC LIMIT 1
-        `, [uid, bracelet.organization_id], (membershipErr, membershipResult) => {
-          if (membershipErr) {
-            console.error('Error checking membership status:', membershipErr);
-          }
-          
-          const hasPendingMembership = membershipResult.rows.length > 0 && 
-                                     membershipResult.rows[0].status === 'pending';
-          
-          // Set organization context for the request (for analytics tracking)
-          req.organization = {
-            id: bracelet.organization_id,
-            subdomain: bracelet.subdomain,
-            name: bracelet.org_name
-          };
-
-          // Add tag information to request for frontend
-          req.tagInfo = {
-            uid: uid,
-            organization: bracelet.subdomain,
-            hasPendingMembership: hasPendingMembership
-          };
-
-          // Set session tracking cookies for analytics
-          const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          const taggedSessionId = `tagged_${uid}_${Date.now()}`;
-          
-          // Cookie configuration for production HTTPS
-          const cookieOptions = {
-            maxAge: 24 * 60 * 60 * 1000, // 24 hours
-            httpOnly: false, // Allow frontend access
-            sameSite: 'lax',
-            secure: req.secure || req.headers['x-forwarded-proto'] === 'https', // HTTPS only in production
-            path: '/' // Ensure cookies are available site-wide
-          };
-          
-          res.cookie('trackingSession', sessionId, cookieOptions);
-          res.cookie('originatingTag', uid, cookieOptions);
-          res.cookie('taggedSession', taggedSessionId, cookieOptions);
-          
-          console.log(`🍪 Session cookies set: trackingSession=${sessionId}, originatingTag=${uid}, taggedSession=${taggedSessionId}`);
-          
-          // Create anonymous session record in database with geolocation
-          const ip = req.ip || req.connection.remoteAddress;
-          const userAgent = req.get('User-Agent');
-          
-          // Get location data from IP (async, don't block session creation)
-          const locationService = require('../services/locationService');
-          locationService.getLocationFromIP(ip).then(location => {
-            db.query(`
-              INSERT INTO anonymous_sessions 
-              (session_id, organization_id, ip_address, user_agent, first_seen_at, last_seen_at, originating_tag_id, tagged_session_id,
-               country, city, latitude, longitude)
-              VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $5, $6, $7, $8, $9, $10)
-              ON CONFLICT (session_id) DO UPDATE SET 
-                last_seen_at = CURRENT_TIMESTAMP,
-                originating_tag_id = COALESCE(anonymous_sessions.originating_tag_id, EXCLUDED.originating_tag_id),
-                tagged_session_id = COALESCE(anonymous_sessions.tagged_session_id, EXCLUDED.tagged_session_id),
-                country = COALESCE(anonymous_sessions.country, EXCLUDED.country),
-                city = COALESCE(anonymous_sessions.city, EXCLUDED.city),
-                latitude = COALESCE(anonymous_sessions.latitude, EXCLUDED.latitude),
-                longitude = COALESCE(anonymous_sessions.longitude, EXCLUDED.longitude)
-            `, [
-              sessionId, 
-              bracelet.organization_id, 
-              ip, 
-              userAgent, 
-              uid, 
-              taggedSessionId,
-              location.country,
-              location.city,
-              location.latitude,
-              location.longitude
-            ], (sessionErr) => {
-              if (sessionErr) {
-                console.error('Error creating anonymous session:', sessionErr);
-              } else {
-                const locationStr = location.city && location.country ? `${location.city}, ${location.country}` : 'Unknown';
-                console.log(`📊 Anonymous session created: ${sessionId} with tag: ${uid} from ${locationStr}`);
-              }
-            });
-          }).catch(err => {
-            // Fallback: create session without location data
-            console.error('Location lookup failed, creating session without location:', err);
-            db.query(`
-              INSERT INTO anonymous_sessions 
-              (session_id, organization_id, ip_address, user_agent, first_seen_at, last_seen_at, originating_tag_id, tagged_session_id)
-              VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $5, $6)
-              ON CONFLICT (session_id) DO UPDATE SET 
-                last_seen_at = CURRENT_TIMESTAMP,
-                originating_tag_id = COALESCE(anonymous_sessions.originating_tag_id, EXCLUDED.originating_tag_id),
-                tagged_session_id = COALESCE(anonymous_sessions.tagged_session_id, EXCLUDED.tagged_session_id)
-            `, [sessionId, bracelet.organization_id, ip, userAgent, uid, taggedSessionId], (sessionErr) => {
-              if (sessionErr) {
-                console.error('Error creating anonymous session:', sessionErr);
-              } else {
-                console.log(`📊 Anonymous session created: ${sessionId} with tag: ${uid} (no location)`);
-              }
-            });
-          });
-          
-          // Create tag interaction record for analytics
-          db.query(`
-            INSERT INTO tag_interactions 
-            (session_id, tag_id, interaction_type, page_url, referrer, user_agent, ip_address, organization_id, interaction_data, tagged_session_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-          `, [
-            sessionId,
-            uid,
-            'scan',
-            req.originalUrl || `/t/${uid}`,
-            req.get('Referrer') || req.get('Referer'),
-            userAgent,
-            ip,
-            bracelet.organization_id,
-            JSON.stringify({ action: 'bracelet_scan', uid, timestamp: Date.now() }),
-            taggedSessionId
-          ], (interactionErr) => {
-            if (interactionErr) {
-              console.error('Error creating tag interaction:', interactionErr);
-            } else {
-              console.log(`📊 Tag interaction logged: ${uid} for org ${bracelet.organization_id}`);
-            }
-          });
-          
-          // Serve the main app with organization context injected!
-          console.log(`🎯 Serving app for organization: ${bracelet.org_name} (${bracelet.subdomain})`);
-          const orgData = {
-            id: bracelet.organization_id,
-            name: bracelet.org_name,
-            subdomain: bracelet.subdomain
-          };
-          return serveHtmlWithOrgContext(res, orgData, uid);
-        });
-      } else {
-        console.log(`🤔 Unclaimed bracelet, showing organization chooser: ${uid}`);
-        
-        // Redirect to choose organization page
-        return res.redirect(`/choose-organization?uid=${uid}`);
-      }
-      });
+    // Pending bracelet link cookie (server-only): allows auto-link immediately after login on this device/session
+    res.cookie('pendingBraceletUid', uid, {
+      maxAge: 10 * 60 * 1000, // 10 minutes
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+      path: '/'
     });
+
+    // If user is already logged in on this device, we can link immediately on tap.
+    let currentUserId = null;
+    const existingAuthToken = req.cookies?.authToken;
+    if (existingAuthToken) {
+      try {
+        const decoded = jwt.verify(existingAuthToken, JWT_SECRET);
+        currentUserId = decoded.userId ?? decoded.id ?? null;
+      } catch (e) {
+        currentUserId = null;
+      }
+    }
+
+    // If bracelet is already linked to a user, auto-login that user
+    db.query(
+      `SELECT user_id FROM ct_user_bracelets WHERE bracelet_uid = $1`,
+      [uid],
+      (linkErr, linkResult) => {
+        if (linkErr) {
+          console.error('Error looking up user bracelet link:', linkErr);
+          // Still allow app access
+          return res.sendFile(path.join(__dirname, '../public', 'index.html'));
+        }
+
+        const linkedUserId = linkResult.rows[0]?.user_id;
+        if (linkedUserId) {
+          const token = jwt.sign(
+            { userId: linkedUserId },
+            JWT_SECRET,
+            { expiresIn: '30d' }
+          );
+
+          res.cookie('authToken', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+          });
+
+          // Clear pending link cookie when we successfully auto-login
+          res.clearCookie('pendingBraceletUid');
+
+          console.log(`🔐 Auto-login via bracelet ${uid} for user ${linkedUserId}`);
+        } else {
+          if (currentUserId) {
+            // Link immediately for logged-in users (tap on this device)
+            db.query(
+              `INSERT INTO ct_user_bracelets (user_id, bracelet_uid, is_primary, nickname)
+               VALUES ($1, $2, FALSE, NULL)
+               ON CONFLICT (bracelet_uid) DO NOTHING`,
+              [currentUserId, uid],
+              (insertErr) => {
+                if (insertErr) {
+                  console.error('Error linking bracelet on tap:', insertErr);
+                } else {
+                  console.log(`🔗 Bracelet ${uid} linked to logged-in user ${currentUserId} on tap`);
+                  res.clearCookie('pendingBraceletUid');
+                }
+              }
+            );
+          } else {
+            console.log(`🆕 Bracelet ${uid} not linked to a user yet (pending link set)`);
+          }
+        }
+
+        // Serve the app (default-org public content; group switching handled post-login)
+        return res.sendFile(path.join(__dirname, '../public', 'index.html'));
+      }
+    );
   } catch (error) {
     console.error('Unexpected error in tap handler:', error);
     return res.status(500).send('Internal server error');
@@ -370,12 +144,6 @@ router.get('/t/:uid', async (req, res) => {
 
 // Organization chooser page
 router.get('/choose-organization', (req, res) => {
-  const { uid } = req.query;
-  
-  if (!uid) {
-    return res.redirect('/?error=missing_uid');
-  }
-  
   // Serve the choose organization interface
   res.sendFile(require('path').join(__dirname, '../public', 'choose-organization.html'));
 });
@@ -480,66 +248,12 @@ router.get('/api/organizations/search', async (req, res) => {
 
 // API endpoint to claim bracelet to organization
 router.post('/api/bracelet/claim', async (req, res) => {
-  try {
-    const { uid, organization_id } = req.body;
-    
-    if (!uid || !organization_id) {
-      return res.status(400).json({ success: false, error: 'UID and organization ID are required' });
-    }
-    
-    // Verify bracelet exists and is unclaimed, or create if it doesn't exist
-    db.query(`
-      SELECT id, organization_id FROM ct_nfc_tags 
-      WHERE custom_id = $1
-    `, [uid], (err, braceletResult) => {
-      if (err) {
-        console.error('Error looking up bracelet:', err);
-        return res.status(500).json({ success: false, error: 'Database error' });
-      }
-      
-      if (braceletResult.rows.length === 0) {
-        // Bracelet doesn't exist, create it first
-        console.log(`🆕 Creating new bracelet record for: ${uid}`);
-        db.query(`
-          INSERT INTO ct_nfc_tags (custom_id, status, batch_name) 
-          VALUES ($1, 'available', 'legacy-import') 
-          RETURNING id, organization_id
-        `, [uid], (createErr, createResult) => {
-          if (createErr) {
-            console.error('Error creating bracelet:', createErr);
-            return res.status(500).json({ success: false, error: 'Failed to create bracelet' });
-          }
-          
-          const bracelet = createResult.rows[0];
-          console.log(`✅ New bracelet created: ${uid} (ID: ${bracelet.id})`);
-          
-          // Continue with organization assignment
-          proceedWithClaim(bracelet, organization_id, uid, res);
-        });
-        return;
-      }
-      
-      const bracelet = braceletResult.rows[0];
-      
-      if (bracelet.organization_id) {
-        // Check if trying to switch to the same organization
-        if (String(bracelet.organization_id) === String(organization_id)) {
-          return res.status(400).json({ success: false, error: 'Bracelet already belongs to this organization' });
-        }
-        
-        console.log(`🔄 Switching bracelet ${uid} from organization ${bracelet.organization_id} to ${organization_id}`);
-        
-        // TODO: Add guardrails here (cooldown period, approval requirements, etc.)
-        // For now, allow immediate switching
-      }
-      
-      // Continue with organization assignment (works for both new claims and switches)
-      proceedWithClaim(bracelet, organization_id, uid, res);
-    });
-  } catch (error) {
-    console.error('Error in bracelet claim:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
+  // Deprecated: org membership is now account-driven via /api/memberships/join.
+  return res.status(410).json({
+    success: false,
+    error: 'Deprecated. Join groups from your account instead of claiming bracelets to organizations.',
+    code: 'ENDPOINT_DEPRECATED'
+  });
 });
 
 // Subdomain validation function
