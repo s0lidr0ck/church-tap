@@ -2,6 +2,7 @@ const express = require('express');
 const { dbQuery, db } = require('../config/database');
 const { requireOrgAuth } = require('../config/middleware');
 const { getOrganizationFeatures, getTranslationCatalog } = require('../services/organizationFeaturesService');
+const { requireOrgFeature } = require('../middleware/featureGate');
 
 const router = express.Router();
 
@@ -200,7 +201,7 @@ router.get('/links', (req, res) => {
 // ===========================
 // Emergency Scripture Topics - Public
 // ===========================
-router.get('/topics', async (req, res) => {
+router.get('/topics', requireOrgFeature('topics', { message: 'Topics are disabled for this group' }), async (req, res) => {
   try {
     const orgId = await resolveOrgIdFromRequest(req);
 
@@ -235,7 +236,7 @@ router.get('/topics', async (req, res) => {
   }
 });
 
-router.get('/topics/:id/random', async (req, res) => {
+router.get('/topics/:id/random', requireOrgFeature('topics', { message: 'Topics are disabled for this group' }), async (req, res) => {
   try {
     const orgId = await resolveOrgIdFromRequest(req);
     const topicId = parseInt(req.params.id, 10);
@@ -286,7 +287,7 @@ router.get('/topics/:id/random', async (req, res) => {
   }
 });
 
-router.get('/default-topics/:id/random', async (req, res) => {
+router.get('/default-topics/:id/random', requireOrgFeature('topics', { message: 'Topics are disabled for this group' }), async (req, res) => {
   try {
     const orgId = await resolveOrgIdFromRequest(req);
     const templateId = parseInt(req.params.id, 10);

@@ -9,7 +9,8 @@ function featureKeyToColumn(featureKey) {
     verseCommentary: 'verse_commentary_enabled',
     anonymousPosts: 'anonymous_posts_enabled',
     groupCalendar: 'group_calendar_enabled',
-    groupLinks: 'group_links_enabled'
+    groupLinks: 'group_links_enabled',
+    topics: 'topics_enabled'
   };
   return map[key] || key;
 }
