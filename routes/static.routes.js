@@ -27,6 +27,11 @@ router.get('/', (req, res) => {
   }
 });
 
+// Always serve the church interface app shell (even on churchtap.app)
+router.get('/app', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
 // Static page routes
 router.get('/verse', (req, res, next) => {
   // Apply analytics tracking manually if needed
@@ -35,6 +40,23 @@ router.get('/verse', (req, res, next) => {
 
 router.get('/verse/:date', (req, res, next) => {
   // Apply analytics tracking manually if needed
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
+// App shell routes for SPA-style pages
+router.get('/favorites', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
+router.get('/collections', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
+router.get('/collections/:id', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
+router.get('/my-prayers', (req, res) => {
   res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
 

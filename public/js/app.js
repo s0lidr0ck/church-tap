@@ -63,27 +63,33 @@ class ChurchTapApp {
       this.setupEventListeners();
       this.applyTheme();
       this.applyTextSize();
-      this.checkAuthStatus();
+      await this.checkAuthStatus();
 
       // Load org feature flags early so we can hide/disable UI and skip calls
       await this.loadOrganizationFeatures();
       this.applyFeatureTogglesToUI();
 
+      // Routing (must exist before rendering the correct page)
+      this.setupRouting();
+
       this.updateTranslationButtons();
       this.hideSplashScreen();
       
       // Load content with proper error handling
-      this.loadVerse(this.currentDate)
-        .catch(err => {
-          console.error('Verse loading failed:', err);
-          this.showErrorState('verse', 'Unable to load today\'s verse. Please check your connection and try again.');
-        });
-      
-      this.loadCommunity(this.currentDate)
-        .catch(err => {
-          console.error('Community loading failed:', err);
-          this.showErrorState('community', 'Unable to load community content.');
-        });
+      // Only auto-load verse/community when the current route is the verse view.
+      if (this.isVerseRoute(window.location.pathname)) {
+        this.loadVerse(this.currentDate)
+          .catch(err => {
+            console.error('Verse loading failed:', err);
+            this.showErrorState('verse', 'Unable to load today\'s verse. Please check your connection and try again.');
+          });
+        
+        this.loadCommunity(this.currentDate)
+          .catch(err => {
+            console.error('Community loading failed:', err);
+            this.showErrorState('community', 'Unable to load community content.');
+          });
+      }
       
       this.setupSwipeGestures();
       this.checkNotificationPermission();
@@ -201,6 +207,428 @@ class ChurchTapApp {
     }
   }
 
+  // ===========================
+  // Routing + Pages
+  // ===========================
+  setupRouting() {
+    window.addEventListener('popstate', () => {
+      this.routeTo(window.location.pathname);
+    });
+
+    // Initial route
+    this.routeTo(window.location.pathname);
+  }
+
+  isVerseRoute(pathname) {
+    const path = String(pathname || '/');
+    if (path === '/' || path === '/app') return true;
+    return /^\/verse\/[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(path);
+  }
+
+  navigate(path) {
+    const p = String(path || '/');
+    if (window.location.pathname === p) return;
+    window.history.pushState({}, '', p);
+    this.routeTo(p);
+  }
+
+  routeTo(pathname) {
+    const path = String(pathname || '/');
+
+    // Collections detail: /collections/:id
+    const collectionMatch = path.match(/^\/collections\/(\d+)$/);
+    if (collectionMatch) {
+      this.showPageContainer();
+      this.renderCollectionDetailPage(Number(collectionMatch[1]));
+      return;
+    }
+
+    if (path === '/favorites') {
+      this.showPageContainer();
+      this.renderFavoritesPage();
+      return;
+    }
+
+    if (path === '/collections') {
+      this.showPageContainer();
+      this.renderCollectionsPage();
+      return;
+    }
+
+    if (path === '/my-prayers') {
+      this.showPageContainer();
+      this.renderMyPrayersPage();
+      return;
+    }
+
+    // Verse route: /verse/YYYY-MM-DD
+    const verseMatch = path.match(/^\/verse\/([0-9]{4}-[0-9]{2}-[0-9]{2})$/);
+    if (verseMatch) {
+      const date = verseMatch[1];
+      this.currentDate = date;
+      this.showVerseContainer();
+      this.loadVerse(date).catch(() => {});
+      this.loadCommunity(date).catch(() => {});
+      return;
+    }
+
+    // Default: main verse view
+    this.showVerseContainer();
+  }
+
+  showPageContainer() {
+    const pageContainer = document.getElementById('pageContainer');
+    if (pageContainer) pageContainer.classList.remove('hidden');
+
+    const dateNav = document.getElementById('dateNav');
+    if (dateNav) dateNav.classList.add('hidden');
+
+    const verseContainer = document.getElementById('verseContainer');
+    if (verseContainer) verseContainer.classList.add('hidden');
+
+    const engagementActions = document.getElementById('engagementActions');
+    if (engagementActions) engagementActions.classList.add('hidden');
+
+    const communitySection = document.getElementById('communitySection');
+    if (communitySection) communitySection.classList.add('hidden');
+
+    this.hideQuickMenu();
+  }
+
+  showVerseContainer() {
+    const pageContainer = document.getElementById('pageContainer');
+    if (pageContainer) pageContainer.classList.add('hidden');
+
+    const dateNav = document.getElementById('dateNav');
+    if (dateNav) dateNav.classList.remove('hidden');
+
+    const verseContainer = document.getElementById('verseContainer');
+    if (verseContainer) verseContainer.classList.remove('hidden');
+  }
+
+  setPageContent(html) {
+    const pageContainer = document.getElementById('pageContainer');
+    const inner = pageContainer?.querySelector('.max-w-lg');
+    if (!inner) return;
+    inner.innerHTML = html;
+  }
+
+  renderAuthRequired(title, message) {
+    this.setPageContent(`
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">${this.escapeHtml(title)}</h2>
+          <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/')">Back</button>
+        </div>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">${this.escapeHtml(message)}</p>
+        <div class="space-y-2">
+          <button class="w-full btn-primary" onclick="window.churchTapApp.showLoginModal()">Login / Create Account</button>
+          <button class="w-full btn-secondary" onclick="window.location.href='/choose-organization'">Choose Group</button>
+        </div>
+      </div>
+    `);
+  }
+
+  async renderFavoritesPage() {
+    if (!this.currentUser) {
+      this.renderAuthRequired('My Favorites', 'Login to sync your favorite verses across devices.');
+      return;
+    }
+
+    this.setPageContent(`
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">My Favorites</h2>
+          <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/')">Back</button>
+        </div>
+        <div class="text-sm text-gray-600 dark:text-gray-400">Loading…</div>
+      </div>
+    `);
+
+    try {
+      const res = await fetch(this.buildApiUrl('/api/favorites'), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        const msg = data?.error || 'Unable to load favorites.';
+        this.renderAuthRequired('My Favorites', msg);
+        return;
+      }
+
+      const favorites = Array.isArray(data.favorites) ? data.favorites : [];
+      const rows = favorites.length
+        ? favorites.map(v => {
+            const ref = this.escapeHtml(v.bible_reference || 'Bible');
+            const date = this.escapeHtml(String(v.date || ''));
+            const previewText = v.verse_text ? this.plainTextFromVerseText(v.verse_text) : '';
+            const preview = previewText ? this.escapeHtml(previewText.slice(0, 120)) : '';
+            return `
+              <div class="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                <div class="flex items-start justify-between space-x-3">
+                  <button class="text-left flex-1" onclick="window.churchTapApp.navigate('/verse/${date}')">
+                    <div class="font-medium text-primary-600 dark:text-primary-400">${ref}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">${date}</div>
+                    ${preview ? `<div class="text-sm text-gray-700 dark:text-gray-200 mt-2">${preview}${previewText.length > 120 ? '…' : ''}</div>` : ''}
+                  </button>
+                  <button class="btn-secondary text-xs" onclick="window.churchTapApp.toggleFavoriteById(${Number(v.id)})">Remove</button>
+                </div>
+              </div>
+            `;
+          }).join('')
+        : `<div class="text-sm text-gray-600 dark:text-gray-400">No favorites yet. Tap “Save” on a verse to add one.</div>`;
+
+      this.setPageContent(`
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">My Favorites</h2>
+            <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/')">Back</button>
+          </div>
+          <div class="space-y-3">${rows}</div>
+        </div>
+      `);
+    } catch (e) {
+      console.error('Favorites page error:', e);
+      this.renderAuthRequired('My Favorites', 'Unable to load favorites.');
+    }
+  }
+
+  async renderCollectionsPage() {
+    if (!this.currentUser) {
+      this.renderAuthRequired('My Collections', 'Login to create collections synced across devices.');
+      return;
+    }
+
+    this.setPageContent(`
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">My Collections</h2>
+          <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/')">Back</button>
+        </div>
+        <div class="text-sm text-gray-600 dark:text-gray-400">Loading…</div>
+      </div>
+    `);
+
+    try {
+      const res = await fetch(this.buildApiUrl('/api/collections'), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        const msg = data?.error || 'Unable to load collections.';
+        this.renderAuthRequired('My Collections', msg);
+        return;
+      }
+
+      const collections = Array.isArray(data.collections) ? data.collections : [];
+      const listHtml = collections.length
+        ? collections.map(c => {
+            const name = this.escapeHtml(c.name || 'Untitled');
+            const desc = this.escapeHtml(c.description || '');
+            return `
+              <div class="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                <button class="w-full text-left" onclick="window.churchTapApp.navigate('/collections/${Number(c.id)}')">
+                  <div class="font-medium text-gray-900 dark:text-white">${name}</div>
+                  ${desc ? `<div class="text-sm text-gray-600 dark:text-gray-400 mt-1">${desc}</div>` : ''}
+                </button>
+              </div>
+            `;
+          }).join('')
+        : `<div class="text-sm text-gray-600 dark:text-gray-400">No collections yet. Create one below.</div>`;
+
+      this.setPageContent(`
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">My Collections</h2>
+            <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/')">Back</button>
+          </div>
+
+          <div class="space-y-3 mb-6">${listHtml}</div>
+
+          <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h3 class="text-sm font-semibold text-gray-800 dark:text-white mb-2">Create a collection</h3>
+            <form id="createCollectionForm" class="space-y-2">
+              <input id="collectionName" type="text" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Collection name" required>
+              <input id="collectionDesc" type="text" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Description (optional)">
+              <button type="submit" class="w-full btn-primary">Create</button>
+            </form>
+          </div>
+        </div>
+      `);
+
+      const form = document.getElementById('createCollectionForm');
+      if (form) {
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const name = document.getElementById('collectionName')?.value;
+          const description = document.getElementById('collectionDesc')?.value;
+          await this.createCollection(name, description);
+        });
+      }
+    } catch (e) {
+      console.error('Collections page error:', e);
+      this.renderAuthRequired('My Collections', 'Unable to load collections.');
+    }
+  }
+
+  async renderCollectionDetailPage(collectionId) {
+    if (!this.currentUser) {
+      this.renderAuthRequired('Collection', 'Login to view your collections.');
+      return;
+    }
+
+    this.setPageContent(`
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Collection</h2>
+          <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/collections')">Back</button>
+        </div>
+        <div class="text-sm text-gray-600 dark:text-gray-400">Loading…</div>
+      </div>
+    `);
+
+    try {
+      const res = await fetch(this.buildApiUrl(`/api/collections/${collectionId}`), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        const msg = data?.error || 'Unable to load collection.';
+        this.renderAuthRequired('Collection', msg);
+        return;
+      }
+
+      const collection = data.collection;
+      const verses = Array.isArray(data.verses) ? data.verses : [];
+      const name = this.escapeHtml(collection?.name || 'Collection');
+      const desc = this.escapeHtml(collection?.description || '');
+
+      const addCurrentBtn = this.currentVerse?.id
+        ? `<button class="btn-primary text-sm" onclick="window.churchTapApp.addCurrentVerseToCollection(${collectionId})">Add current verse</button>`
+        : '';
+
+      const rows = verses.length
+        ? verses.map(v => {
+            const ref = this.escapeHtml(v.bible_reference || 'Bible');
+            const date = this.escapeHtml(String(v.date || ''));
+            const previewText = v.verse_text ? this.plainTextFromVerseText(v.verse_text) : '';
+            const preview = previewText ? this.escapeHtml(previewText.slice(0, 120)) : '';
+            return `
+              <div class="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                <div class="flex items-start justify-between space-x-3">
+                  <button class="text-left flex-1" onclick="window.churchTapApp.navigate('/verse/${date}')">
+                    <div class="font-medium text-primary-600 dark:text-primary-400">${ref}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">${date}</div>
+                    ${preview ? `<div class="text-sm text-gray-700 dark:text-gray-200 mt-2">${preview}${previewText.length > 120 ? '…' : ''}</div>` : ''}
+                  </button>
+                  <button class="btn-secondary text-xs" onclick="window.churchTapApp.removeVerseFromCollection(${collectionId}, ${Number(v.id)})">Remove</button>
+                </div>
+              </div>
+            `;
+          }).join('')
+        : `<div class="text-sm text-gray-600 dark:text-gray-400">No verses yet. Add one from the verse screen.</div>`;
+
+      this.setPageContent(`
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">${name}</h2>
+            <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/collections')">Back</button>
+          </div>
+          ${desc ? `<div class="text-sm text-gray-600 dark:text-gray-400 mb-4">${desc}</div>` : '<div class="mb-4"></div>'}
+
+          ${addCurrentBtn ? `<div class="mb-4">${addCurrentBtn}</div>` : ''}
+
+          <div class="space-y-3">${rows}</div>
+
+          <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-6">
+            <button class="w-full text-red-600 dark:text-red-400 font-medium" onclick="window.churchTapApp.deleteCollection(${collectionId})">Delete collection</button>
+          </div>
+        </div>
+      `);
+    } catch (e) {
+      console.error('Collection detail error:', e);
+      this.renderAuthRequired('Collection', 'Unable to load collection.');
+    }
+  }
+
+  async renderMyPrayersPage() {
+    if (!this.currentUser) {
+      this.renderAuthRequired('My Prayers', 'Login to keep your prayer journal synced across devices.');
+      return;
+    }
+
+    this.setPageContent(`
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">My Prayers</h2>
+          <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/')">Back</button>
+        </div>
+        <div class="text-sm text-gray-600 dark:text-gray-400">Loading…</div>
+      </div>
+    `);
+
+    try {
+      const res = await fetch(this.buildApiUrl('/api/personal-prayers'), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        const msg = data?.error || 'Unable to load prayers.';
+        this.renderAuthRequired('My Prayers', msg);
+        return;
+      }
+
+      const prayers = Array.isArray(data.prayers) ? data.prayers : [];
+      const rows = prayers.length
+        ? prayers.map(p => {
+            const id = Number(p.id);
+            const content = this.escapeHtml(p.content || '');
+            const created = this.escapeHtml(String(p.created_at || ''));
+            const checked = p.is_answered ? 'checked' : '';
+            return `
+              <div class="p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <div class="flex items-start justify-between space-x-3">
+                  <div class="flex-1">
+                    <div class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">${content}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-2">${created}</div>
+                    <label class="mt-3 inline-flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                      <input type="checkbox" ${checked} onchange="window.churchTapApp.setPrayerAnswered(${id}, this.checked)">
+                      <span>Answered</span>
+                    </label>
+                  </div>
+                  <button class="btn-secondary text-xs" onclick="window.churchTapApp.deletePersonalPrayer(${id})">Delete</button>
+                </div>
+              </div>
+            `;
+          }).join('')
+        : `<div class="text-sm text-gray-600 dark:text-gray-400">No prayers yet. Add one below.</div>`;
+
+      this.setPageContent(`
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">My Prayers</h2>
+            <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/')">Back</button>
+          </div>
+
+          <div class="space-y-3 mb-6">${rows}</div>
+
+          <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h3 class="text-sm font-semibold text-gray-800 dark:text-white mb-2">Add a prayer</h3>
+            <form id="createPrayerForm" class="space-y-2">
+              <textarea id="prayerText" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Write a prayer…" rows="4" required></textarea>
+              <button type="submit" class="w-full btn-primary">Add</button>
+            </form>
+          </div>
+        </div>
+      `);
+
+      const form = document.getElementById('createPrayerForm');
+      if (form) {
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const content = document.getElementById('prayerText')?.value;
+          await this.createPersonalPrayer(content);
+        });
+      }
+    } catch (e) {
+      console.error('My prayers page error:', e);
+      this.renderAuthRequired('My Prayers', 'Unable to load prayers.');
+    }
+  }
+
   escapeHtml(value) {
     if (value === null || value === undefined) return '';
     return String(value)
@@ -314,6 +742,26 @@ class ChurchTapApp {
       document.getElementById('loginMenuBtn').click(); // Reuse existing login functionality
     });
 
+    // Menu navigation (Favorites / Collections / My Prayers)
+    const favoritesMenuBtn = document.getElementById('favoritesBtn');
+    if (favoritesMenuBtn) {
+      favoritesMenuBtn.addEventListener('click', () => {
+        this.navigate('/favorites');
+      });
+    }
+    const collectionsMenuBtn = document.getElementById('collectionsBtn');
+    if (collectionsMenuBtn) {
+      collectionsMenuBtn.addEventListener('click', () => {
+        this.navigate('/collections');
+      });
+    }
+    const personalPrayersMenuBtn = document.getElementById('personalPrayersBtn');
+    if (personalPrayersMenuBtn) {
+      personalPrayersMenuBtn.addEventListener('click', () => {
+        this.navigate('/my-prayers');
+      });
+    }
+
     // Navigation
     document.getElementById('prevDay').addEventListener('click', () => {
       this.navigateDay(-1);
@@ -404,18 +852,22 @@ class ChurchTapApp {
       this.shareVerse();
     });
 
-    document.getElementById('downloadBtn').addEventListener('click', () => {
-      this.downloadVerseImage();
-    });
+    // "Download Image" menu item removed for now; keep handler optional.
+    const downloadBtn = document.getElementById('downloadBtn');
+    if (downloadBtn) {
+      downloadBtn.addEventListener('click', () => {
+        this.downloadVerseImage();
+      });
+    }
 
     document.getElementById('searchBtn').addEventListener('click', () => {
       this.showVerseSearchModal();
       this.toggleQuickMenu();
     });
 
-    const fundraisingBtn = document.getElementById('fundraisingBtn');
-    if (fundraisingBtn) {
-      fundraisingBtn.addEventListener('click', () => {
+    const fundraisingCard = document.getElementById('fundraisingCard');
+    if (fundraisingCard) {
+      fundraisingCard.addEventListener('click', () => {
         this.openFundraisingModal();
         this.toggleQuickMenu();
       });
@@ -441,6 +893,13 @@ class ChurchTapApp {
     document.getElementById('favoriteBtn').addEventListener('click', () => {
       this.toggleFavorite();
     });
+
+    const addToCollectionBtn = document.getElementById('addToCollectionBtn');
+    if (addToCollectionBtn) {
+      addToCollectionBtn.addEventListener('click', () => {
+        this.showAddToCollectionModal();
+      });
+    }
 
     document.getElementById('qrBtn').addEventListener('click', () => {
       this.showQRCode();
@@ -990,7 +1449,10 @@ class ChurchTapApp {
               const size = this.getTopicSize(topic, topics);
               return `
                 <button 
-                  onclick="window.churchTapApp.selectTopicFromWordCloud(${topic.id}, '${this.escapeHtml(topic.name)}', '${topic.source || 'custom'}')"
+                  type="button"
+                  data-topic-id="${this.escapeHtml(topic.id)}"
+                  data-topic-name="${this.escapeHtml(topic.name)}"
+                  data-topic-source="${this.escapeHtml(topic.source || 'custom')}"
                   class="topic-tag px-4 py-2 rounded-full font-medium transition-all hover:scale-105 hover:shadow-lg ${this.getTopicColor(topic)}"
                   style="font-size: ${size}px;"
                 >
@@ -1013,6 +1475,20 @@ class ChurchTapApp {
             e.stopPropagation();
             this.closeModal();
           });
+        }
+
+        // Delegate topic selection (avoids inline onclick issues on mobile / with quotes)
+        const cloud = document.getElementById('topicsWordCloud');
+        if (cloud) {
+          cloud.addEventListener('click', (e) => {
+            const btn = e.target && e.target.closest ? e.target.closest('button[data-topic-id]') : null;
+            if (!btn) return;
+            const topicId = parseInt((btn.dataset.topicId || '').toString(), 10);
+            const topicName = (btn.dataset.topicName || '').toString();
+            const source = (btn.dataset.topicSource || 'custom').toString();
+            if (!topicId) return;
+            this.selectTopicFromWordCloud(topicId, topicName, source);
+          }, { passive: true });
         }
       }, 0);
     } catch (error) {
@@ -1135,7 +1611,8 @@ class ChurchTapApp {
       });
       
       // Track analytics
-      this.trackAnalytics('topic_verse_viewed', { topicId, topicName });
+      // trackAnalytics' second parameter maps to `verse_id` on the backend; keep it numeric.
+      this.trackAnalytics('topic_verse_viewed', verse?.id || null);
       
     } catch (error) {
       console.error('Error loading topic verse:', error);
@@ -1152,10 +1629,32 @@ class ChurchTapApp {
       this._fundraising = null;
     }
 
-    const btn = document.getElementById('fundraisingBtn');
-    if (btn) {
-      if (this._fundraising) btn.classList.remove('hidden');
-      else btn.classList.add('hidden');
+    const card = document.getElementById('fundraisingCard');
+    if (card) {
+      if (!this._fundraising) {
+        card.classList.add('hidden');
+      } else {
+        const f = this._fundraising;
+        const goal = (f.goal_amount_cents || 0) / 100;
+        const current = (f.current_amount_cents || 0) / 100;
+        const pct = goal > 0 ? Math.min(100, Math.round((current / goal) * 100)) : 0;
+        const deadline = f.deadline_date ? new Date(f.deadline_date).toLocaleDateString() : null;
+
+        const fmt = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
+        const titleEl = document.getElementById('fundraisingTitle');
+        const amountsEl = document.getElementById('fundraisingAmounts');
+        const pctEl = document.getElementById('fundraisingPct');
+        const barEl = document.getElementById('fundraisingProgressBar');
+        const deadlineEl = document.getElementById('fundraisingDeadline');
+
+        if (titleEl) titleEl.textContent = (f.goal_title || 'Fundraising').toString();
+        if (amountsEl) amountsEl.textContent = `${fmt.format(current)} / ${fmt.format(goal)}`;
+        if (pctEl) pctEl.textContent = `${pct}%`;
+        if (barEl) barEl.style.width = `${pct}%`;
+        if (deadlineEl) deadlineEl.textContent = deadline ? `By ${deadline}` : '';
+
+        card.classList.remove('hidden');
+      }
     }
 
     return this._fundraising;
@@ -1623,12 +2122,43 @@ class ChurchTapApp {
     }
   }
 
-  toggleFavorite() {
+  async toggleFavorite() {
     if (!this.currentVerse) return;
-    
+
     const verseId = this.currentVerse.id;
+
+    // Prefer server-backed favorites when logged in with an active group
+    const canUseServer = !!(this.currentUser && this.membershipContext?.active_organization_id);
+
+    if (canUseServer) {
+      try {
+        const response = await fetch(this.buildApiUrl('/api/favorites/toggle'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ verse_id: verseId })
+        });
+
+        const data = await response.json().catch(() => null);
+        if (response.ok && data?.success) {
+          const favorited = !!data.favorited;
+          const index = this.favorites.indexOf(verseId);
+          if (favorited && index === -1) this.favorites.push(verseId);
+          if (!favorited && index !== -1) this.favorites.splice(index, 1);
+
+          localStorage.setItem('favorites', JSON.stringify(this.favorites));
+          this.updateFavoriteButton();
+          this.showToast(favorited ? '❤️ Added to favorites!' : '💔 Removed from favorites');
+          this.trackAnalytics('favorite', verseId);
+          return;
+        }
+      } catch (error) {
+        console.error('Error toggling server favorite:', error);
+      }
+      // Fall through to local toggle if server fails
+    }
+
     const index = this.favorites.indexOf(verseId);
-    
     if (index === -1) {
       this.favorites.push(verseId);
       this.showToast('❤️ Added to favorites!');
@@ -1636,10 +2166,255 @@ class ChurchTapApp {
       this.favorites.splice(index, 1);
       this.showToast('💔 Removed from favorites');
     }
-    
+
     localStorage.setItem('favorites', JSON.stringify(this.favorites));
     this.updateFavoriteButton();
     this.trackAnalytics('favorite', verseId);
+  }
+
+  async toggleFavoriteById(verseId) {
+    const id = Number(verseId);
+    if (!id || Number.isNaN(id)) return;
+
+    if (!this.currentUser) {
+      this.showToast('Please login to manage favorites');
+      this.showLoginModal();
+      return;
+    }
+
+    try {
+      const response = await fetch(this.buildApiUrl('/api/favorites/toggle'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ verse_id: id })
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && data?.success) {
+        const favorited = !!data.favorited;
+        const idx = this.favorites.indexOf(id);
+        if (favorited && idx === -1) this.favorites.push(id);
+        if (!favorited && idx !== -1) this.favorites.splice(idx, 1);
+        localStorage.setItem('favorites', JSON.stringify(this.favorites));
+        this.updateFavoriteButton();
+        if (window.location.pathname === '/favorites') this.renderFavoritesPage();
+      }
+    } catch (e) {
+      console.error('toggleFavoriteById error:', e);
+      this.showToast('Failed to update favorite');
+    }
+  }
+
+  async createCollection(name, description) {
+    const n = String(name || '').trim();
+    const d = String(description || '').trim();
+    if (!n) return;
+
+    try {
+      const res = await fetch(this.buildApiUrl('/api/collections'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ name: n, description: d })
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success && data.collection?.id) {
+        this.showToast('Collection created');
+        this.navigate(`/collections/${Number(data.collection.id)}`);
+        return;
+      }
+      this.showToast(data?.error || 'Failed to create collection');
+    } catch (e) {
+      console.error('createCollection error:', e);
+      this.showToast('Failed to create collection');
+    }
+  }
+
+  async deleteCollection(collectionId) {
+    const id = Number(collectionId);
+    if (!id || Number.isNaN(id)) return;
+    if (!window.confirm('Delete this collection?')) return;
+
+    try {
+      const res = await fetch(this.buildApiUrl(`/api/collections/${id}`), {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        this.showToast('Collection deleted');
+        this.navigate('/collections');
+        return;
+      }
+      this.showToast(data?.error || 'Failed to delete collection');
+    } catch (e) {
+      console.error('deleteCollection error:', e);
+      this.showToast('Failed to delete collection');
+    }
+  }
+
+  async addCurrentVerseToCollection(collectionId) {
+    const id = Number(collectionId);
+    const verseId = this.currentVerse?.id;
+    if (!id || Number.isNaN(id) || !verseId) return;
+
+    try {
+      const res = await fetch(this.buildApiUrl(`/api/collections/${id}/verses`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ verse_id: verseId })
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        this.showToast('Added to collection');
+        if (window.location.pathname === `/collections/${id}`) {
+          this.renderCollectionDetailPage(id);
+        }
+        return;
+      }
+      this.showToast(data?.error || 'Failed to add verse');
+    } catch (e) {
+      console.error('addCurrentVerseToCollection error:', e);
+      this.showToast('Failed to add verse');
+    }
+  }
+
+  async removeVerseFromCollection(collectionId, verseId) {
+    const cid = Number(collectionId);
+    const vid = Number(verseId);
+    if (!cid || Number.isNaN(cid) || !vid || Number.isNaN(vid)) return;
+
+    try {
+      const res = await fetch(this.buildApiUrl(`/api/collections/${cid}/verses/${vid}`), {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        this.showToast('Removed from collection');
+        if (window.location.pathname === `/collections/${cid}`) {
+          this.renderCollectionDetailPage(cid);
+        }
+        return;
+      }
+      this.showToast(data?.error || 'Failed to remove verse');
+    } catch (e) {
+      console.error('removeVerseFromCollection error:', e);
+      this.showToast('Failed to remove verse');
+    }
+  }
+
+  async createPersonalPrayer(content) {
+    const c = String(content || '').trim();
+    if (!c) return;
+
+    try {
+      const res = await fetch(this.buildApiUrl('/api/personal-prayers'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ content: c })
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        this.showToast('Prayer added');
+        if (window.location.pathname === '/my-prayers') this.renderMyPrayersPage();
+        return;
+      }
+      this.showToast(data?.error || 'Failed to add prayer');
+    } catch (e) {
+      console.error('createPersonalPrayer error:', e);
+      this.showToast('Failed to add prayer');
+    }
+  }
+
+  async setPrayerAnswered(prayerId, isAnswered) {
+    const id = Number(prayerId);
+    if (!id || Number.isNaN(id)) return;
+
+    try {
+      const res = await fetch(this.buildApiUrl(`/api/personal-prayers/${id}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ is_answered: !!isAnswered })
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        this.showToast(!!isAnswered ? 'Marked answered' : 'Marked unanswered');
+        return;
+      }
+      this.showToast(data?.error || 'Failed to update prayer');
+    } catch (e) {
+      console.error('setPrayerAnswered error:', e);
+      this.showToast('Failed to update prayer');
+    }
+  }
+
+  async deletePersonalPrayer(prayerId) {
+    const id = Number(prayerId);
+    if (!id || Number.isNaN(id)) return;
+    if (!window.confirm('Delete this prayer?')) return;
+
+    try {
+      const res = await fetch(this.buildApiUrl(`/api/personal-prayers/${id}`), {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        this.showToast('Deleted');
+        if (window.location.pathname === '/my-prayers') this.renderMyPrayersPage();
+        return;
+      }
+      this.showToast(data?.error || 'Failed to delete prayer');
+    } catch (e) {
+      console.error('deletePersonalPrayer error:', e);
+      this.showToast('Failed to delete prayer');
+    }
+  }
+
+  async showAddToCollectionModal() {
+    if (!this.currentVerse) return;
+    if (!this.currentUser) {
+      this.showToast('Please login to use collections');
+      this.showLoginModal();
+      return;
+    }
+
+    this.showModal('Add to Collection', `
+      <div id="addToCollectionBody" class="space-y-3">
+        <div class="text-sm text-gray-600 dark:text-gray-400">Loading collections…</div>
+      </div>
+    `);
+
+    try {
+      const res = await fetch(this.buildApiUrl('/api/collections'), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        const msg = data?.error || 'Unable to load collections.';
+        document.getElementById('addToCollectionBody').innerHTML = `<div class="text-sm text-red-600">${this.escapeHtml(msg)}</div>`;
+        return;
+      }
+
+      const collections = Array.isArray(data.collections) ? data.collections : [];
+      const buttons = collections.length
+        ? collections.map(c => {
+            const name = this.escapeHtml(c.name || 'Untitled');
+            return `<button class="w-full btn-secondary text-left" onclick="window.churchTapApp.addCurrentVerseToCollection(${Number(c.id)}); window.churchTapApp.closeModal();">${name}</button>`;
+          }).join('')
+        : `<div class="text-sm text-gray-600 dark:text-gray-400">No collections yet. Create one from the Collections page.</div>`;
+
+      document.getElementById('addToCollectionBody').innerHTML = `
+        <div class="space-y-2">${buttons}</div>
+        <button class="w-full btn-primary" onclick="window.churchTapApp.closeModal(); window.churchTapApp.navigate('/collections');">Manage Collections</button>
+      `;
+    } catch (e) {
+      console.error('showAddToCollectionModal error:', e);
+      const body = document.getElementById('addToCollectionBody');
+      if (body) body.innerHTML = `<div class="text-sm text-red-600">Unable to load collections.</div>`;
+    }
   }
 
   updateFavoriteButton() {
@@ -2005,6 +2780,46 @@ class ChurchTapApp {
     }
   }
 
+  async refreshFavoritesFromServer() {
+    if (!this.currentUser) return false;
+    if (!this.membershipContext?.active_organization_id) return false;
+
+    try {
+      const res = await fetch(this.buildApiUrl('/api/favorites'), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) return false;
+
+      const favorites = Array.isArray(data.favorites) ? data.favorites : [];
+      this.favorites = favorites.map(v => Number(v.id)).filter(v => v && !Number.isNaN(v));
+      localStorage.setItem('favorites', JSON.stringify(this.favorites));
+      this.updateFavoriteButton();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async importLocalFavoritesToServer() {
+    if (!this.currentUser) return false;
+    if (!this.membershipContext?.active_organization_id) return false;
+
+    const local = JSON.parse(localStorage.getItem('favorites') || '[]');
+    const verseIds = Array.isArray(local) ? local.map(v => Number(v)).filter(v => v && !Number.isNaN(v)) : [];
+    if (verseIds.length === 0) return true;
+
+    try {
+      await fetch(this.buildApiUrl('/api/favorites/import'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ verse_ids: verseIds })
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   async refreshForActiveGroupChange() {
     // Ensure we stop forcing old orgParam once account-driven groups are active.
     if (this.currentUser && this.membershipContext?.active_organization_id) {
@@ -2017,6 +2832,7 @@ class ChurchTapApp {
     await this.loadOrganizationLinks?.();
     await this.initCTA?.();
     await this.loadCommunity(this.currentDate).catch(() => null);
+    await this.refreshFavoritesFromServer().catch(() => null);
   }
 
   getUserPreferredTranslation() {
@@ -4154,6 +4970,8 @@ class ChurchTapApp {
           this.membershipContext = await this.fetchMembershipContext();
           this.adminOrganizations = await this.fetchAdminOrganizations();
           this.updateGroupDisplay();
+          // Sync favorites for the active group
+          this.refreshFavoritesFromServer().catch(() => {});
         } else {
           this.updateUIForLoggedOutUser();
         }
@@ -4365,11 +5183,18 @@ class ChurchTapApp {
 
         // Default post-login flow: if user has no active group, send them to Join Group picker.
         const membershipContext = await this.fetchMembershipContext();
+        this.membershipContext = membershipContext;
+        this.adminOrganizations = await this.fetchAdminOrganizations().catch(() => ({ organizations: [] }));
+        this.updateGroupDisplay();
         const activeOrgId = membershipContext?.active_organization_id;
         if (!activeOrgId) {
           window.location.href = '/choose-organization';
           return;
         }
+
+        // Import any local favorites and then refresh from server
+        await this.importLocalFavoritesToServer().catch(() => false);
+        await this.refreshFavoritesFromServer().catch(() => false);
 
         this.showToast('Welcome back! 🙏');
       } else {
@@ -4729,13 +5554,14 @@ class ChurchTapApp {
   }
 
   
-  escapeHtml(unsafe) {
-    return unsafe
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+  escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
   
   // STRONG'S NUMBERS METHODS
