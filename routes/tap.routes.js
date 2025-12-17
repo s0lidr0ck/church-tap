@@ -90,6 +90,9 @@ router.get('/t/:uid', async (req, res) => {
         if (linkErr) {
           console.error('Error looking up user bracelet link:', linkErr);
           // Still allow app access
+          res.set('Cache-Control', 'no-store');
+          res.set('Pragma', 'no-cache');
+          res.set('Expires', '0');
           return res.sendFile(path.join(__dirname, '../public', 'index.html'));
         }
 

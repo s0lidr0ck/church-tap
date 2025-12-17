@@ -131,7 +131,37 @@ app.use('/', tapRoutes);
 app.use('/', staticRoutes);
 
 // Static files - put at the end so dynamic routes take precedence
-app.use(express.static('public'));
+app.use(express.static('public', {
+  etag: true,
+  lastModified: true,
+  setHeaders: (res, filePath) => {
+    const normalized = String(filePath).replace(/\\/g, '/').toLowerCase();
+
+    // Critical: service workers must not be aggressively cached,
+    // otherwise clients can get "stuck" on old app versions.
+    if (normalized.endsWith('/public/sw.js')) {
+      res.setHeader('Cache-Control', 'no-store');
+      return;
+    }
+
+    // HTML should always be fresh (it points at JS/CSS + controls SW updates).
+    if (normalized.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-store');
+      return;
+    }
+
+    // Manifests should revalidate frequently.
+    if (normalized.endsWith('/manifest.json') || normalized.endsWith('/admin-manifest.json')) {
+      res.setHeader('Cache-Control', 'no-cache');
+      return;
+    }
+
+    // These are NOT fingerprinted, so don't let them be cached for a long time.
+    if (normalized.endsWith('.js') || normalized.endsWith('.css')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  }
+}));
 
 // Error handling middleware
 app.use(handleValidationError);

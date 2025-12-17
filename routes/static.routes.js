@@ -3,6 +3,13 @@ const path = require('path');
 
 const router = express.Router();
 
+function setNoStore(res) {
+  // Help prevent phones from sticking to old HTML/app shells.
+  res.set('Cache-Control', 'no-store');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+}
+
 // Homepage route with NFC tag handling
 router.get('/', (req, res) => {
   const hostHeader = req.headers['x-forwarded-host'] || req.headers.host || '';
@@ -20,51 +27,62 @@ router.get('/', (req, res) => {
   // Regular homepage request
   if (host === 'churchtap.app' || host === 'www.churchtap.app') {
     console.log(`📄 Serving marketing homepage for: ${host}`);
+    setNoStore(res);
     res.sendFile(path.join(__dirname, '../public', 'homepage.html'));
   } else {
     console.log(`⛪ Serving church interface for: ${host}`);
+    setNoStore(res);
     res.sendFile(path.join(__dirname, '../public', 'index.html'));
   }
 });
 
 // Always serve the church interface app shell (even on churchtap.app)
 router.get('/app', (req, res) => {
+  setNoStore(res);
   res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
 
 // Static page routes
 router.get('/verse', (req, res, next) => {
   // Apply analytics tracking manually if needed
+  setNoStore(res);
   res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
 
 router.get('/verse/:date', (req, res, next) => {
   // Apply analytics tracking manually if needed
+  setNoStore(res);
   res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
 
 // App shell routes for SPA-style pages
 router.get('/favorites', (req, res) => {
+  setNoStore(res);
   res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
 
 router.get('/collections', (req, res) => {
+  setNoStore(res);
   res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
 
 router.get('/collections/:id', (req, res) => {
+  setNoStore(res);
   res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
 
 router.get('/my-prayers', (req, res) => {
+  setNoStore(res);
   res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
 
 router.get('/admin', (req, res) => {
+  setNoStore(res);
   res.sendFile(path.join(__dirname, '../public', 'admin.html'));
 });
 
 router.get('/master', (req, res) => {
+  setNoStore(res);
   res.sendFile(path.join(__dirname, '../public', 'master.html'));
 });
 

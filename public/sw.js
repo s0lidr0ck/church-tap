@@ -1,68 +1,160 @@
-const CACHE_NAME = 'daily-verse-v1';
-const urlsToCache = [
-  '/',
+// NOTE:
+// If you make a breaking change to the caching strategy, bump CACHE_VERSION.
+// This ensures clients drop old caches quickly.
+const CACHE_VERSION = 'v2';
+const APP_SHELL_CACHE = `churchtap-shell-${CACHE_VERSION}`;
+const RUNTIME_CACHE = `churchtap-runtime-${CACHE_VERSION}`;
+
+const APP_SHELL_URLS = [
   '/verse',
   '/css/style.css',
   '/js/app.js',
   '/manifest.json',
   '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png'
+  '/icons/icon-512x512.png',
 ];
 
-// Install service worker and cache resources
-self.addEventListener('install', event => {
+function isHtmlNavigationRequest(request) {
+  if (request.mode === 'navigate') return true;
+  const accept = request.headers.get('accept') || '';
+  return accept.includes('text/html');
+}
+
+function isStaticAssetPath(pathname) {
+  return (
+    pathname.startsWith('/js/') ||
+    pathname.startsWith('/css/') ||
+    pathname.startsWith('/icons/') ||
+    pathname.endsWith('.png') ||
+    pathname.endsWith('.jpg') ||
+    pathname.endsWith('.jpeg') ||
+    pathname.endsWith('.webp') ||
+    pathname.endsWith('.gif') ||
+    pathname.endsWith('.svg') ||
+    pathname.endsWith('.woff') ||
+    pathname.endsWith('.woff2') ||
+    pathname.endsWith('.ttf')
+  );
+}
+
+async function networkFirst(event) {
+  try {
+    const response = await fetch(event.request);
+
+    // Cache successful same-origin GET responses for offline fallback.
+    // (We do NOT cache /api calls here.)
+    if (response && response.ok) {
+      const url = new URL(event.request.url);
+      if (!url.pathname.startsWith('/api/')) {
+        const cache = await caches.open(RUNTIME_CACHE);
+        cache.put(event.request, response.clone());
+      }
+    }
+
+    return response;
+  } catch (err) {
+    // Offline fallback for navigations.
+    if (isHtmlNavigationRequest(event.request)) {
+      const cache = await caches.open(APP_SHELL_CACHE);
+      const offlineShell = await cache.match('/verse');
+      if (offlineShell) return offlineShell;
+    }
+
+    // Otherwise try runtime cache.
+    const runtime = await caches.open(RUNTIME_CACHE);
+    const cached = await runtime.match(event.request);
+    if (cached) return cached;
+
+    return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+  }
+}
+
+async function staleWhileRevalidate(event) {
+  const cache = await caches.open(RUNTIME_CACHE);
+  const cached = await cache.match(event.request);
+
+  const fetchPromise = fetch(event.request)
+    .then((response) => {
+      if (response && response.ok) {
+        cache.put(event.request, response.clone());
+      }
+      return response;
+    })
+    .catch(() => null);
+
+  return cached || (await fetchPromise) || new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+}
+
+// Install service worker and cache app shell
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
+    (async () => {
+      const cache = await caches.open(APP_SHELL_CACHE);
+      await cache.addAll(APP_SHELL_URLS);
+      await self.skipWaiting();
+    })()
   );
 });
 
-// Fetch event - serve from cache when offline
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Return cached version or fetch from network
-        if (response) {
-          return response;
-        }
-        return fetch(event.request).catch(() => {
-          // If network fails and it's a navigation request, show offline page
-          if (event.request.mode === 'navigate') {
-            return caches.match('/verse').then(offlineResponse => {
-              return offlineResponse || new Response('Offline', {
-                status: 503,
-                statusText: 'Service Unavailable'
-              });
-            });
-          }
-          // For non-navigation requests, return a proper error response
-          return new Response('Network Error', {
-            status: 503,
-            statusText: 'Service Unavailable'
-          });
-        });
-      })
-  );
-});
-
-// Update service worker
-self.addEventListener('activate', event => {
+// Activate: clear old caches and take control ASAP
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys.map((key) => {
+          if (key !== APP_SHELL_CACHE && key !== RUNTIME_CACHE) {
+            return caches.delete(key);
           }
+          return undefined;
         })
       );
-    })
+      await self.clients.claim();
+    })()
   );
+});
+
+// Allow the page to trigger immediate activation
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// Fetch strategy:
+// - Navigations (HTML): network-first (prevents "stuck on old HTML")
+// - Static assets: stale-while-revalidate (fast + updates in background)
+// - API: always network
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // Never try to cache or intercept the service worker script itself.
+  if (url.pathname === '/sw.js') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // Never cache API responses.
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  if (isHtmlNavigationRequest(event.request)) {
+    event.respondWith(networkFirst(event));
+    return;
+  }
+
+  if (isStaticAssetPath(url.pathname)) {
+    event.respondWith(staleWhileRevalidate(event));
+    return;
+  }
+
+  // Default to network-first for everything else.
+  event.respondWith(networkFirst(event));
 });
 
 // Handle background sync for analytics

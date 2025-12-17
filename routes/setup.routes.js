@@ -7,6 +7,9 @@ const router = express.Router();
 
 // Serve setup page
 router.get('/:token', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
   res.sendFile(path.join(__dirname, '..', 'public', 'setup.html'));
 });
 

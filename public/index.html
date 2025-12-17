@@ -40,9 +40,38 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
+        let refreshing = false;
+
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (refreshing) return;
+          refreshing = true;
+          window.location.reload();
+        });
+
         navigator.serviceWorker.register('/sw.js')
-          .then(registration => console.log('SW registered'))
-          .catch(error => console.log('SW registration failed'));
+          .then((registration) => {
+            // Force an update check on each load (helps with mobile caching quirks)
+            registration.update();
+
+            // If there's already an updated worker waiting, activate it now.
+            if (registration.waiting) {
+              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+
+            // When a new SW is found, tell it to activate ASAP.
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              if (!newWorker) return;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  newWorker.postMessage({ type: 'SKIP_WAITING' });
+                }
+              });
+            });
+
+            console.log('SW registered');
+          })
+          .catch(() => console.log('SW registration failed'));
       });
     }
   </script>
