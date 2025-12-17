@@ -40,6 +40,9 @@ const tapRoutes = require('./routes/tap.routes');
 const userRoutes = require('./routes/user.routes');
 const braceletsRoutes = require('./routes/bracelets.routes');
 const membershipsRoutes = require('./routes/memberships.routes');
+const favoritesRoutes = require('./routes/favorites.routes');
+const collectionsRoutes = require('./routes/collections.routes');
+const personalPrayersRoutes = require('./routes/personalPrayers.routes');
 
 // Initialize Express app
 const app = express();
@@ -117,6 +120,9 @@ app.use('/api/session', sessionRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/bracelets', braceletsRoutes);
 app.use('/api/memberships', membershipsRoutes);
+app.use('/api/favorites', favoritesRoutes);
+app.use('/api/collections', collectionsRoutes);
+app.use('/api/personal-prayers', personalPrayersRoutes);
 
 // Tap routes - must come before static routes to handle /t/<uid>
 app.use('/', tapRoutes);

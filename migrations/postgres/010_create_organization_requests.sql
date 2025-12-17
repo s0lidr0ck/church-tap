@@ -61,9 +61,18 @@ CREATE INDEX IF NOT EXISTS idx_ct_org_requests_bracelet_uid ON ct_organization_r
 CREATE INDEX IF NOT EXISTS idx_ct_org_requests_organization_id ON ct_organization_requests(organization_id);
 
 -- Add foreign key constraints
-ALTER TABLE ct_organization_requests
-ADD CONSTRAINT fk_org_requests_organization
-FOREIGN KEY (organization_id) REFERENCES CT_organizations(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'fk_org_requests_organization'
+  ) THEN
+    ALTER TABLE ct_organization_requests
+      ADD CONSTRAINT fk_org_requests_organization
+      FOREIGN KEY (organization_id) REFERENCES CT_organizations(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 -- Note: We can't add foreign key to CT_master_admins as it might not exist yet
 -- This should be added in a later migration if needed

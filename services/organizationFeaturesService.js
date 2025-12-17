@@ -40,21 +40,45 @@ async function getOrganizationFeatures(organizationId) {
   if (!organizationId) return { ...DEFAULTS };
   await ensureRow(organizationId);
 
-  const result = await db.query(
-    `SELECT organization_id,
-            prayer_requests_enabled,
-            praise_reports_enabled,
-            insights_enabled,
-            verse_commentary_enabled,
-            anonymous_posts_enabled,
-            group_calendar_enabled,
-            group_links_enabled,
-            topics_enabled,
-            enabled_translations
-     FROM ct_organization_features
-     WHERE organization_id = $1`,
-    [organizationId]
-  );
+  let result;
+  try {
+    result = await db.query(
+      `SELECT organization_id,
+              prayer_requests_enabled,
+              praise_reports_enabled,
+              insights_enabled,
+              verse_commentary_enabled,
+              anonymous_posts_enabled,
+              group_calendar_enabled,
+              group_links_enabled,
+              topics_enabled,
+              enabled_translations
+       FROM ct_organization_features
+       WHERE organization_id = $1`,
+      [organizationId]
+    );
+  } catch (e) {
+    // Backwards-compatible: older DBs may not have topics_enabled yet.
+    // If so, re-query without it and fail-open to DEFAULTS.
+    if (e && e.code === '42703') {
+      result = await db.query(
+        `SELECT organization_id,
+                prayer_requests_enabled,
+                praise_reports_enabled,
+                insights_enabled,
+                verse_commentary_enabled,
+                anonymous_posts_enabled,
+                group_calendar_enabled,
+                group_links_enabled,
+                enabled_translations
+         FROM ct_organization_features
+         WHERE organization_id = $1`,
+        [organizationId]
+      );
+    } else {
+      throw e;
+    }
+  }
 
   const row = result.rows[0];
   if (!row) return { ...DEFAULTS };
@@ -78,6 +102,7 @@ async function updateOrganizationFeatures(organizationId, patch) {
     'anonymous_posts_enabled',
     'group_calendar_enabled',
     'group_links_enabled',
+    // topics_enabled may not exist on older schemas; only update if present.
     'topics_enabled',
     'enabled_translations'
   ];
@@ -106,12 +131,37 @@ async function updateOrganizationFeatures(organizationId, patch) {
   }
 
   values.push(organizationId);
-  await db.query(
-    `UPDATE ct_organization_features
-     SET ${sets.join(', ')}, updated_at = NOW()
-     WHERE organization_id = $${idx}`,
-    values
-  );
+  try {
+    await db.query(
+      `UPDATE ct_organization_features
+       SET ${sets.join(', ')}, updated_at = NOW()
+       WHERE organization_id = $${idx}`,
+      values
+    );
+  } catch (e) {
+    // If schema doesn't have topics_enabled yet, strip it and retry.
+    if (e && e.code === '42703' && Object.prototype.hasOwnProperty.call(next, 'topics_enabled')) {
+      const retryNext = { ...next };
+      delete retryNext.topics_enabled;
+      const retrySets = [];
+      const retryValues = [];
+      let retryIdx = 1;
+      for (const [k, v] of Object.entries(retryNext)) {
+        retrySets.push(`${k} = $${retryIdx++}`);
+        retryValues.push(v);
+      }
+      if (retrySets.length === 0) return await getOrganizationFeatures(organizationId);
+      retryValues.push(organizationId);
+      await db.query(
+        `UPDATE ct_organization_features
+         SET ${retrySets.join(', ')}, updated_at = NOW()
+         WHERE organization_id = $${retryIdx}`,
+        retryValues
+      );
+    } else {
+      throw e;
+    }
+  }
 
   return await getOrganizationFeatures(organizationId);
 }

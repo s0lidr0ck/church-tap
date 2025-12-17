@@ -111,14 +111,35 @@
         <button id="shareBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
           📤 Share Verse
         </button>
-        <button id="downloadBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-          💾 Download Image
-        </button>
         <button id="searchBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
           🔍 Search Verses
         </button>
-        <button id="fundraisingBtn" class="hidden w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-          🎯 Fundraising
+        <button id="fundraisingCard" class="hidden w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <div class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                  🎯 <span id="fundraisingTitle">Fundraising</span>
+                </div>
+                <div id="fundraisingPct" class="text-xs font-semibold text-green-700 dark:text-green-300 tabular-nums whitespace-nowrap">
+                  0%
+                </div>
+              </div>
+
+              <div class="mt-1 flex items-center gap-2">
+                <div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                  <div id="fundraisingProgressBar" class="h-1.5 bg-green-600" style="width:0%"></div>
+                </div>
+                <div id="fundraisingAmounts" class="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                  --
+                </div>
+              </div>
+
+              <div id="fundraisingDeadline" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <!-- optional -->
+              </div>
+            </div>
+          </div>
         </button>
         <button id="playlistBtn" class="hidden w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
           📺 Worship Playlist
@@ -242,7 +263,7 @@
     <!-- Main Content -->
     <main class="pb-20">
       <!-- Date Navigation -->
-      <div class="px-4 py-3">
+      <div id="dateNav" class="px-4 py-3">
         <div class="flex items-center justify-between max-w-lg mx-auto">
           <button id="prevDay" class="p-3 rounded-full bg-white dark:bg-gray-800 shadow-md text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Previous day">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -260,6 +281,13 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
             </svg>
           </button>
+        </div>
+      </div>
+
+      <!-- Page Container (Favorites / Collections / My Prayers) -->
+      <div id="pageContainer" class="hidden px-4">
+        <div class="max-w-lg mx-auto">
+          <!-- Populated by JavaScript -->
         </div>
       </div>
 
@@ -387,6 +415,14 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
             </svg>
             <span class="text-xs text-gray-600 dark:text-gray-400">Save</span>
+          </button>
+
+          <!-- Add to Collection Button -->
+          <button id="addToCollectionBtn" class="flex flex-col items-center space-y-1 p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation min-w-[60px] min-h-[60px]" aria-label="Add to collection">
+            <svg class="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M4 12h16M4 17h16M12 4v16"></path>
+            </svg>
+            <span class="text-xs text-gray-600 dark:text-gray-400">Collect</span>
           </button>
 
           <!-- QR Code Button -->
