@@ -6,7 +6,9 @@ const BIBLE_VERSIONS = [
   { code: 'NASB', name: 'New American Standard Bible' },
   { code: 'CSB', name: 'Christian Standard Bible' },
   { code: 'MSG', name: 'The Message' },
-  { code: 'AMP', name: 'Amplified Bible' }
+  { code: 'AMP', name: 'Amplified Bible' },
+  { code: 'ASV', name: 'American Standard Version' },
+  { code: 'WEB', name: 'World English Bible' }
 ];
 
 module.exports = {
