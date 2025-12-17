@@ -394,7 +394,8 @@ class ChurchTapApp {
     document.getElementById('topicsBtn').addEventListener('click', () => {
       // If flags haven't loaded yet, fail-open (we'll still try).
       if (this.orgFeatures && !this.isFeatureEnabled('topics_enabled')) {
-        this.showToast('Topics are disabled for this group', 'info');
+        // showToast's second arg is duration (ms), not a type
+        this.showToast('Topics are disabled for this group');
         return;
       }
       this.showTopicsWordCloud();
@@ -1950,13 +1951,40 @@ class ChurchTapApp {
     }
   }
 
-  showToast(message, duration = 3000) {
+  showToast(message, typeOrDuration = 3000, maybeDuration) {
+    // Back-compat: many callers pass ('msg', 'info'|'error'|'success').
+    // Also allow ('msg', 4000) or ('msg', 'info', 4000).
+    let type = 'default';
+    let duration = 3000;
+
+    if (typeof typeOrDuration === 'number') {
+      duration = typeOrDuration;
+    } else if (typeof typeOrDuration === 'string') {
+      type = typeOrDuration;
+      duration = 3000;
+    } else if (typeOrDuration && typeof typeOrDuration === 'object') {
+      type = String(typeOrDuration.type || 'default');
+      const d = Number(typeOrDuration.duration);
+      duration = Number.isFinite(d) ? d : 3000;
+    }
+
+    if (typeof maybeDuration === 'number') {
+      duration = maybeDuration;
+    }
+
     const toast = document.createElement('div');
-    toast.className = 'fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-800 px-4 py-2 rounded-lg z-50 animate-slide-up';
+    const base = 'fixed bottom-24 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg z-50 animate-slide-up shadow-lg';
+    const variants = {
+      success: 'bg-green-600 text-white',
+      error: 'bg-red-600 text-white',
+      info: 'bg-blue-600 text-white',
+      default: 'bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-800'
+    };
+    toast.className = `${base} ${variants[type] || variants.default}`;
     toast.textContent = message;
-    
+
     document.body.appendChild(toast);
-    
+
     setTimeout(() => {
       if (document.body.contains(toast)) {
         document.body.removeChild(toast);

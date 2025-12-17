@@ -15,6 +15,26 @@ async function ensureSchema() {
     await client.connect();
     console.log('✅ Database connection successful');
 
+    // Ensure ct_organization_features has the latest columns (best-effort, idempotent)
+    try {
+      const featuresTable = await client.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_name = 'ct_organization_features'
+        ) AS exists;
+      `);
+
+      if (featuresTable.rows?.[0]?.exists) {
+        await client.query(`
+          ALTER TABLE ct_organization_features
+            ADD COLUMN IF NOT EXISTS topics_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+        `);
+      }
+    } catch (e) {
+      console.error('❌ ct_organization_features schema check failed:', e.message);
+      // Don't fail startup
+    }
+
     // Check if ct_organization_requests table exists
     const tableCheck = await client.query(`
       SELECT EXISTS (
