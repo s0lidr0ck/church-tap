@@ -7,8 +7,8 @@ const { JWT_SECRET } = require('../config/constants');
 
 const router = express.Router();
 
-// Helper function to serve HTML with injected organization context
-function serveHtmlWithOrgContext(res, orgData, tagUid) {
+// Helper function to serve HTML with injected tap/org context
+function serveHtmlWithTapContext(res, orgData, tagUid) {
   const htmlPath = path.join(__dirname, '../public', 'index.html');
 
   fs.readFile(htmlPath, 'utf8', (err, html) => {
@@ -17,22 +17,23 @@ function serveHtmlWithOrgContext(res, orgData, tagUid) {
       return res.status(500).send('Internal server error');
     }
 
-    // Inject organization context script before closing head tag
-    const orgScript = `
-    <script>
-      window.nfcOrgContext = {
-        orgParam: '${orgData.subdomain}',
-        tagIdParam: '${tagUid}',
-        organization: {
-          id: ${orgData.id},
-          name: '${orgData.name.replace(/'/g, "\\'")}',
-          subdomain: '${orgData.subdomain}'
-        }
-      };
-    </script>
-  </head>`;
+    const ctx = {
+      orgParam: orgData?.subdomain || null,
+      tagIdParam: tagUid || null,
+      organization: orgData
+        ? {
+            id: orgData.id,
+            name: orgData.name,
+            subdomain: orgData.subdomain
+          }
+        : null
+    };
 
-    const modifiedHtml = html.replace('</head>', orgScript);
+    // Inject context script before closing head tag.
+    // Escape "<" to avoid accidental HTML/script injection via JSON serialization.
+    const serialized = JSON.stringify(ctx).replace(/</g, '\\u003c');
+    const injected = `\n<script>window.nfcOrgContext=${serialized};</script>\n</head>`;
+    const modifiedHtml = html.replace('</head>', injected);
     res.send(modifiedHtml);
   });
 }
@@ -132,8 +133,23 @@ router.get('/t/:uid', async (req, res) => {
           }
         }
 
-        // Serve the app (default-org public content; group switching handled post-login)
-        return res.sendFile(path.join(__dirname, '../public', 'index.html'));
+        // Resolve org context from tag assignment (if any), then serve app shell with injected context.
+        db.query(
+          `SELECT o.id, o.name, o.subdomain
+           FROM ct_nfc_tags nt
+           JOIN ct_organizations o ON nt.organization_id = o.id
+           WHERE nt.custom_id = $1
+           LIMIT 1`,
+          [uid],
+          (orgErr, orgResult) => {
+            if (orgErr) {
+              console.error('Error resolving organization for tap:', orgErr);
+              return serveHtmlWithTapContext(res, null, uid);
+            }
+            const orgData = orgResult.rows[0] || null;
+            return serveHtmlWithTapContext(res, orgData, uid);
+          }
+        );
       }
     );
   } catch (error) {

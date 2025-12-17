@@ -27,6 +27,20 @@ class ChurchTapApp {
       this.tagIdParam = urlParams.get('tag_id');
       console.log('🔗 Using URL parameters: org=' + this.orgParam + ', tag_id=' + this.tagIdParam);
     }
+
+    // Support new tap URL format: /t/<UID>
+    // (Legacy URLs used /?org=...&tag_id=... but we now redirect tag_id -> /t/:uid)
+    if (!this.tagIdParam) {
+      const tapMatch = String(window.location.pathname || '').match(/^\/t\/([^\/?#]+)/);
+      if (tapMatch && tapMatch[1]) {
+        try {
+          this.tagIdParam = decodeURIComponent(tapMatch[1]);
+        } catch (e) {
+          this.tagIdParam = tapMatch[1];
+        }
+        console.log('🏷️ Using /t/:uid path tag:', this.tagIdParam);
+      }
+    }
     
     // Handle tag_id persistence with cookies
     this.setupTagIdTracking();
@@ -222,6 +236,8 @@ class ChurchTapApp {
   isVerseRoute(pathname) {
     const path = String(pathname || '/');
     if (path === '/' || path === '/app') return true;
+    // Tap route should behave like the main verse view
+    if (/^\/t\/[^\/?#]+$/.test(path)) return true;
     return /^\/verse\/[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(path);
   }
 
@@ -234,6 +250,15 @@ class ChurchTapApp {
 
   routeTo(pathname) {
     const path = String(pathname || '/');
+
+    // Tap route: /t/<UID> (show main verse view for this tag session)
+    const tapMatch = path.match(/^\/t\/([^\/?#]+)$/);
+    if (tapMatch) {
+      this.showVerseContainer();
+      this.loadVerse(this.currentDate).catch(() => {});
+      this.loadCommunity(this.currentDate).catch(() => {});
+      return;
+    }
 
     // Collections detail: /collections/:id
     const collectionMatch = path.match(/^\/collections\/(\d+)$/);
@@ -725,21 +750,28 @@ class ChurchTapApp {
   }
 
   setupEventListeners() {
+    // Helper: safely attach event listeners (prevents hard crashes if markup is missing / cached)
+    const on = (id, eventName, handler) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener(eventName, handler);
+    };
+
     // Theme toggle (now in menu)
-    document.getElementById('themeMenuBtn').addEventListener('click', () => {
+    on('themeMenuBtn', 'click', () => {
       this.toggleTheme();
       this.updateMenuIndicators();
     });
 
     // Text size toggle (now in menu)
-    document.getElementById('textSizeMenuBtn').addEventListener('click', () => {
+    on('textSizeMenuBtn', 'click', () => {
       this.cycleTextSize();
       this.updateMenuIndicators();
     });
 
     // Account/Login button (now in menu)
-    document.getElementById('loginMenuBtnNew').addEventListener('click', () => {
-      document.getElementById('loginMenuBtn').click(); // Reuse existing login functionality
+    on('loginMenuBtnNew', 'click', () => {
+      document.getElementById('loginMenuBtn')?.click(); // Reuse existing login functionality
     });
 
     // Menu navigation (Favorites / Collections / My Prayers)
@@ -763,24 +795,24 @@ class ChurchTapApp {
     }
 
     // Navigation
-    document.getElementById('prevDay').addEventListener('click', () => {
+    on('prevDay', 'click', () => {
       this.navigateDay(-1);
     });
 
-    document.getElementById('nextDay').addEventListener('click', () => {
+    on('nextDay', 'click', () => {
       this.navigateDay(1);
     });
 
-    document.getElementById('todayBtn').addEventListener('click', () => {
+    on('todayBtn', 'click', () => {
       this.goToToday();
     });
 
-    document.getElementById('backToToday').addEventListener('click', () => {
+    on('backToToday', 'click', () => {
       this.goToToday();
     });
 
     // Menu toggle
-    document.getElementById('menuToggle').addEventListener('click', () => {
+    on('menuToggle', 'click', () => {
       this.toggleQuickMenu();
     });
 
@@ -811,17 +843,17 @@ class ChurchTapApp {
     }
 
     // Clear tag session
-    document.getElementById('clearTagSessionBtn').addEventListener('click', () => {
+    on('clearTagSessionBtn', 'click', () => {
       this.clearTagSession();
     });
 
     // Change Group button
-    document.getElementById('changeGroupBtn').addEventListener('click', () => {
+    on('changeGroupBtn', 'click', () => {
       this.changeGroup();
     });
 
     // Request a Group button
-    document.getElementById('requestGroupBtn').addEventListener('click', () => {
+    on('requestGroupBtn', 'click', () => {
       this.requestGroup();
     });
 
@@ -835,11 +867,11 @@ class ChurchTapApp {
     }
 
     // Main action buttons
-    document.getElementById('randomVerseBtn').addEventListener('click', () => {
+    on('randomVerseBtn', 'click', () => {
       this.showRandomVerse();
     });
 
-    document.getElementById('topicsBtn').addEventListener('click', () => {
+    on('topicsBtn', 'click', () => {
       // If flags haven't loaded yet, fail-open (we'll still try).
       if (this.orgFeatures && !this.isFeatureEnabled('topics_enabled')) {
         this.showToast('Topics are disabled for this group', 'info');
@@ -848,7 +880,7 @@ class ChurchTapApp {
       this.showTopicsWordCloud();
     });
 
-    document.getElementById('shareBtn').addEventListener('click', () => {
+    on('shareBtn', 'click', () => {
       this.shareVerse();
     });
 
@@ -860,7 +892,7 @@ class ChurchTapApp {
       });
     }
 
-    document.getElementById('searchBtn').addEventListener('click', () => {
+    on('searchBtn', 'click', () => {
       this.showVerseSearchModal();
       this.toggleQuickMenu();
     });
@@ -1240,33 +1272,40 @@ class ChurchTapApp {
   }
 
   hideLoading() {
-    document.getElementById('loadingVerse').classList.add('hidden');
+    document.getElementById('loadingVerse')?.classList.add('hidden');
   }
 
   showNoVerse() {
     this.hideLoading();
-    document.getElementById('verseContent').classList.add('hidden');
-    document.getElementById('noVerse').classList.remove('hidden');
-    document.getElementById('engagementActions').classList.add('hidden');
+    document.getElementById('verseContent')?.classList.add('hidden');
+    document.getElementById('noVerse')?.classList.remove('hidden');
+    document.getElementById('engagementActions')?.classList.add('hidden');
   }
 
   showOfflineMessage() {
     this.hideLoading();
-    document.getElementById('verseContent').classList.add('hidden');
-    document.getElementById('noVerse').classList.remove('hidden');
-    document.querySelector('#noVerse h3').textContent = 'No internet connection';
-    document.querySelector('#noVerse p').textContent = 'Please check your connection and try again.';
+    document.getElementById('verseContent')?.classList.add('hidden');
+    document.getElementById('noVerse')?.classList.remove('hidden');
+    const h3 = document.querySelector('#noVerse h3');
+    const p = document.querySelector('#noVerse p');
+    if (h3) h3.textContent = 'No internet connection';
+    if (p) p.textContent = 'Please check your connection and try again.';
   }
 
   showErrorState(section, message) {
     if (section === 'verse') {
       this.hideLoading();
-      document.getElementById('verseContent').classList.add('hidden');
-      document.getElementById('noVerse').classList.remove('hidden');
-      document.querySelector('#noVerse h3').textContent = 'Something went wrong';
-      document.querySelector('#noVerse p').textContent = message;
-      document.getElementById('backToToday').textContent = 'Try Again';
-      document.getElementById('backToToday').onclick = () => this.retry('verse');
+      document.getElementById('verseContent')?.classList.add('hidden');
+      document.getElementById('noVerse')?.classList.remove('hidden');
+      const h3 = document.querySelector('#noVerse h3');
+      const p = document.querySelector('#noVerse p');
+      if (h3) h3.textContent = 'Something went wrong';
+      if (p) p.textContent = message;
+      const btn = document.getElementById('backToToday');
+      if (btn) {
+        btn.textContent = 'Try Again';
+        btn.onclick = () => this.retry('verse');
+      }
     } else if (section === 'community') {
       const container = document.getElementById('communityContent');
       if (container) {
