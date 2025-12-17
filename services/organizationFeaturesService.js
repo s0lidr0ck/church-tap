@@ -9,6 +9,7 @@ const DEFAULTS = Object.freeze({
   anonymous_posts_enabled: true,
   group_calendar_enabled: true,
   group_links_enabled: true,
+  topics_enabled: true,
   enabled_translations: null // null => all enabled
 });
 
@@ -48,6 +49,7 @@ async function getOrganizationFeatures(organizationId) {
             anonymous_posts_enabled,
             group_calendar_enabled,
             group_links_enabled,
+            topics_enabled,
             enabled_translations
      FROM ct_organization_features
      WHERE organization_id = $1`,
@@ -76,6 +78,7 @@ async function updateOrganizationFeatures(organizationId, patch) {
     'anonymous_posts_enabled',
     'group_calendar_enabled',
     'group_links_enabled',
+    'topics_enabled',
     'enabled_translations'
   ];
 

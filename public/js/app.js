@@ -193,6 +193,12 @@ class ChurchTapApp {
         if (el) el.style.display = 'none';
       });
     }
+
+    // Topics (tag button / Emergency Scripture)
+    if (!this.isFeatureEnabled('topics_enabled')) {
+      const topicsBtn = document.getElementById('topicsBtn');
+      if (topicsBtn) topicsBtn.style.display = 'none';
+    }
   }
 
   escapeHtml(value) {
@@ -386,6 +392,11 @@ class ChurchTapApp {
     });
 
     document.getElementById('topicsBtn').addEventListener('click', () => {
+      // If flags haven't loaded yet, fail-open (we'll still try).
+      if (this.orgFeatures && !this.isFeatureEnabled('topics_enabled')) {
+        this.showToast('Topics are disabled for this group', 'info');
+        return;
+      }
       this.showTopicsWordCloud();
     });
 

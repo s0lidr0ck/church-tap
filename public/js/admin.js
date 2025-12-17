@@ -3348,6 +3348,7 @@ class AdminDashboard {
       setChecked('featAnonymousPosts', this.featureFlags.anonymous_posts_enabled);
       setChecked('featGroupCalendar', this.featureFlags.group_calendar_enabled);
       setChecked('featGroupLinks', this.featureFlags.group_links_enabled);
+      setChecked('featTopics', this.featureFlags.topics_enabled);
 
       this.renderTranslationsGrid();
       this.wireFeatureToggleButtons();
@@ -3446,6 +3447,7 @@ class AdminDashboard {
         anonymous_posts_enabled: getChecked('featAnonymousPosts'),
         group_calendar_enabled: getChecked('featGroupCalendar'),
         group_links_enabled: getChecked('featGroupLinks'),
+        topics_enabled: getChecked('featTopics'),
         enabled_translations: enabledTranslationsPayload
       };
 
