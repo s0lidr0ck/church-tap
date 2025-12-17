@@ -4105,6 +4105,40 @@ class ChurchTapApp {
   }
 
   // Authentication Functions
+  normalizeUser(user) {
+    if (!user) return user;
+    const prefs = user.preferences || {};
+
+    const interests = Array.isArray(user.interests)
+      ? user.interests
+      : (Array.isArray(prefs.interests) ? prefs.interests : []);
+
+    const struggles = Array.isArray(user.struggles)
+      ? user.struggles
+      : (Array.isArray(prefs.struggles) ? prefs.struggles : []);
+
+    return {
+      ...user,
+      // Keep original nested object if present, but also expose fields at top-level
+      // because the UI code expects these keys on `currentUser`.
+      lifeStage: user.lifeStage ?? prefs.lifeStage ?? null,
+      prayerFrequency: user.prayerFrequency ?? prefs.prayerFrequency ?? null,
+      preferredTranslation: user.preferredTranslation ?? prefs.preferredTranslation ?? null,
+      interests,
+      struggles
+    };
+  }
+
+  async refreshCurrentUserFromServer() {
+    const response = await fetch(this.buildApiUrl('/api/auth/me'), { credentials: 'include' });
+    if (!response.ok) return false;
+    const data = await response.json().catch(() => null);
+    if (!data?.success) return false;
+    this.currentUser = this.normalizeUser(data.user);
+    this.updateTranslationButtons();
+    return true;
+  }
+
   async checkAuthStatus() {
     try {
       const response = await fetch(this.buildApiUrl('/api/auth/me'), {
@@ -4114,7 +4148,7 @@ class ChurchTapApp {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          this.currentUser = data.user;
+          this.currentUser = this.normalizeUser(data.user);
           this.updateUIForLoggedInUser();
           // Load memberships + active group for group switcher/community gating UI
           this.membershipContext = await this.fetchMembershipContext();
@@ -4320,10 +4354,14 @@ class ChurchTapApp {
       const data = await response.json();
 
       if (data.success) {
-        this.currentUser = data.user;
+        this.currentUser = this.normalizeUser(data.user);
         this.authToken = data.token;
         this.closeModal();
         this.updateUIForLoggedInUser();
+
+        // Hydrate full profile + preferences (best effort) for UI consistency.
+        // This also ensures Profile Settings shows the right saved values.
+        this.refreshCurrentUserFromServer().catch(() => {});
 
         // Default post-login flow: if user has no active group, send them to Join Group picker.
         const membershipContext = await this.fetchMembershipContext();
@@ -4372,11 +4410,14 @@ class ChurchTapApp {
       const data = await response.json();
 
       if (data.success) {
-        this.currentUser = data.user;
+        this.currentUser = this.normalizeUser(data.user);
         this.authToken = data.token;
         this.closeModal();
         this.updateUIForLoggedInUser();
         this.showToast('Account created! Welcome! ✨');
+
+        // Hydrate full profile + preferences (best effort).
+        this.refreshCurrentUserFromServer().catch(() => {});
 
         // Default post-register flow: send them to Join Group picker (with a Not right now option).
         window.location.href = '/choose-organization';
@@ -4407,190 +4448,11 @@ class ChurchTapApp {
     }
   }
 
+  // Deprecated: onboarding questionnaire was too intrusive on login/register.
+  // Keep the method for backwards compatibility, but route to Profile Settings instead.
   showOnboardingModal() {
-    this.showModal('Welcome! Let\'s Personalize Your Experience', `
-      <div class="text-sm text-gray-600 dark:text-gray-400 mb-6">
-        Help us personalize your daily verses by sharing a bit about yourself. This is optional but will help us provide more relevant content.
-      </div>
-      <form id="onboardingForm" class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Life Stage</label>
-          <select id="lifeStage" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-            <option value="">Select your life stage</option>
-            <option value="teen">Teen (13-19)</option>
-            <option value="young_adult">Young Adult (20-29)</option>
-            <option value="adult">Adult (30-49)</option>
-            <option value="middle_aged">Middle-aged (50-64)</option>
-            <option value="senior">Senior (65+)</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Interests (Select all that apply)</label>
-          <div id="interestsGrid" class="grid grid-cols-2 gap-2">
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="faith_growth" class="rounded">
-              <span class="text-sm">Faith Growth</span>
-            </label>
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="family" class="rounded">
-              <span class="text-sm">Family</span>
-            </label>
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="relationships" class="rounded">
-              <span class="text-sm">Relationships</span>
-            </label>
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="work_career" class="rounded">
-              <span class="text-sm">Work/Career</span>
-            </label>
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="health" class="rounded">
-              <span class="text-sm">Health</span>
-            </label>
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="finances" class="rounded">
-              <span class="text-sm">Finances</span>
-            </label>
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="service" class="rounded">
-              <span class="text-sm">Service</span>
-            </label>
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="leadership" class="rounded">
-              <span class="text-sm">Leadership</span>
-            </label>
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Current Struggles (Optional - helps us provide supportive verses)</label>
-          <div id="strugglesGrid" class="grid grid-cols-2 gap-2">
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="anxiety" class="rounded">
-              <span class="text-sm">Anxiety</span>
-            </label>
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="depression" class="rounded">
-              <span class="text-sm">Depression</span>
-            </label>
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="loneliness" class="rounded">
-              <span class="text-sm">Loneliness</span>
-            </label>
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="grief" class="rounded">
-              <span class="text-sm">Grief</span>
-            </label>
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="anger" class="rounded">
-              <span class="text-sm">Anger</span>
-            </label>
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="doubt" class="rounded">
-              <span class="text-sm">Doubt</span>
-            </label>
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="addiction" class="rounded">
-              <span class="text-sm">Addiction</span>
-            </label>
-            <label class="flex items-center space-x-2">
-              <input type="checkbox" value="forgiveness" class="rounded">
-              <span class="text-sm">Forgiveness</span>
-            </label>
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">How often do you pray?</label>
-          <select id="prayerFrequency" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-            <option value="">Select frequency</option>
-            <option value="multiple_daily">Multiple times daily</option>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="occasionally">Occasionally</option>
-            <option value="rarely">Rarely</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Preferred Bible Translation</label>
-          <select id="preferredTranslation" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-            <option value="NASB" selected>NASB - New American Standard Bible (Recommended)</option>
-            <option value="ESV">ESV - English Standard Version</option>
-            <option value="NIV">NIV - New International Version</option>
-            <option value="NLT">NLT - New Living Translation</option>
-            <option value="KJV">KJV - King James Version</option>
-            <option value="MSG">MSG - The Message</option>
-            <option value="CSB">CSB - Christian Standard Bible</option>
-          </select>
-        </div>
-
-        <div id="onboardingError" class="hidden text-red-600 text-sm"></div>
-        <div class="flex space-x-3">
-          <button type="submit" class="btn-primary flex-1">✨ Complete Setup</button>
-          <button type="button" onclick="window.churchTapApp.skipOnboarding()" class="btn-secondary">Skip for Now</button>
-        </div>
-      </form>
-    `);
-
-    document.getElementById('onboardingForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.handleOnboarding();
-    });
-  }
-
-  async handleOnboarding() {
-    const lifeStage = document.getElementById('lifeStage').value;
-    const prayerFrequency = document.getElementById('prayerFrequency').value;
-    const preferredTranslation = document.getElementById('preferredTranslation').value;
-    const errorEl = document.getElementById('onboardingError');
-
-    // Collect selected interests
-    const interests = Array.from(document.querySelectorAll('#interestsGrid input[type="checkbox"]:checked'))
-      .map(cb => cb.value);
-
-    // Collect selected struggles
-    const struggles = Array.from(document.querySelectorAll('#strugglesGrid input[type="checkbox"]:checked'))
-      .map(cb => cb.value);
-
-    try {
-      const response = await fetch('/api/auth/onboarding', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          lifeStage,
-          interests,
-          struggles,
-          prayerFrequency,
-          preferredTranslation
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        this.closeModal();
-        this.showToast('Setup complete! Your verses will be personalized 🎯');
-        // Reload today's verse to potentially get a personalized one
-        this.loadVerse();
-      } else {
-        errorEl.textContent = data.error || 'Failed to save preferences';
-        errorEl.classList.remove('hidden');
-      }
-    } catch (error) {
-      console.error('Onboarding error:', error);
-      errorEl.textContent = 'Connection error';
-      errorEl.classList.remove('hidden');
-    }
-  }
-
-  skipOnboarding() {
-    this.closeModal();
-    this.showToast('You can set preferences later in your profile');
+    this.showToast('You can update preferences in your profile');
+    this.showProfileModal();
   }
 
   showProfileModal() {
@@ -4639,13 +4501,93 @@ class ChurchTapApp {
                 <option value="senior" ${this.currentUser.lifeStage === 'senior' ? 'selected' : ''}>Senior (65+)</option>
               </select>
             </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Interests (Select all that apply)</label>
+              <div id="profileInterestsGrid" class="grid grid-cols-2 gap-2">
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="faith_growth" class="rounded" ${(this.currentUser.interests || []).includes('faith_growth') ? 'checked' : ''}>
+                  <span class="text-sm">Faith Growth</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="family" class="rounded" ${(this.currentUser.interests || []).includes('family') ? 'checked' : ''}>
+                  <span class="text-sm">Family</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="relationships" class="rounded" ${(this.currentUser.interests || []).includes('relationships') ? 'checked' : ''}>
+                  <span class="text-sm">Relationships</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="work_career" class="rounded" ${(this.currentUser.interests || []).includes('work_career') ? 'checked' : ''}>
+                  <span class="text-sm">Work/Career</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="health" class="rounded" ${(this.currentUser.interests || []).includes('health') ? 'checked' : ''}>
+                  <span class="text-sm">Health</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="finances" class="rounded" ${(this.currentUser.interests || []).includes('finances') ? 'checked' : ''}>
+                  <span class="text-sm">Finances</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="service" class="rounded" ${(this.currentUser.interests || []).includes('service') ? 'checked' : ''}>
+                  <span class="text-sm">Service</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="leadership" class="rounded" ${(this.currentUser.interests || []).includes('leadership') ? 'checked' : ''}>
+                  <span class="text-sm">Leadership</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Current Struggles (Optional)</label>
+              <div id="profileStrugglesGrid" class="grid grid-cols-2 gap-2">
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="anxiety" class="rounded" ${(this.currentUser.struggles || []).includes('anxiety') ? 'checked' : ''}>
+                  <span class="text-sm">Anxiety</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="depression" class="rounded" ${(this.currentUser.struggles || []).includes('depression') ? 'checked' : ''}>
+                  <span class="text-sm">Depression</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="loneliness" class="rounded" ${(this.currentUser.struggles || []).includes('loneliness') ? 'checked' : ''}>
+                  <span class="text-sm">Loneliness</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="grief" class="rounded" ${(this.currentUser.struggles || []).includes('grief') ? 'checked' : ''}>
+                  <span class="text-sm">Grief</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="anger" class="rounded" ${(this.currentUser.struggles || []).includes('anger') ? 'checked' : ''}>
+                  <span class="text-sm">Anger</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="doubt" class="rounded" ${(this.currentUser.struggles || []).includes('doubt') ? 'checked' : ''}>
+                  <span class="text-sm">Doubt</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="addiction" class="rounded" ${(this.currentUser.struggles || []).includes('addiction') ? 'checked' : ''}>
+                  <span class="text-sm">Addiction</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" value="forgiveness" class="rounded" ${(this.currentUser.struggles || []).includes('forgiveness') ? 'checked' : ''}>
+                  <span class="text-sm">Forgiveness</span>
+                </label>
+              </div>
+            </div>
             
             <div>
               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Prayer Frequency</label>
               <select id="profilePrayerFrequency" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                <option value="">Select frequency</option>
+                <option value="multiple_daily" ${this.currentUser.prayerFrequency === 'multiple_daily' ? 'selected' : ''}>Multiple times daily</option>
                 <option value="daily" ${this.currentUser.prayerFrequency === 'daily' ? 'selected' : ''}>Daily</option>
                 <option value="weekly" ${this.currentUser.prayerFrequency === 'weekly' ? 'selected' : ''}>Weekly</option>
-                <option value="as_needed" ${this.currentUser.prayerFrequency === 'as_needed' ? 'selected' : ''}>As Needed</option>
+                <option value="occasionally" ${this.currentUser.prayerFrequency === 'occasionally' ? 'selected' : ''}>Occasionally</option>
+                <option value="as_needed" ${this.currentUser.prayerFrequency === 'as_needed' ? 'selected' : ''}>As needed</option>
+                <option value="rarely" ${this.currentUser.prayerFrequency === 'rarely' ? 'selected' : ''}>Rarely</option>
               </select>
             </div>
 
@@ -4744,6 +4686,11 @@ class ChurchTapApp {
     const preferredTranslation = document.getElementById('profilePreferredTranslation').value;
     const errorEl = document.getElementById('preferencesError');
 
+    const interests = Array.from(document.querySelectorAll('#profileInterestsGrid input[type="checkbox"]:checked'))
+      .map(cb => cb.value);
+    const struggles = Array.from(document.querySelectorAll('#profileStrugglesGrid input[type="checkbox"]:checked'))
+      .map(cb => cb.value);
+
     try {
       const response = await fetch('/api/auth/preferences', {
         method: 'PUT',
@@ -4753,6 +4700,8 @@ class ChurchTapApp {
         credentials: 'include',
         body: JSON.stringify({
           lifeStage,
+          interests,
+          struggles,
           prayerFrequency,
           preferredTranslation
         })
@@ -4762,6 +4711,8 @@ class ChurchTapApp {
 
       if (data.success) {
         this.currentUser.lifeStage = lifeStage;
+        this.currentUser.interests = interests;
+        this.currentUser.struggles = struggles;
         this.currentUser.prayerFrequency = prayerFrequency;
         this.currentUser.preferredTranslation = preferredTranslation;
         this.showToast('Preferences updated successfully! 🎯');

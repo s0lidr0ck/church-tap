@@ -109,7 +109,6 @@ router.post('/register', validateInput.email, validateInput.password, validateIn
               isVerified: userRow.is_verified
             },
             token,
-            requiresOnboarding: true,
             bracelet_link: braceletLink
           });
         }
@@ -175,25 +174,19 @@ router.post('/login', validateInput.email, validateInput.password, async (req, r
         res.clearCookie('pendingBraceletUid');
       }
 
-      // Check if user has completed onboarding
-      db.query(`SELECT * FROM ct_user_preferences WHERE user_id = $1`, [user.id], (err, result) => {
-        const prefs = result.rows[0];
-        const requiresOnboarding = !prefs || (!prefs.interests && !prefs.life_stage);
-
-        res.json({
-          success: true,
-          user: {
-            id: user.id,
-            email: user.email,
-            firstName: user.first_name,
-            lastName: user.last_name,
-            displayName: user.display_name,
-            isVerified: user.is_verified
-          },
-          token,
-          requiresOnboarding,
-          bracelet_link: braceletLink
-        });
+      // Note: personalization preferences are optional and managed from Profile Settings.
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          displayName: user.display_name,
+          isVerified: user.is_verified
+        },
+        token,
+        bracelet_link: braceletLink
       });
     });
   } catch (error) {
