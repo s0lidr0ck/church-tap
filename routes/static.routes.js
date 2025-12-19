@@ -36,6 +36,12 @@ router.get('/', (req, res) => {
   }
 });
 
+// Global store redirect (Shopify)
+router.get('/store', (req, res) => {
+  setNoStore(res);
+  return res.redirect(302, 'https://shop.churchtap.app');
+});
+
 // Always serve the church interface app shell (even on churchtap.app)
 router.get('/app', (req, res) => {
   setNoStore(res);

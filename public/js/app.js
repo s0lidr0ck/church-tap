@@ -794,6 +794,14 @@ class ChurchTapApp {
       });
     }
 
+    // Store
+    const storeBtn = document.getElementById('storeBtn');
+    if (storeBtn) {
+      storeBtn.addEventListener('click', () => {
+        window.location.href = '/store';
+      });
+    }
+
     // Navigation
     on('prevDay', 'click', () => {
       this.navigateDay(-1);
@@ -5811,7 +5819,7 @@ class ChurchTapApp {
     console.log('Links container found:', !!linksContainer);
     console.log('Links button found:', !!linksButton);
     
-    if (!linksContainer || !links || links.length === 0) {
+    if (!linksContainer || !Array.isArray(links) || links.length === 0) {
       console.log('Hiding links button - no links or container missing');
       if (linksButton) {
         linksButton.style.display = 'none';
@@ -5839,13 +5847,35 @@ class ChurchTapApp {
       event: '🎉'
     };
 
-    linksContainer.innerHTML = links.map(link => `
-      <button onclick="window.open('${link.url}', '_blank')" 
-              class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center space-x-2">
-        <span>${iconMap[link.icon] || '🌐'}</span>
-        <span class="truncate">${link.title}</span>
-      </button>
-    `).join('');
+    // Avoid injecting untrusted URLs into inline onclick/HTML.
+    linksContainer.innerHTML = '';
+    const frag = document.createDocumentFragment();
+
+    for (const link of links) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center space-x-2';
+
+      const iconSpan = document.createElement('span');
+      iconSpan.textContent = iconMap[link?.icon] || '🌐';
+
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'truncate';
+      titleSpan.textContent = (link?.title || '').toString();
+
+      const url = (link?.url || '').toString();
+      btn.addEventListener('click', () => {
+        if (!url) return;
+        const w = window.open(url, '_blank', 'noopener,noreferrer');
+        if (w) w.opener = null;
+      });
+
+      btn.appendChild(iconSpan);
+      btn.appendChild(titleSpan);
+      frag.appendChild(btn);
+    }
+
+    linksContainer.appendChild(frag);
     
     // Show the links button
     if (linksButton) {

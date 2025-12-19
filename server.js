@@ -14,6 +14,7 @@ const { resolveActiveOrganization } = require('./middleware/resolveActiveOrganiz
 const createRateLimiter = require('./middleware/rateLimit');
 const { handleValidationError } = require('./middleware/validation');
 const { VerseImportService } = require('./services/verseService');
+const CalendarSyncService = require('./services/calendarSyncService');
 const { db } = require('./config/database');
 
 // Import route modules
@@ -222,12 +223,29 @@ cron.schedule('0 0 * * *', async () => {
   await checkAndImportTodayVerses();
 });
 
+/**
+ * Scheduled task to sync enabled external calendar integrations
+ * Runs every 30 minutes
+ */
+cron.schedule('*/30 * * * *', async () => {
+  try {
+    console.log('🗓️ Running external calendar sync...');
+    const result = await CalendarSyncService.syncAllEnabledCalendarIntegrations(25);
+    const okCount = (result.outcomes || []).filter(o => o.success === true).length;
+    const errCount = (result.outcomes || []).filter(o => o.success === false).length;
+    console.log(`🗓️ External calendar sync complete: ${okCount} ok, ${errCount} errors`);
+  } catch (e) {
+    console.error('🗓️ External calendar sync failed:', e);
+  }
+});
+
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Church Tap app running on http://0.0.0.0:${PORT}`);
   console.log('🚀 Multi-tenant system ready!');
   console.log('📖 Automatic verse import system enabled');
   console.log('⏰ Daily verse import scheduler running (00:00 daily)');
+  console.log('🗓️ External calendar sync scheduler running (every 30 min)');
   console.log('🏗️ Modular architecture loaded');
   
   // Run startup verse check (check if today's verses exist for all orgs)

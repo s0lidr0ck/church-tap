@@ -6,6 +6,19 @@ const { requireOrgFeature } = require('../middleware/featureGate');
 
 const router = express.Router();
 
+function isAllowedOrganizationLinkUrl(raw) {
+  const url = (raw || '').toString().trim();
+  if (!url) return false;
+  if (/\s/.test(url)) return false;
+  if (url.length > 2048) return false;
+  try {
+    const u = new URL(url);
+    return ['http:', 'https:', 'mailto:', 'tel:'].includes(u.protocol);
+  } catch (e) {
+    return false;
+  }
+}
+
 async function resolveOrgIdFromRequest(req) {
   let orgId = req.organization?.id || null;
   const originatingTagId = req.cookies?.originatingTag;
@@ -60,6 +73,9 @@ router.post('/links', requireOrgAuth, (req, res) => {
   if (!title || !url) {
     return res.status(400).json({ success: false, error: 'Title and URL are required' });
   }
+  if (!isAllowedOrganizationLinkUrl(url)) {
+    return res.status(400).json({ success: false, error: 'Invalid URL. Please use a full http(s) URL (or mailto:/tel:).' });
+  }
   
   db.query(
     `INSERT INTO ct_organization_links (organization_id, title, url, icon, sort_order)
@@ -94,6 +110,9 @@ router.put('/links/:id', requireOrgAuth, (req, res) => {
   
   if (!title || !url) {
     return res.status(400).json({ success: false, error: 'Title and URL are required' });
+  }
+  if (!isAllowedOrganizationLinkUrl(url)) {
+    return res.status(400).json({ success: false, error: 'Invalid URL. Please use a full http(s) URL (or mailto:/tel:).' });
   }
   
   db.query(
@@ -415,6 +434,8 @@ router.get('/calendar/daily', (req, res) => {
        FROM CT_events
        WHERE organization_id = $1
          AND is_active = TRUE
+         -- Hide recurring "series definitions" from public calendar; show instances + one-time events.
+         AND (is_instance = TRUE OR is_recurring = FALSE OR is_recurring IS NULL)
          AND DATE(start_at) = $2
        ORDER BY start_at ASC`,
       [orgId, date],
@@ -474,6 +495,8 @@ router.get('/calendar/month', (req, res) => {
        FROM CT_events e, bounds b
        WHERE e.organization_id = $1
          AND e.is_active = TRUE
+         -- Hide recurring "series definitions" from public calendar; show instances + one-time events.
+         AND (e.is_instance = TRUE OR e.is_recurring = FALSE OR e.is_recurring IS NULL)
          AND e.start_at < b.next_month
          AND COALESCE(e.end_at, e.start_at) >= b.month_start
        ORDER BY e.start_at ASC`,
@@ -563,9 +586,21 @@ router.get('/public', (req, res) => {
   console.log('🏢 Fetching public organizations for bracelet claiming');
 
   db.query(
-    `SELECT id, name, short_name, location
-     FROM organizations
-     WHERE is_active = true
+    `SELECT
+       id,
+       name,
+       -- Backward-compat fields (some clients expect these keys)
+       name AS short_name,
+       address AS location,
+       subdomain,
+       org_type,
+       join_type,
+       city,
+       state,
+       zip_code,
+       country
+     FROM ct_organizations
+     WHERE is_active = TRUE
      ORDER BY name ASC`,
     [],
     (err, result) => {

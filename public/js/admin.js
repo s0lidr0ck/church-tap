@@ -6,6 +6,10 @@ class AdminDashboard {
     this.filters = { search: '', type: 'all', status: 'all' };
     this.brand = null;
 
+    // Events UI state
+    this.eventsViewMode = 'list'; // 'list' | 'month'
+    this.eventsCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
     // Per-group feature flags (loaded from /api/admin/organization/features)
     this.featureFlags = null;
     this.translationCatalog = [];
@@ -196,6 +200,22 @@ class AdminDashboard {
     if (addEventBtn) addEventBtn.addEventListener('click', () => this.showEventModal());
     const addFirstEventBtn = document.getElementById('addFirstEventBtn');
     if (addFirstEventBtn) addFirstEventBtn.addEventListener('click', () => this.showEventModal());
+    const eventsViewListBtn = document.getElementById('eventsViewListBtn');
+    const eventsViewMonthBtn = document.getElementById('eventsViewMonthBtn');
+    if (eventsViewListBtn) eventsViewListBtn.addEventListener('click', () => this.setEventsViewMode('list'));
+    if (eventsViewMonthBtn) eventsViewMonthBtn.addEventListener('click', () => this.setEventsViewMode('month'));
+    const calPrev = document.getElementById('eventsCalendarPrevBtn');
+    const calNext = document.getElementById('eventsCalendarNextBtn');
+    const calToday = document.getElementById('eventsCalendarTodayBtn');
+    if (calPrev) calPrev.addEventListener('click', () => this.shiftEventsCalendarMonth(-1));
+    if (calNext) calNext.addEventListener('click', () => this.shiftEventsCalendarMonth(1));
+    if (calToday) calToday.addEventListener('click', () => this.goToEventsCalendarToday());
+    const saveCalendarIntegrationBtn = document.getElementById('saveCalendarIntegrationBtn');
+    if (saveCalendarIntegrationBtn) saveCalendarIntegrationBtn.addEventListener('click', () => this.saveCalendarIntegration());
+    const runCalendarSyncBtn = document.getElementById('runCalendarSyncBtn');
+    if (runCalendarSyncBtn) runCalendarSyncBtn.addEventListener('click', () => this.runCalendarSync());
+    const clearImportedCalendarEventsBtn = document.getElementById('clearImportedCalendarEventsBtn');
+    if (clearImportedCalendarEventsBtn) clearImportedCalendarEventsBtn.addEventListener('click', () => this.clearImportedCalendarEvents());
     const addCtaBtn = document.getElementById('addCtaBtn');
     if (addCtaBtn) addCtaBtn.addEventListener('click', () => this.showCtaModal());
     const addFirstCtaBtn = document.getElementById('addFirstCtaBtn');
@@ -731,7 +751,10 @@ class AdminDashboard {
     } else if (tabName === 'verseImport') {
       this.loadVerseImportSettings();
     } else if (tabName === 'events') {
-      this.loadEvents();
+      this.loadCalendarIntegration();
+      this.applyEventsViewModeToUI();
+      if (this.eventsViewMode === 'month') this.loadEventsMonth();
+      else this.loadEvents();
     } else if (tabName === 'cta') {
       this.loadCtas();
     } else if (tabName === 'settings') {
@@ -917,6 +940,416 @@ class AdminDashboard {
     `).join('');
   }
 
+  // ===== Events View (List / Month) =====
+  setEventsViewMode(mode) {
+    const next = (mode || '').toString().toLowerCase() === 'month' ? 'month' : 'list';
+    this.eventsViewMode = next;
+    this.applyEventsViewModeToUI();
+    if (next === 'month') this.loadEventsMonth();
+    else this.loadEvents();
+  }
+
+  applyEventsViewModeToUI() {
+    const listBtn = document.getElementById('eventsViewListBtn');
+    const monthBtn = document.getElementById('eventsViewMonthBtn');
+    const listTable = document.getElementById('eventsTableContainer');
+    const calendar = document.getElementById('eventsCalendarContainer');
+    const empty = document.getElementById('noEventsMessage');
+
+    if (listBtn && monthBtn) {
+      if (this.eventsViewMode === 'month') {
+        listBtn.className = 'px-3 py-2 text-sm font-medium bg-white text-gray-700';
+        monthBtn.className = 'px-3 py-2 text-sm font-medium bg-gray-900 text-white';
+      } else {
+        listBtn.className = 'px-3 py-2 text-sm font-medium bg-gray-900 text-white';
+        monthBtn.className = 'px-3 py-2 text-sm font-medium bg-white text-gray-700';
+      }
+    }
+
+    if (calendar) calendar.classList.toggle('hidden', this.eventsViewMode !== 'month');
+    if (listTable) listTable.classList.toggle('hidden', this.eventsViewMode !== 'list');
+    if (empty) empty.classList.add('hidden');
+  }
+
+  shiftEventsCalendarMonth(delta) {
+    const m = this.eventsCalendarMonth;
+    this.eventsCalendarMonth = new Date(m.getFullYear(), m.getMonth() + delta, 1);
+    if (this.eventsViewMode === 'month') this.loadEventsMonth();
+  }
+
+  goToEventsCalendarToday() {
+    const now = new Date();
+    this.eventsCalendarMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    if (this.eventsViewMode === 'month') this.loadEventsMonth();
+  }
+
+  toLocalDateKey(isoLike) {
+    const d = new Date(isoLike);
+    if (!Number.isFinite(d.getTime())) return null;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  formatMonthTitle(date) {
+    try {
+      return date.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+    } catch (e) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    }
+  }
+
+  async loadEventsMonth() {
+    const calendar = document.getElementById('eventsCalendarContainer');
+    const grid = document.getElementById('eventsCalendarGrid');
+    const subtitle = document.getElementById('eventsCalendarSubtitle');
+    if (!calendar || !grid || !subtitle) return;
+
+    try {
+      subtitle.textContent = this.formatMonthTitle(this.eventsCalendarMonth);
+
+      // Fetch instances so recurring events appear on the right dates.
+      const res = await fetch('/api/admin/organization/events?include_instances=true');
+      const data = await res.json();
+      const all = data?.events || [];
+
+      // Filter out recurring series definitions (keep one-time events + instances).
+      const events = (all || []).filter(ev => (ev.is_instance === true) || !(ev.is_recurring === true));
+
+      this.renderEventsCalendarMonth(events, this.eventsCalendarMonth);
+    } catch (e) {
+      console.error('Error loading events month', e);
+      grid.innerHTML = `<div class="col-span-7 text-sm text-gray-500">Failed to load calendar.</div>`;
+    }
+  }
+
+  renderEventsCalendarMonth(events, monthDate) {
+    const grid = document.getElementById('eventsCalendarGrid');
+    const subtitle = document.getElementById('eventsCalendarSubtitle');
+    if (!grid) return;
+    if (subtitle) subtitle.textContent = this.formatMonthTitle(monthDate);
+
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+    const first = new Date(year, month, 1);
+    const last = new Date(year, month + 1, 0);
+    const startDow = first.getDay(); // 0=Sun
+    const totalDays = last.getDate();
+
+    const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const byDay = new Map();
+    for (const ev of (events || [])) {
+      const key = this.toLocalDateKey(ev.start_at);
+      if (!key || !key.startsWith(monthKey)) continue;
+      if (!byDay.has(key)) byDay.set(key, []);
+      byDay.get(key).push(ev);
+    }
+
+    for (const [k, list] of byDay.entries()) {
+      list.sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
+      byDay.set(k, list);
+    }
+
+    const cells = [];
+    for (let i = 0; i < startDow; i++) {
+      cells.push(`<div class="h-28 border rounded-lg bg-gray-50"></div>`);
+    }
+
+    const todayKey = this.toLocalDateKey(new Date());
+
+    for (let day = 1; day <= totalDays; day++) {
+      const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const list = byDay.get(dateKey) || [];
+      const isToday = todayKey === dateKey;
+
+      const itemsHtml = list.slice(0, 3).map(ev => {
+        const start = (() => {
+          try {
+            const d = new Date(ev.start_at);
+            return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+          } catch (e) { return ''; }
+        })();
+        const title = (ev.title || 'Event').toString();
+        const cancelled = ev.is_active === false;
+        const pillClass = cancelled
+          ? 'bg-red-100 text-red-800'
+          : (ev.is_instance ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800');
+
+        return `
+          <button type="button"
+                  class="w-full text-left truncate px-2 py-1 rounded ${pillClass} hover:opacity-90"
+                  onclick="adminDashboard.handleCalendarEventClick(${Number(ev.id)}, ${ev.is_instance ? 'true' : 'false'}, ${ev.parent_event_id ? Number(ev.parent_event_id) : 'null'}, '${String(ev.instance_date || '').slice(0, 10)}', ${ev.is_active === false ? 'true' : 'false'})"
+                  title="${title.replace(/"/g, '&quot;')}">
+            <span class="text-xs font-semibold">${start}</span>
+            <span class="text-xs"> ${title}</span>
+          </button>
+        `;
+      }).join('');
+
+      const more = list.length > 3 ? `<div class="text-xs text-gray-500 px-1 mt-1">+${list.length - 3} more</div>` : '';
+
+      cells.push(`
+        <div class="h-28 border rounded-lg bg-white overflow-hidden flex flex-col">
+          <div class="px-2 py-1 flex items-center justify-between ${isToday ? 'bg-primary-50' : 'bg-gray-50'}">
+            <div class="text-xs font-semibold ${isToday ? 'text-primary-700' : 'text-gray-700'}">${day}</div>
+          </div>
+          <div class="p-1 space-y-1 overflow-hidden">
+            ${itemsHtml || `<div class="text-xs text-gray-400 px-1">—</div>`}
+            ${more}
+          </div>
+        </div>
+      `);
+    }
+
+    const remainder = cells.length % 7;
+    if (remainder !== 0) {
+      const toAdd = 7 - remainder;
+      for (let i = 0; i < toAdd; i++) {
+        cells.push(`<div class="h-28 border rounded-lg bg-gray-50"></div>`);
+      }
+    }
+
+    grid.innerHTML = cells.join('');
+  }
+
+  async cancelOrRestoreOccurrence(parentId, dateStr, action) {
+    const parent = parseInt(parentId, 10);
+    const date = (dateStr || '').toString().slice(0, 10);
+    if (!parent || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      this.showToast('Invalid occurrence', 'error');
+      return { success: false };
+    }
+    const act = (action || '').toString().toLowerCase();
+    if (!['cancel', 'restore'].includes(act)) return { success: false };
+
+    const reason = act === 'cancel' ? (prompt('Reason (optional):', '') || '').trim() : '';
+    const res = await fetch(`/api/admin/organization/events/${parent}/occurrence`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: act, date, reason })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      this.showToast(data.error || 'Failed', 'error');
+      return data;
+    }
+    this.showToast(act === 'cancel' ? 'Occurrence cancelled' : 'Occurrence restored');
+    return data;
+  }
+
+  handleCalendarEventClick(eventId, isInstance, parentEventId, instanceDate, isCancelled) {
+    const id = parseInt(eventId, 10);
+    if (!id) return;
+
+    // One-time event: just edit as normal.
+    if (!isInstance) {
+      this.showEventModal(id);
+      return;
+    }
+
+    const parentId = parentEventId ? parseInt(parentEventId, 10) : null;
+    const date = (instanceDate || '').toString().slice(0, 10);
+    const cancelled = !!isCancelled;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'fixed inset-0 z-50 bg-black/40 flex items-center justify-center';
+    wrapper.innerHTML = `
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+        <div class="px-5 py-4 border-b">
+          <div class="text-sm text-gray-500">Occurrence</div>
+          <div class="text-lg font-semibold">${date || 'Selected date'}</div>
+        </div>
+        <div class="p-5 space-y-3">
+          <button id="occ_edit_instance" class="w-full px-4 py-3 rounded-lg bg-primary-600 hover:bg-primary-700 text-white">
+            Edit this occurrence
+          </button>
+          <button id="occ_toggle_cancel" class="w-full px-4 py-3 rounded-lg ${cancelled ? 'bg-gray-100 hover:bg-gray-200' : 'bg-red-600 hover:bg-red-700 text-white'}">
+            ${cancelled ? 'Restore this occurrence' : 'Cancel this occurrence'}
+          </button>
+          ${parentId ? `
+            <button id="occ_edit_series" class="w-full px-4 py-3 rounded-lg bg-gray-100 hover:bg-gray-200">
+              Edit series
+            </button>
+          ` : ''}
+          <button id="occ_close" class="w-full px-4 py-3 rounded-lg bg-white border hover:bg-gray-50">
+            Close
+          </button>
+        </div>
+      </div>
+    `;
+    wrapper.addEventListener('click', (e) => { if (e.target === wrapper) wrapper.remove(); });
+    document.body.appendChild(wrapper);
+
+    const close = () => wrapper.remove();
+    wrapper.querySelector('#occ_close').onclick = close;
+    wrapper.querySelector('#occ_edit_instance').onclick = () => {
+      close();
+      this.showEventModal(id, { includeInstances: true });
+    };
+    wrapper.querySelector('#occ_toggle_cancel').onclick = async () => {
+      try {
+        const act = cancelled ? 'restore' : 'cancel';
+        close();
+        if (parentId) await this.cancelOrRestoreOccurrence(parentId, date, act);
+        // Refresh the current view
+        if (this.eventsViewMode === 'month') await this.loadEventsMonth();
+        else await this.loadEvents();
+      } catch (e) {
+        this.showToast('Failed', 'error');
+      }
+    };
+    const seriesBtn = wrapper.querySelector('#occ_edit_series');
+    if (seriesBtn) {
+      seriesBtn.onclick = () => {
+        close();
+        this.showEventModal(parentId);
+      };
+    }
+  }
+
+  // ===== External Calendar Sync (Google ICS) =====
+  async loadCalendarIntegration() {
+    const statusEl = document.getElementById('calendarSyncStatusText');
+    const urlEl = document.getElementById('calendarIcsUrl');
+    const enabledEl = document.getElementById('calendarSyncEnabled');
+    const aheadEl = document.getElementById('calendarSyncAhead');
+    const backEl = document.getElementById('calendarSyncBack');
+
+    if (!statusEl || !urlEl || !enabledEl || !aheadEl || !backEl) return;
+
+    statusEl.textContent = 'Loading…';
+    try {
+      const res = await fetch('/api/admin/organization/calendar-integrations/google_ics');
+      const data = await res.json();
+      const integration = data?.integration || null;
+
+      if (!integration) {
+        urlEl.value = '';
+        enabledEl.checked = false;
+        aheadEl.value = '180';
+        backEl.value = '14';
+        statusEl.textContent = 'Not configured yet.';
+        return;
+      }
+
+      urlEl.value = integration.ics_url || '';
+      enabledEl.checked = integration.is_enabled !== false;
+      aheadEl.value = String(integration.sync_window_days_ahead ?? 180);
+      backEl.value = String(integration.sync_window_days_back ?? 14);
+
+      const status = (integration.last_sync_status || 'never').toString();
+      const last = integration.last_synced_at ? new Date(integration.last_synced_at).toLocaleString() : 'Never';
+      const err = (integration.last_sync_error || '').toString().trim();
+      statusEl.textContent = status === 'error'
+        ? `Last sync: ${last} (error: ${err || 'unknown'})`
+        : `Last sync: ${last} (${status})`;
+    } catch (e) {
+      console.error('Error loading calendar integration', e);
+      statusEl.textContent = 'Failed to load calendar sync settings.';
+    }
+  }
+
+  async saveCalendarIntegration() {
+    const urlEl = document.getElementById('calendarIcsUrl');
+    const enabledEl = document.getElementById('calendarSyncEnabled');
+    const aheadEl = document.getElementById('calendarSyncAhead');
+    const backEl = document.getElementById('calendarSyncBack');
+
+    if (!urlEl || !enabledEl || !aheadEl || !backEl) return;
+
+    const inputUrl = (urlEl.value || '').trim();
+    if (!inputUrl) {
+      this.showToast('Paste a Google Calendar link first', 'error');
+      return;
+    }
+
+    const payload = {
+      input_url: inputUrl,
+      is_enabled: !!enabledEl.checked,
+      sync_window_days_ahead: parseInt(aheadEl.value || '180', 10),
+      sync_window_days_back: parseInt(backEl.value || '14', 10)
+    };
+
+    try {
+      const res = await fetch('/api/admin/organization/calendar-integrations/google_ics', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!data.success) {
+        this.showToast(data.error || 'Failed to save calendar sync settings', 'error');
+        return;
+      }
+      this.showToast('Calendar sync settings saved');
+      await this.loadCalendarIntegration();
+    } catch (e) {
+      console.error('Error saving calendar integration', e);
+      this.showToast('Failed to save calendar sync settings', 'error');
+    }
+  }
+
+  async runCalendarSync() {
+    try {
+      const res = await fetch('/api/admin/organization/calendar-integrations/google_ics/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const data = await res.json();
+      if (!data.success) {
+        this.showToast(data.error || 'Calendar sync failed', 'error');
+        await this.loadCalendarIntegration();
+        return;
+      }
+
+      const r = data.result || {};
+      if (r.not_modified) {
+        this.showToast('No calendar changes (not modified)');
+      } else {
+        const fetched = Number(r.fetched_events || 0);
+        this.showToast(`Synced: ${Number(r.upserted || 0)} upserted, ${Number(r.deactivated || 0)} deactivated (fetched ${fetched})`);
+      }
+      await this.loadCalendarIntegration();
+      await this.loadEvents();
+    } catch (e) {
+      console.error('Error running calendar sync', e);
+      this.showToast('Calendar sync failed', 'error');
+      await this.loadCalendarIntegration();
+    }
+  }
+
+  async clearImportedCalendarEvents() {
+    const disable = confirm(
+      'Disable sync too?\n\nOK = Disable sync AND remove imported events\nCancel = Keep sync enabled, just remove imported events'
+    );
+
+    const confirmed = confirm(
+      'This will remove ALL imported events from your external calendar for this group.\n\nThis cannot be undone.\n\nContinue?'
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch('/api/admin/organization/calendar-integrations/google_ics/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disable })
+      });
+      const data = await res.json();
+      if (!data.success) {
+        this.showToast(data.error || 'Failed to remove imported events', 'error');
+        return;
+      }
+      this.showToast(`Removed ${Number(data.deleted || 0)} imported events`);
+      await this.loadCalendarIntegration();
+      await this.loadEvents();
+    } catch (e) {
+      console.error('Error clearing imported events', e);
+      this.showToast('Failed to remove imported events', 'error');
+    }
+  }
+
   // ===== Events Admin =====
   async loadEvents() {
     const noMsg = document.getElementById('noEventsMessage');
@@ -926,17 +1359,23 @@ class AdminDashboard {
       const data = await res.json();
       const events = data?.events || [];
       if (events.length === 0) {
-        noMsg.classList.remove('hidden');
-        table.classList.add('hidden');
+        if (this.eventsViewMode === 'list') {
+          noMsg.classList.remove('hidden');
+          table.classList.add('hidden');
+        }
         return;
       }
       this.renderEventsTable(events);
-      noMsg.classList.add('hidden');
-      table.classList.remove('hidden');
+      if (this.eventsViewMode === 'list') {
+        noMsg.classList.add('hidden');
+        table.classList.remove('hidden');
+      }
     } catch (e) {
       console.error('Error loading events', e);
-      noMsg.classList.remove('hidden');
-      table.classList.add('hidden');
+      if (this.eventsViewMode === 'list') {
+        noMsg.classList.remove('hidden');
+        table.classList.add('hidden');
+      }
     }
   }
 
@@ -948,6 +1387,9 @@ class AdminDashboard {
           ${ev.title}
           ${ev.is_recurring ? '<span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">🔄 Recurring</span>' : ''}
           ${ev.is_instance ? '<span class="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">📅 Instance</span>' : ''}
+          ${ev.is_recurring && !ev.is_instance && (Number(ev.cancelled_count) > 0)
+            ? `<span class="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">⛔ ${Number(ev.cancelled_count)} cancelled</span>`
+            : ''}
         </td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${new Date(ev.start_at).toLocaleString()}</td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${ev.location || ''}</td>
@@ -962,14 +1404,29 @@ class AdminDashboard {
     `).join('');
   }
 
-  async showEventModal(id) {
+  async showEventModal(id, opts = {}) {
     const creating = !id;
-    const ev = creating ? null : (await (await fetch('/api/admin/organization/events')).json()).events.find(e => e.id === id);
+    let ev = null;
+    if (!creating) {
+      const includeInstances = !!opts.includeInstances;
+      const urlA = includeInstances ? '/api/admin/organization/events?include_instances=true' : '/api/admin/organization/events';
+      const listA = (await (await fetch(urlA)).json()).events || [];
+      ev = listA.find(e => e.id === id) || null;
+      // Fallback: if not found, try including instances.
+      if (!ev && !includeInstances) {
+        const listB = (await (await fetch('/api/admin/organization/events?include_instances=true')).json()).events || [];
+        ev = listB.find(e => e.id === id) || null;
+      }
+    }
     const wrapper = document.createElement('div');
     wrapper.className = 'fixed inset-0 z-50 bg-black/40 flex items-center justify-center';
     wrapper.innerHTML = `
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4 p-5">
-        <h3 class="text-lg font-semibold mb-3">${creating ? 'Add Event' : 'Edit Event'}</h3>
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4 max-h-[90vh] flex flex-col">
+        <div class="px-5 py-4 border-b">
+          <h3 class="text-lg font-semibold">${creating ? 'Add Event' : 'Edit Event'}</h3>
+        </div>
+
+        <div class="p-5 overflow-y-auto">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label class="text-sm">Title</label>
@@ -988,16 +1445,34 @@ class AdminDashboard {
             <input id="ev_location" class="w-full px-3 py-2 border rounded-md" value="${ev?.location || ''}">
           </div>
           <div>
-            <label class="text-sm">Address</label>
-            <input id="ev_address" class="w-full px-3 py-2 border rounded-md" value="${ev?.address || ''}">
+            <div class="flex items-center justify-between">
+              <label class="text-sm">Address</label>
+              <button type="button" id="ev_use_org_address" class="text-xs px-2 py-1 rounded-md bg-gray-100 hover:bg-gray-200">
+                Use church address
+              </button>
+            </div>
+            <input id="ev_address" list="ev_address_list" class="w-full px-3 py-2 border rounded-md" value="${ev?.address || ''}" placeholder="Start typing… (remembers recent)">
+            <datalist id="ev_address_list"></datalist>
           </div>
           <div>
             <label class="text-sm">Start</label>
             <input id="ev_start" type="datetime-local" class="w-full px-3 py-2 border rounded-md" value="${ev ? this.formatDateTimeLocalValue(ev.start_at) : ''}">
           </div>
           <div>
-            <label class="text-sm">End</label>
-            <input id="ev_end" type="datetime-local" class="w-full px-3 py-2 border rounded-md" value="${ev?.end_at ? this.formatDateTimeLocalValue(ev.end_at) : ''}">
+            <label class="text-sm">Length (minutes)</label>
+            <div class="flex gap-2">
+              <input id="ev_duration_minutes" type="number" min="0" step="5" class="w-full px-3 py-2 border rounded-md" value="">
+              <button type="button" id="ev_dur_15" class="px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-sm">+15</button>
+              <button type="button" id="ev_dur_30" class="px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-sm">+30</button>
+              <button type="button" id="ev_dur_60" class="px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-sm">+60</button>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">We’ll calculate the end time for you.</div>
+            <details class="mt-2">
+              <summary class="text-xs text-gray-600 cursor-pointer select-none">Advanced: set end time manually</summary>
+              <div class="mt-2">
+                <input id="ev_end" type="datetime-local" class="w-full px-3 py-2 border rounded-md" value="${ev?.end_at ? this.formatDateTimeLocalValue(ev.end_at) : ''}">
+              </div>
+            </details>
           </div>
           <div>
             <label class="text-sm">Notify lead (min)</label>
@@ -1027,11 +1502,33 @@ class AdminDashboard {
                 <option value="weekly" ${ev?.recurrence_type === 'weekly' ? 'selected' : ''}>Weekly</option>
                 <option value="daily" ${ev?.recurrence_type === 'daily' ? 'selected' : ''}>Daily</option>
                 <option value="monthly" ${ev?.recurrence_type === 'monthly' ? 'selected' : ''}>Monthly</option>
+                <option value="quarterly" ${ev?.recurrence_type === 'quarterly' ? 'selected' : ''}>Quarterly</option>
               </select>
             </div>
             <div>
               <label class="text-sm">Every</label>
               <input id="ev_recurrence_interval" type="number" min="1" class="w-full px-3 py-2 border rounded-md" value="${ev?.recurrence_interval || 1}">
+            </div>
+            <div id="ev_weekly_days_wrap" class="md:col-span-2">
+              <label class="text-sm">Weekly on</label>
+              <div class="mt-1 grid grid-cols-7 gap-2 text-xs">
+                ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((label, idx) => {
+                  const selected = (() => {
+                    try {
+                      const days = ev?.recurrence_days ? JSON.parse(ev.recurrence_days) : null;
+                      if (Array.isArray(days)) return days.map(Number).includes(idx);
+                    } catch (e) {}
+                    return ev?.recurrence_type === 'weekly' ? (new Date(ev.start_at).getDay() === idx) : false;
+                  })();
+                  return `
+                    <label class="flex items-center justify-center gap-1 border rounded-md py-2 cursor-pointer select-none">
+                      <input type="checkbox" class="ev_weekly_day" value="${idx}" ${selected ? 'checked' : ''}>
+                      <span>${label}</span>
+                    </label>
+                  `;
+                }).join('')}
+              </div>
+              <div class="text-xs text-gray-500 mt-1">If none selected, we’ll default to the start date’s weekday.</div>
             </div>
             <div class="md:col-span-2">
               <label class="text-sm">End Repeat (optional)</label>
@@ -1040,7 +1537,44 @@ class AdminDashboard {
           </div>
         </div>
 
-        <div class="mt-4 flex justify-end space-x-2">
+        <!-- Occurrence tools (per-instance cancel/restore) -->
+        <div id="occurrence_tools" class="mt-4 border-t pt-4 ${ev?.is_recurring ? '' : 'hidden'}">
+          <div class="flex items-center justify-between gap-3 mb-2">
+            <div class="text-sm font-medium">Occurrences</div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-600">Show next</label>
+              <select id="ev_occurrence_days" class="text-sm px-2 py-1 border rounded-md bg-white">
+                <option value="30">30 days</option>
+                <option value="60">60 days</option>
+                <option value="90" selected>90 days</option>
+                <option value="180">180 days</option>
+              </select>
+              <button id="ev_occurrence_refresh" class="px-3 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200 text-sm">Refresh</button>
+            </div>
+          </div>
+          <div class="text-xs text-gray-500 mb-3">Cancel/restore with one click (no typing dates). Add a reason when cancelling.</div>
+
+          <div id="ev_occurrence_list" class="text-sm text-gray-700 border rounded-md p-3 bg-gray-50">
+            <div class="text-gray-500">Loading…</div>
+          </div>
+
+          <details class="mt-3">
+            <summary class="text-xs text-gray-600 cursor-pointer select-none">Advanced: cancel/restore by date</summary>
+            <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
+              <div>
+                <label class="text-sm">Occurrence date</label>
+                <input id="ev_occurrence_date" type="date" class="w-full px-3 py-2 border rounded-md" value="">
+              </div>
+              <div class="md:col-span-2 flex gap-2">
+                <button id="ev_occurrence_cancel" class="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white w-full">Cancel</button>
+                <button id="ev_occurrence_restore" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 w-full">Restore</button>
+              </div>
+            </div>
+          </details>
+        </div>
+        </div>
+
+        <div class="px-5 py-4 border-t bg-white flex justify-end space-x-2">
           <button id="ev_cancel" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">Cancel</button>
           <button id="ev_save" class="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white">Save</button>
         </div>
@@ -1054,13 +1588,322 @@ class AdminDashboard {
     recurringCheckbox.addEventListener('change', () => {
       if (recurringCheckbox.checked) {
         recurringOptions.classList.remove('hidden');
+        const tools = document.getElementById('occurrence_tools');
+        if (tools) tools.classList.remove('hidden');
       } else {
         recurringOptions.classList.add('hidden');
+        const tools = document.getElementById('occurrence_tools');
+        if (tools) tools.classList.add('hidden');
       }
     });
 
+    const recurrenceTypeEl = document.getElementById('ev_recurrence_type');
+    const weeklyDaysWrap = document.getElementById('ev_weekly_days_wrap');
+    const syncWeeklyDaysVisibility = () => {
+      const t = (recurrenceTypeEl.value || '').toLowerCase();
+      if (t === 'weekly') weeklyDaysWrap.classList.remove('hidden');
+      else weeklyDaysWrap.classList.add('hidden');
+    };
+    recurrenceTypeEl.addEventListener('change', syncWeeklyDaysVisibility);
+    syncWeeklyDaysVisibility();
+
     document.getElementById('ev_cancel').onclick = () => wrapper.remove();
+
+    // Quick-add helpers
+    const startEl = document.getElementById('ev_start');
+    const endEl = document.getElementById('ev_end');
+    const durationEl = document.getElementById('ev_duration_minutes');
+    const allDayEl = document.getElementById('ev_all_day');
+    const btn15 = document.getElementById('ev_dur_15');
+    const btn30 = document.getElementById('ev_dur_30');
+    const btn60 = document.getElementById('ev_dur_60');
+
+    const parseLocalDateTimeValue = (v) => {
+      if (!v) return null;
+      const d = new Date(v);
+      return Number.isFinite(d.getTime()) ? d : null;
+    };
+
+    const setDurationFromStartEnd = () => {
+      if (!durationEl) return;
+      const start = parseLocalDateTimeValue(startEl?.value);
+      const end = parseLocalDateTimeValue(endEl?.value);
+      if (!start || !end) return;
+      const mins = Math.round((end.getTime() - start.getTime()) / 60000);
+      if (Number.isFinite(mins) && mins >= 0) durationEl.value = String(mins);
+    };
+
+    const setEndFromStartDuration = () => {
+      const isAllDay = !!allDayEl?.checked;
+      if (isAllDay) return;
+      const start = parseLocalDateTimeValue(startEl?.value);
+      if (!start) return;
+      const mins = parseInt(durationEl?.value || '', 10);
+      if (!Number.isFinite(mins) || mins <= 0) return;
+      const end = new Date(start.getTime() + mins * 60000);
+      endEl.value = this.formatDateTimeLocalValue(end.toISOString());
+    };
+
+    // Initialize duration (edit mode: from existing end; create mode: default 60)
+    if (durationEl) {
+      if (!creating && ev?.end_at && ev?.start_at) {
+        setDurationFromStartEnd();
+      }
+      if (!durationEl.value) durationEl.value = '60';
+    }
+
+    if (startEl && endEl) {
+      startEl.addEventListener('change', () => {
+        // Auto-calc end when start changes (unless all-day)
+        setEndFromStartDuration();
+      });
+      endEl.addEventListener('change', () => {
+        // If they manually set end, keep duration in sync.
+        setDurationFromStartEnd();
+      });
+    }
+
+    if (durationEl) {
+      durationEl.addEventListener('change', () => setEndFromStartDuration());
+      durationEl.addEventListener('input', () => setEndFromStartDuration());
+    }
+    const addDuration = (deltaMins) => {
+      if (!durationEl) return;
+      const current = parseInt((durationEl.value || '').toString().trim(), 10);
+      const next = (Number.isFinite(current) ? current : 0) + deltaMins;
+      durationEl.value = String(Math.max(0, next));
+      setEndFromStartDuration();
+    };
+    if (btn15) btn15.addEventListener('click', () => addDuration(15));
+    if (btn30) btn30.addEventListener('click', () => addDuration(30));
+    if (btn60) btn60.addEventListener('click', () => addDuration(60));
+    if (allDayEl) {
+      allDayEl.addEventListener('change', () => {
+        if (allDayEl.checked) {
+          // All-day: clear end so backend stores null unless user manually sets it.
+          endEl.value = '';
+        } else {
+          setEndFromStartDuration();
+        }
+      });
+    }
+
+    // Address speed-ups: recent addresses + "use church address"
+    const addressEl = document.getElementById('ev_address');
+    const addressListEl = document.getElementById('ev_address_list');
+    const useOrgAddressBtn = document.getElementById('ev_use_org_address');
+
+    const recentKey = 'ct_admin_recent_event_addresses';
+    const loadRecentAddresses = () => {
+      if (!addressListEl) return [];
+      let items = [];
+      try {
+        const raw = localStorage.getItem(recentKey);
+        items = raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        items = [];
+      }
+      if (!Array.isArray(items)) items = [];
+      addressListEl.innerHTML = items
+        .filter(v => typeof v === 'string' && v.trim())
+        .slice(0, 15)
+        .map(v => `<option value="${v.replace(/"/g, '&quot;')}"></option>`)
+        .join('');
+      return items;
+    };
+
+    const saveRecentAddress = (addr) => {
+      const v = (addr || '').toString().trim();
+      if (!v) return;
+      let items = [];
+      try {
+        items = JSON.parse(localStorage.getItem(recentKey) || '[]');
+      } catch (e) {
+        items = [];
+      }
+      if (!Array.isArray(items)) items = [];
+      items = [v, ...items.filter(x => (x || '').toString().trim() && x !== v)].slice(0, 15);
+      try {
+        localStorage.setItem(recentKey, JSON.stringify(items));
+      } catch (e) {
+        // ignore quota issues
+      }
+    };
+
+    loadRecentAddresses();
+
+    const formatOrgAddress = (org) => {
+      if (!org) return '';
+      const parts = [
+        org.address,
+        [org.city, org.state].filter(Boolean).join(', '),
+        org.zip_code,
+        org.country
+      ]
+        .map(s => (s || '').toString().trim())
+        .filter(Boolean);
+      // Remove duplicates while keeping order.
+      return Array.from(new Set(parts)).join(', ');
+    };
+
+    const loadOrgProfile = async () => {
+      const cacheKey = 'ct_admin_org_profile_cache';
+      try {
+        const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+        if (cached?.organization?.id && cached?.cached_at && (Date.now() - cached.cached_at) < 10 * 60 * 1000) {
+          return cached.organization;
+        }
+      } catch (e) {}
+
+      const res = await fetch('/api/admin/organization/profile');
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to load org profile');
+      const org = data.organization;
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({ cached_at: Date.now(), organization: org }));
+      } catch (e) {}
+      return org;
+    };
+
+    if (useOrgAddressBtn && addressEl) {
+      useOrgAddressBtn.addEventListener('click', async () => {
+        try {
+          useOrgAddressBtn.disabled = true;
+          useOrgAddressBtn.textContent = 'Loading…';
+          const org = await loadOrgProfile();
+          const addr = formatOrgAddress(org);
+          if (!addr) {
+            this.showToast('No church address saved yet (Settings → profile)', 'error');
+            return;
+          }
+          addressEl.value = addr;
+          saveRecentAddress(addr);
+          loadRecentAddresses();
+          this.showToast('Filled church address');
+        } catch (e) {
+          console.error('Error loading org address', e);
+          this.showToast('Failed to load church address', 'error');
+        } finally {
+          useOrgAddressBtn.disabled = false;
+          useOrgAddressBtn.textContent = 'Use church address';
+        }
+      });
+    }
+
+    // Cancel/restore a single occurrence (only available when editing an existing recurring event)
+    if (!creating && ev?.is_recurring) {
+      const occDateEl = document.getElementById('ev_occurrence_date');
+      const cancelBtn = document.getElementById('ev_occurrence_cancel');
+      const restoreBtn = document.getElementById('ev_occurrence_restore');
+      const listEl = document.getElementById('ev_occurrence_list');
+      const daysEl = document.getElementById('ev_occurrence_days');
+      const refreshBtn = document.getElementById('ev_occurrence_refresh');
+
+      const loadOccurrences = async () => {
+        try {
+          const daysAhead = parseInt((daysEl?.value || '90'), 10) || 90;
+          const res = await fetch(`/api/admin/organization/events/${ev.id}/occurrences?days_ahead=${daysAhead}`);
+          const data = await res.json();
+          const list = data?.occurrences || [];
+          if (!Array.isArray(list) || list.length === 0) {
+            listEl.innerHTML = `<div class="text-gray-500">No upcoming occurrences found.</div>`;
+            return;
+          }
+
+          const fmtTime = (iso) => {
+            try {
+              if (!iso) return '';
+              return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            } catch (e) { return ''; }
+          };
+
+          listEl.innerHTML = `
+            <div class="space-y-2">
+              ${list.slice(0, 50).map(o => {
+                const d = (o.instance_date || '').toString().slice(0, 10);
+                const cancelled = !!o.is_cancelled;
+                const reason = (o.reason || '').toString().trim();
+                const start = o.start_at ? fmtTime(o.start_at) : '';
+                const end = o.end_at ? fmtTime(o.end_at) : '';
+                const timeRange = start ? (end ? `${start}–${end}` : start) : '';
+                return `
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="font-medium flex items-center gap-2">
+                        <span>${d}</span>
+                        ${timeRange ? `<span class="text-xs text-gray-500">${timeRange}</span>` : ''}
+                        ${cancelled ? `<span class="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">Cancelled</span>` : `<span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Active</span>`}
+                      </div>
+                      ${reason ? `<div class="text-xs text-gray-600 truncate">${this.escapeHtml ? this.escapeHtml(reason) : reason}</div>` : ''}
+                    </div>
+                    <div class="flex items-center gap-2">
+                      ${cancelled
+                        ? `<button class="px-3 py-1.5 rounded-md bg-white border hover:bg-gray-100" data-occ-action="restore" data-occ-date="${d}">Restore</button>`
+                        : `<button class="px-3 py-1.5 rounded-md bg-red-600 hover:bg-red-700 text-white" data-occ-action="cancel" data-occ-date="${d}">Cancel</button>`
+                      }
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+
+          Array.from(listEl.querySelectorAll('[data-occ-action]')).forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const action = btn.getAttribute('data-occ-action');
+              const date = btn.getAttribute('data-occ-date');
+              await runOccurrenceAction(action, date);
+            });
+          });
+        } catch (e) {
+          listEl.innerHTML = `<div class="text-gray-500">Failed to load occurrences.</div>`;
+        }
+      };
+
+      const runOccurrenceAction = async (action, dateOverride) => {
+        const date = (dateOverride || occDateEl?.value || '').trim();
+        if (!date) return this.showToast('Pick an occurrence date first', 'error');
+
+        const reason = action === 'cancel'
+          ? (prompt('Reason (optional):', '') || '').trim()
+          : '';
+        const res = await fetch(`/api/admin/organization/events/${ev.id}/occurrence`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, date, reason })
+        });
+        const data = await res.json();
+        if (data.success) {
+          this.showToast(action === 'cancel' ? 'Occurrence cancelled' : 'Occurrence restored');
+          await loadOccurrences();
+        } else {
+          this.showToast(data.error || 'Failed', 'error');
+        }
+      };
+
+      if (cancelBtn) cancelBtn.onclick = () => runOccurrenceAction('cancel');
+      if (restoreBtn) restoreBtn.onclick = () => runOccurrenceAction('restore');
+      if (refreshBtn) refreshBtn.onclick = () => loadOccurrences();
+      if (daysEl) daysEl.addEventListener('change', () => loadOccurrences());
+      loadOccurrences();
+    }
+
     document.getElementById('ev_save').onclick = async () => {
+      // Ensure end time is computed from start+duration if user didn't set end explicitly.
+      if (endEl && (!endEl.value || !endEl.value.trim())) {
+        setEndFromStartDuration();
+      }
+      // Persist address as a "recent" entry for faster future entry.
+      if (addressEl) {
+        saveRecentAddress(addressEl.value);
+        loadRecentAddresses();
+      }
+      const recurrenceType = document.getElementById('ev_recurrence_type').value;
+      const recurrenceDays = Array.from(document.querySelectorAll('.ev_weekly_day'))
+        .filter(el => el.checked)
+        .map(el => parseInt(el.value, 10))
+        .filter(n => Number.isFinite(n) && n >= 0 && n <= 6);
+
       const payload = {
         title: document.getElementById('ev_title').value,
         description: document.getElementById('ev_description').value,
@@ -1073,9 +1916,10 @@ class AdminDashboard {
         is_active: document.getElementById('ev_active').checked,
         notify_lead_minutes: parseInt(document.getElementById('ev_notify').value || '120', 10),
         is_recurring: document.getElementById('ev_is_recurring').checked,
-        recurrence_type: document.getElementById('ev_recurrence_type').value,
+        recurrence_type: recurrenceType,
         recurrence_interval: parseInt(document.getElementById('ev_recurrence_interval').value || '1', 10),
-        recurrence_end_date: document.getElementById('ev_recurrence_end').value || null
+        recurrence_end_date: document.getElementById('ev_recurrence_end').value || null,
+        recurrence_days: recurrenceType === 'weekly' ? recurrenceDays : null
       };
       const method = id ? 'PUT' : 'POST';
       const url = id ? `/api/admin/organization/events/${id}` : '/api/admin/organization/events';
@@ -1083,7 +1927,8 @@ class AdminDashboard {
       const data = await res.json();
       if (data.success) {
         wrapper.remove();
-        this.loadEvents();
+        if (this.eventsViewMode === 'month') this.loadEventsMonth();
+        else this.loadEvents();
         this.showToast('Event saved!');
       } else {
         this.showToast(data.error || 'Failed to save event', 'error');
@@ -1096,7 +1941,8 @@ class AdminDashboard {
     const res = await fetch(`/api/admin/organization/events/${id}`, { method: 'DELETE' });
     const data = await res.json();
     if (data.success) {
-      this.loadEvents();
+      if (this.eventsViewMode === 'month') this.loadEventsMonth();
+      else this.loadEvents();
       this.showToast('Event deleted');
     } else {
       this.showToast(data.error || 'Failed to delete event', 'error');
@@ -2887,7 +3733,7 @@ class AdminDashboard {
           </td>
           <td class="px-6 py-4 text-sm text-gray-900">
             <div class="max-w-xs truncate">
-              <a href="${link.url}" target="_blank" class="text-primary-600 hover:text-primary-900">
+              <a href="${link.url}" target="_blank" rel="noopener noreferrer" class="text-primary-600 hover:text-primary-900">
                 ${link.url}
               </a>
             </div>
