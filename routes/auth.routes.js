@@ -229,6 +229,7 @@ router.get('/me', authenticateUser, (req, res) => {
           struggles: user.struggles ? JSON.parse(user.struggles) : [],
           prayerFrequency: user.prayer_frequency,
           preferredTranslation: user.preferred_translation,
+          studyModeEnabled: user.study_mode_enabled,
           notificationEnabled: user.notification_enabled,
           notificationTime: user.notification_time,
           timezone: user.timezone
@@ -277,27 +278,66 @@ router.put('/profile', authenticateUser, (req, res) => {
 
 // Update user preferences
 router.put('/preferences', authenticateUser, (req, res) => {
-  const { 
-    lifeStage, interests, struggles, prayerFrequency, preferredTranslation,
-    notificationEnabled, notificationTime, timezone 
-  } = req.body;
+  const allowedKeys = new Set([
+    'lifeStage',
+    'interests',
+    'struggles',
+    'prayerFrequency',
+    'preferredTranslation',
+    'notificationEnabled',
+    'notificationTime',
+    'timezone',
+    'studyModeEnabled'
+  ]);
 
-  const interestsJson = JSON.stringify(interests || []);
-  const strugglesJson = JSON.stringify(struggles || []);
+  const input = req.body || {};
+  const patch = {};
+  for (const k of Object.keys(input)) {
+    if (allowedKeys.has(k)) patch[k] = input[k];
+  }
 
-  dbQuery.run(`UPDATE ct_user_preferences SET 
-          life_stage = $1, interests = $2, struggles = $3, prayer_frequency = $4, preferred_translation = $5,
-          notification_enabled = $6, notification_time = $7, timezone = $8, updated_at = CURRENT_TIMESTAMP
-          WHERE user_id = $9`,
-    [lifeStage, interestsJson, strugglesJson, prayerFrequency, preferredTranslation,
-     notificationEnabled, notificationTime, timezone, req.user.userId],
+  const sets = [];
+  const values = [];
+  let idx = 1;
+
+  function addSet(column, value) {
+    sets.push(`${column} = $${idx++}`);
+    values.push(value);
+  }
+
+  // Only update fields that were provided (avoids clobbering when clients send partial updates)
+  if (Object.prototype.hasOwnProperty.call(patch, 'lifeStage')) addSet('life_stage', patch.lifeStage || null);
+  if (Object.prototype.hasOwnProperty.call(patch, 'interests')) addSet('interests', JSON.stringify(patch.interests || []));
+  if (Object.prototype.hasOwnProperty.call(patch, 'struggles')) addSet('struggles', JSON.stringify(patch.struggles || []));
+  if (Object.prototype.hasOwnProperty.call(patch, 'prayerFrequency')) addSet('prayer_frequency', patch.prayerFrequency || null);
+  if (Object.prototype.hasOwnProperty.call(patch, 'preferredTranslation')) addSet('preferred_translation', patch.preferredTranslation || null);
+  if (Object.prototype.hasOwnProperty.call(patch, 'notificationEnabled')) addSet('notification_enabled', patch.notificationEnabled);
+  if (Object.prototype.hasOwnProperty.call(patch, 'notificationTime')) addSet('notification_time', patch.notificationTime || null);
+  if (Object.prototype.hasOwnProperty.call(patch, 'timezone')) addSet('timezone', patch.timezone || null);
+  if (Object.prototype.hasOwnProperty.call(patch, 'studyModeEnabled')) addSet('study_mode_enabled', !!patch.studyModeEnabled);
+
+  if (sets.length === 0) {
+    return res.json({ success: true, message: 'No preference changes provided' });
+  }
+
+  // Always bump updated_at when any preference changes
+  sets.push(`updated_at = CURRENT_TIMESTAMP`);
+
+  values.push(req.user.userId);
+  const userIdIdx = idx;
+
+  dbQuery.run(
+    `UPDATE ct_user_preferences
+     SET ${sets.join(', ')}
+     WHERE user_id = $${userIdIdx}`,
+    values,
     function(err) {
       if (err) {
         return res.status(500).json({ success: false, error: 'Failed to update preferences' });
       }
-
       res.json({ success: true, message: 'Preferences updated successfully' });
-    });
+    }
+  );
 });
 
 module.exports = { router, authenticateUser };

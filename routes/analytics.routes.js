@@ -3,6 +3,65 @@ const { dbQuery, db } = require('../config/database');
 
 const router = express.Router();
 
+function buildTrackingCookieOptions(req) {
+  return {
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    httpOnly: false, // allow frontend access for attribution
+    sameSite: 'lax',
+    secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+    path: '/'
+  };
+}
+
+function generateTrackingSessionId() {
+  return `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+}
+
+/**
+ * Analytics historically used the `trackingSession` cookie for anonymous session attribution.
+ * In the account-driven world, users can land on routes without ever hitting /t/:uid,
+ * so we must create a tracking session on demand.
+ */
+function getOrCreateTrackingSessionId(req, res) {
+  const existing = req.cookies?.trackingSession;
+  if (existing) return existing;
+
+  const id = generateTrackingSessionId();
+  res.cookie('trackingSession', id, buildTrackingCookieOptions(req));
+  return id;
+}
+
+async function ensureAnonymousSession({ sessionId, ip, userAgent, orgId, originatingTagId, taggedSessionId }) {
+  if (!sessionId) return;
+  try {
+    await db.query(
+      `
+      INSERT INTO anonymous_sessions (
+        session_id,
+        ip_address,
+        user_agent,
+        organization_id,
+        originating_tag_id,
+        tagged_session_id,
+        first_seen_at,
+        last_seen_at,
+        total_interactions
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)
+      ON CONFLICT (session_id) DO UPDATE SET
+        last_seen_at = CURRENT_TIMESTAMP,
+        total_interactions = anonymous_sessions.total_interactions + 1,
+        organization_id = COALESCE(EXCLUDED.organization_id, anonymous_sessions.organization_id),
+        originating_tag_id = COALESCE(EXCLUDED.originating_tag_id, anonymous_sessions.originating_tag_id),
+        tagged_session_id = COALESCE(EXCLUDED.tagged_session_id, anonymous_sessions.tagged_session_id)
+      `,
+      [sessionId, ip, userAgent, orgId || null, originatingTagId || null, taggedSessionId || null]
+    );
+  } catch (e) {
+    console.error('Error ensuring anonymous session:', e);
+  }
+}
+
 // Track analytics
 router.post('/', (req, res) => {
   const { action, verse_id, user_token, timestamp, originating_tag_id: originatingTagFromBody } = req.body;
@@ -13,7 +72,7 @@ router.post('/', (req, res) => {
   // Get session attribution from cookies
   let taggedSessionId = req.cookies?.taggedSession;
   let originatingTagId = req.cookies?.originatingTag || originatingTagFromBody;
-  const sessionIdCookie = req.cookies?.trackingSession;
+  const sessionIdCookie = getOrCreateTrackingSessionId(req, res);
   
   // Debug cookie reading
   console.log('📊 Analytics cookies received:', {
@@ -76,6 +135,16 @@ router.post('/', (req, res) => {
         return res.json({ success: true });
       }
 
+    // Ensure anonymous session exists for this request (required by FK on tag_interactions.session_id)
+    ensureAnonymousSession({
+      sessionId: sessionIdCookie,
+      ip,
+      userAgent,
+      orgId,
+      originatingTagId,
+      taggedSessionId
+    }).catch(() => {});
+
     dbQuery.run(`INSERT INTO ct_analytics
       (verse_id, action, ip_address, user_agent, organization_id, tagged_session_id, originating_tag_id)
       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -92,9 +161,17 @@ router.post('/', (req, res) => {
         const interactionData = { action, verse_id, taggedSession: taggedSessionId };
         db.query(`
           INSERT INTO tag_interactions (
-            session_id, tag_id, interaction_type, page_url, referrer,
-            user_agent, ip_address, organization_id, interaction_data
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            session_id,
+            tag_id,
+            interaction_type,
+            page_url,
+            referrer,
+            user_agent,
+            ip_address,
+            organization_id,
+            interaction_data,
+            tagged_session_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         `, [
           sessionIdCookie,
           originatingTagId,
@@ -104,7 +181,8 @@ router.post('/', (req, res) => {
           userAgent,
           ip,
           orgId,
-          JSON.stringify(interactionData)
+          JSON.stringify(interactionData),
+          taggedSessionId || null
         ], (err) => {
           if (err) console.error('Tag interactions insert error:', err);
           else console.log('Tag interactions insert successful');
@@ -115,9 +193,13 @@ router.post('/', (req, res) => {
 
       // Update session activity timestamp if we have a session
       if (sessionIdCookie) {
-        db.query(`UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE session_id = $1`, [sessionIdCookie], (err) => {
-          if (err) console.error('Error updating session timestamp:', err);
-        });
+        db.query(
+          `UPDATE anonymous_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE session_id = $1`,
+          [sessionIdCookie],
+          (err) => {
+            if (err) console.error('Error updating session timestamp:', err);
+          }
+        );
       }
       
       res.json({ success: true });
@@ -135,7 +217,7 @@ router.post('/sync', (req, res) => {
   // Get session attribution from cookies
   const taggedSessionId = req.cookies?.taggedSession;
   const originatingTagId = req.cookies?.originatingTag;
-  const sessionId = req.cookies?.trackingSession;
+  const sessionId = getOrCreateTrackingSessionId(req, res);
 
   // Resolve organization from tag if not already available
   const resolveOrgFromTag = (cb) => {

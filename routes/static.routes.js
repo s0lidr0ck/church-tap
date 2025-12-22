@@ -48,6 +48,33 @@ router.get('/app', (req, res) => {
   res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
 
+// App shell routes for SPA-style pages (support hard refresh on deep links)
+router.get('/explore', (req, res) => {
+  setNoStore(res);
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
+router.get('/saved', (req, res) => {
+  setNoStore(res);
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
+router.get('/me', (req, res) => {
+  setNoStore(res);
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
+router.get('/study', (req, res) => {
+  setNoStore(res);
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
+// Community is a SPA shortcut route that scrolls within Today
+router.get('/community', (req, res) => {
+  setNoStore(res);
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
 // Static page routes
 router.get('/verse', (req, res, next) => {
   // Apply analytics tracking manually if needed

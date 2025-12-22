@@ -9,6 +9,11 @@ class ChurchTapApp {
     this.currentVerse = null;
     this.textSize = localStorage.getItem('textSize') || 'medium';
     this.theme = localStorage.getItem('theme') || 'light';
+    // User-level (optional) toggle for deeper Bible study tools.
+    // Hybrid persistence: localStorage for guests; DB-backed for logged-in users.
+    this.studyMode = localStorage.getItem('studyMode') === 'true';
+    // Study Tools (Explore) page state
+    this.studyState = this.loadStudyState();
     this.userToken = this.getUserToken();
     this.favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
     this.recentlyViewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
@@ -73,6 +78,142 @@ class ChurchTapApp {
       this.showCriticalError('Application failed to initialize. Please refresh the page.');
       this.hideSplashScreen();
     });
+  }
+
+  // ===========================
+  // Study Tools State + Recent
+  // ===========================
+  loadStudyRecent() {
+    try {
+      const raw = localStorage.getItem('studyRecent.v1');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  saveStudyRecent(recent) {
+    try {
+      localStorage.setItem('studyRecent.v1', JSON.stringify(Array.isArray(recent) ? recent.slice(0, 20) : []));
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  loadStudyState() {
+    let translation = '';
+    try {
+      translation = String(localStorage.getItem('studyTranslation.v1') || '').toUpperCase();
+    } catch (e) {}
+    let commentarySourceKey = '';
+    let dictionarySourceKey = '';
+    try {
+      commentarySourceKey = String(localStorage.getItem('studyCommentarySource.v1') || '');
+      dictionarySourceKey = String(localStorage.getItem('studyDictionarySource.v1') || '');
+    } catch (e) {}
+
+    return {
+      mode: 'bible',
+      ref: '',
+      word: '',
+      translation,
+      commentarySourceKey,
+      dictionarySourceKey,
+      recent: this.loadStudyRecent()
+    };
+  }
+
+  async ensureStudySourcesLoaded() {
+    this._studyCommentarySources = this._studyCommentarySources || null;
+    this._studyDictionarySources = this._studyDictionarySources || null;
+
+    const tasks = [];
+    if (this._studyCommentarySources === null) {
+      tasks.push(
+        fetch(this.buildApiUrl('/api/commentary/sources'), { credentials: 'include' })
+          .then(r => r.json().catch(() => null))
+          .then(d => { this._studyCommentarySources = Array.isArray(d?.sources) ? d.sources : []; })
+          .catch(() => { this._studyCommentarySources = []; })
+      );
+    }
+    if (this._studyDictionarySources === null) {
+      tasks.push(
+        fetch(this.buildApiUrl('/api/dictionary/sources'), { credentials: 'include' })
+          .then(r => r.json().catch(() => null))
+          .then(d => { this._studyDictionarySources = Array.isArray(d?.sources) ? d.sources : []; })
+          .catch(() => { this._studyDictionarySources = []; })
+      );
+    }
+    await Promise.all(tasks);
+    this.updateStudyPickerOptions();
+  }
+
+  updateStudyPickerOptions() {
+    const mode = (this.studyState?.mode || 'bible');
+    const picker = document.getElementById('studySourceSelect');
+    if (!picker) return;
+
+    if (mode === 'bible') {
+      const enabled = this.getEnabledTranslationCodes();
+      const current = String(this.studyState?.translation || this.getUserPreferredTranslation() || 'NASB').toUpperCase();
+      const options = (enabled && enabled.length ? enabled : ['NASB', 'ESV', 'NIV', 'NLT', 'KJV', 'CSB', 'MSG'])
+        .map(code => {
+          const c = String(code || '').toUpperCase();
+          return `<option value="${this.escapeHtml(c)}" ${c === current ? 'selected' : ''}>${this.escapeHtml(c)}</option>`;
+        })
+        .join('');
+      picker.innerHTML = options;
+      return;
+    }
+
+    if (mode === 'commentary') {
+      const sources = Array.isArray(this._studyCommentarySources) ? this._studyCommentarySources : [];
+      const current = String(this.studyState?.commentarySourceKey || '');
+      const opts = [
+        `<option value="" ${current ? '' : 'selected'}>Auto</option>`,
+        ...sources.map(s => {
+          const key = String(s.source_key || '');
+          const label = String(s.title || s.abbreviation || key || 'Source');
+          return `<option value="${this.escapeHtml(key)}" ${key === current ? 'selected' : ''}>${this.escapeHtml(label)}</option>`;
+        })
+      ].join('');
+      picker.innerHTML = opts;
+      return;
+    }
+
+    // dictionary
+    const sources = Array.isArray(this._studyDictionarySources) ? this._studyDictionarySources : [];
+    const current = String(this.studyState?.dictionarySourceKey || '');
+    const opts = [
+      `<option value="" ${current ? '' : 'selected'}>Auto</option>`,
+      ...sources.map(s => {
+        const key = String(s.source_key || '');
+        const label = String(s.title || s.abbreviation || key || 'Source');
+        return `<option value="${this.escapeHtml(key)}" ${key === current ? 'selected' : ''}>${this.escapeHtml(label)}</option>`;
+      })
+    ].join('');
+    picker.innerHTML = opts;
+  }
+
+  handleStudySourceChange(value) {
+    const mode = (this.studyState?.mode || 'bible');
+    const v = String(value || '').trim();
+    if (mode === 'bible') {
+      this.studyState.translation = v.toUpperCase();
+      try { localStorage.setItem('studyTranslation.v1', this.studyState.translation); } catch (e) {}
+      this.runStudyLookup().catch(() => {});
+      return;
+    }
+    if (mode === 'commentary') {
+      this.studyState.commentarySourceKey = v;
+      try { localStorage.setItem('studyCommentarySource.v1', v); } catch (e) {}
+      this.runStudyLookup().catch(() => {});
+      return;
+    }
+    this.studyState.dictionarySourceKey = v;
+    try { localStorage.setItem('studyDictionarySource.v1', v); } catch (e) {}
+    this.runStudyLookup().catch(() => {});
   }
 
   async ensureBibleStructureLoaded() {
@@ -311,6 +452,15 @@ class ChurchTapApp {
       return;
     }
 
+    // Study Tools (Explore): /study
+    if (path === '/study') {
+      // Study is part of Explore, so keep the bottom nav highlight on Explore.
+      this.setActiveTab('explore');
+      this.showPageContainer();
+      this.renderStudyPage();
+      return;
+    }
+
     // Tab: Community (shortcut to the community section on Today)
     if (path === '/community') {
       this.setActiveTab('community');
@@ -462,6 +612,25 @@ class ChurchTapApp {
   }
 
   renderExplorePage() {
+    const studyEnabled = this.isStudyModeEnabled();
+    const studyTile = studyEnabled
+      ? `
+          <button class="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-gray-200 dark:border-gray-700 text-left hover:bg-purple-100 dark:hover:bg-purple-800 transition-colors"
+                  onclick="window.churchTapApp.navigate('/study')">
+            <div class="text-lg">📚</div>
+            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Study</div>
+            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Definitions • Commentary</div>
+          </button>
+        `
+      : `
+          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  onclick="window.churchTapApp.navigate('/me'); window.churchTapApp.showToast('Turn on Study Mode in Me to unlock Study tools')">
+            <div class="text-lg">🔒</div>
+            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Study</div>
+            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Turn on Study Mode in Me</div>
+          </button>
+        `;
+
     this.setPageContent(`
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
         <div class="flex items-center justify-between mb-2">
@@ -474,35 +643,37 @@ class ChurchTapApp {
         </div>
 
         <div class="grid grid-cols-2 gap-3">
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   onclick="window.churchTapApp.showBibleReadModal()">
             <div class="text-lg">📖</div>
             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Read</div>
             <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Book • Chapter • Verse</div>
           </button>
 
-          <button class="p-4 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-100 dark:border-primary-800 text-left hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
+          <button class="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 text-left hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors"
                   onclick="window.churchTapApp.showVerseSearchModal()">
             <div class="text-lg">🔍</div>
             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Search</div>
             <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Verses & Bible</div>
           </button>
 
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+          ${studyTile}
+
+          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   onclick="window.churchTapApp.showHistory()">
             <div class="text-lg">🕐</div>
             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">History</div>
             <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Last 60 days</div>
           </button>
 
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   onclick="window.churchTapApp.openCalendarModal()">
             <div class="text-lg">📅</div>
             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Calendar</div>
             <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Pick a date</div>
           </button>
 
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   onclick="window.churchTapApp.showRandomVerse()">
             <div class="text-lg">🎲</div>
             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Random</div>
@@ -582,6 +753,19 @@ class ChurchTapApp {
           <button class="w-full btn-secondary" onclick="window.churchTapApp.cycleTextSize(); window.churchTapApp.updateMenuIndicators();">
             📝 Text Size
           </button>
+          <label class="w-full flex items-center justify-between px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/30">
+            <div class="min-w-0">
+              <div class="text-sm font-medium text-gray-900 dark:text-white">📚 Study Mode</div>
+              <div class="text-xs text-gray-600 dark:text-gray-400">Unlock definitions and commentary tools</div>
+            </div>
+            <input
+              type="checkbox"
+              class="h-5 w-5 accent-primary-600"
+              ${this.isStudyModeEnabled() ? 'checked' : ''}
+              onchange="window.churchTapApp.handleStudyModeToggle(this.checked)"
+              aria-label="Toggle Study Mode"
+            />
+          </label>
         </div>
 
         <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3">
@@ -620,6 +804,441 @@ class ChurchTapApp {
         </div>
       </div>
     `);
+  }
+
+  // ===========================
+  // Study Tools Page (/study)
+  // ===========================
+  renderStudyPage() {
+    if (!this.isStudyModeEnabled()) {
+      this.setPageContent(`
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Study</h2>
+            <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/explore')">Explore</button>
+          </div>
+          <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Study Mode is turned off.
+          </div>
+          <button class="w-full btn-primary" onclick="window.churchTapApp.navigate('/me')">Turn on Study Mode</button>
+        </div>
+      `);
+      return;
+    }
+
+    const mode = (this.studyState?.mode || 'bible');
+    const ref = String(this.studyState?.ref || this.currentVerse?.bible_reference || '').trim();
+    const word = String(this.studyState?.word || '').trim();
+    const contextValue = mode === 'dictionary' ? word : ref;
+    const contextPlaceholder = mode === 'dictionary' ? 'Type a word (e.g. faith)' : 'Type a reference (e.g. John 3:16)';
+
+    this.setPageContent(`
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-0 mt-4 overflow-hidden">
+        <div class="sticky top-0 z-10 bg-white dark:bg-gray-800 backdrop-blur border-b border-gray-200 dark:border-gray-700 p-4">
+          <div class="flex items-center justify-between gap-3">
+            <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/explore')">Back</button>
+            <div class="flex-1 min-w-0">
+              <input id="studyContextInput"
+                     value="${this.escapeHtml(contextValue)}"
+                     placeholder="${this.escapeHtml(contextPlaceholder)}"
+                     class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm placeholder-gray-500 dark:placeholder-gray-400" />
+            </div>
+            <button class="btn-secondary text-sm" onclick="window.churchTapApp.openStudyRecent()">Recent</button>
+          </div>
+
+          <div class="mt-3 flex items-center gap-2">
+            <button class="study-tab-btn ${mode === 'bible' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'} px-3 py-2 rounded-lg text-sm transition-colors"
+                    onclick="window.churchTapApp.setStudyModeTab('bible')">Bible</button>
+            <button class="study-tab-btn ${mode === 'commentary' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'} px-3 py-2 rounded-lg text-sm transition-colors"
+                    onclick="window.churchTapApp.setStudyModeTab('commentary')">Commentary</button>
+            <button class="study-tab-btn ${mode === 'dictionary' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'} px-3 py-2 rounded-lg text-sm transition-colors"
+                    onclick="window.churchTapApp.setStudyModeTab('dictionary')">Dictionary</button>
+            <div class="flex-1"></div>
+            <button class="btn-secondary text-sm" onclick="window.churchTapApp.runStudyLookup()">Go</button>
+          </div>
+
+          <div class="mt-3 flex items-center justify-between gap-2">
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+              ${mode === 'bible' ? 'Translation' : 'Source'}
+            </div>
+            <select id="studySourceSelect"
+                    class="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                    onchange="window.churchTapApp.handleStudySourceChange(this.value)">
+              <option value="">Loading…</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="p-4">
+          <div id="studyContent" class="min-h-[200px]"></div>
+        </div>
+      </div>
+
+      <div id="studyRecentPanel" class="hidden fixed inset-0 z-50 bg-black/40">
+        <div class="absolute right-0 top-0 h-full w-full max-w-sm bg-white dark:bg-gray-800 shadow-2xl p-4 overflow-y-auto">
+          <div class="flex items-center justify-between mb-3">
+            <div class="text-sm font-semibold text-gray-900 dark:text-white">Recent</div>
+            <div class="flex items-center gap-2">
+              <button class="btn-secondary text-sm" onclick="window.churchTapApp.clearStudyRecent()">Clear</button>
+              <button class="btn-secondary text-sm" onclick="window.churchTapApp.closeStudyRecent()">Close</button>
+            </div>
+          </div>
+          <div id="studyRecentList" class="space-y-2"></div>
+        </div>
+      </div>
+    `);
+
+    // Wire context input (Enter triggers lookup)
+    const input = document.getElementById('studyContextInput');
+    if (input) {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          this.runStudyLookup();
+        }
+      });
+    }
+
+    // Load sources (commentary/dictionary) and populate picker options
+    this.updateStudyPickerOptions();
+    this.ensureStudySourcesLoaded().catch(() => {});
+
+    // Initial content render (best effort)
+    this.studyState.ref = ref;
+    this.runStudyLookup().catch(() => {});
+  }
+
+  setStudyModeTab(mode) {
+    const next = String(mode || '').toLowerCase();
+    if (!['bible', 'commentary', 'dictionary'].includes(next)) return;
+    this.studyState.mode = next;
+    this.renderStudyPage();
+  }
+
+  readStudyContextInput() {
+    const el = document.getElementById('studyContextInput');
+    return String(el?.value || '').trim();
+  }
+
+  async runStudyLookup() {
+    const mode = this.studyState?.mode || 'bible';
+    const value = this.readStudyContextInput();
+    if (mode === 'dictionary') {
+      this.studyState.word = value;
+      await this.renderStudyDictionary(value);
+      return;
+    }
+    this.studyState.ref = value;
+    if (mode === 'commentary') {
+      await this.renderStudyCommentary(value);
+      return;
+    }
+    await this.renderStudyBible(value);
+  }
+
+  openStudyRecent() {
+    this.renderStudyRecentList();
+    document.getElementById('studyRecentPanel')?.classList.remove('hidden');
+  }
+
+  closeStudyRecent() {
+    document.getElementById('studyRecentPanel')?.classList.add('hidden');
+  }
+
+  renderStudyRecentList() {
+    const list = document.getElementById('studyRecentList');
+    if (!list) return;
+    const items = Array.isArray(this.studyState?.recent) ? this.studyState.recent : [];
+    if (items.length === 0) {
+      list.innerHTML = `<div class="text-sm text-gray-600 dark:text-gray-400">No recent study items yet.</div>`;
+      return;
+    }
+    list.innerHTML = items.map((it, idx) => {
+      const type = this.escapeHtml(it.type || '');
+      const label = this.escapeHtml(it.label || '');
+      const when = this.escapeHtml(it.whenLabel || '');
+      const icon = type === 'Bible' ? '📖' : (type === 'Commentary' ? '📝' : (type === 'Dictionary' ? '📚' : '🧠'));
+      return `
+        <button class="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+                onclick="window.churchTapApp.restoreStudyRecent(${idx})">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-sm font-medium text-gray-900 dark:text-white truncate">${icon} ${label}</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">${type}${when ? ` • ${when}` : ''}</div>
+            </div>
+            <div class="text-gray-400">›</div>
+          </div>
+        </button>
+      `;
+    }).join('');
+  }
+
+  restoreStudyRecent(index) {
+    const items = Array.isArray(this.studyState?.recent) ? this.studyState.recent : [];
+    const it = items[index];
+    if (!it) return;
+    this.studyState.mode = it.mode || this.studyState.mode;
+    if (it.ref) this.studyState.ref = it.ref;
+    if (it.word) this.studyState.word = it.word;
+    if (it.translation) {
+      this.studyState.translation = String(it.translation).toUpperCase();
+      try { localStorage.setItem('studyTranslation.v1', this.studyState.translation); } catch (e) {}
+    }
+    this.closeStudyRecent();
+    this.renderStudyPage();
+  }
+
+  clearStudyRecent() {
+    this.studyState.recent = [];
+    this.saveStudyRecent([]);
+    this.renderStudyRecentList();
+  }
+
+  // --- Study content renderers ---
+  setStudyContent(html) {
+    const el = document.getElementById('studyContent');
+    if (!el) return;
+    el.innerHTML = html;
+  }
+
+  pushStudyRecent(entry) {
+    const e = entry && typeof entry === 'object' ? entry : {};
+    const type = String(e.type || '').trim();
+    const key = String(e.key || '').trim();
+    if (!type || !key) return;
+
+    const items = Array.isArray(this.studyState?.recent) ? this.studyState.recent.slice() : [];
+    const deduped = items.filter(x => !(x && x.type === type && x.key === key));
+    const now = new Date();
+    const whenLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    deduped.unshift({
+      type,
+      key,
+      label: String(e.label || key),
+      mode: e.mode || this.studyState.mode,
+      ref: e.ref || null,
+      word: e.word || null,
+      translation: e.translation || null,
+      when: now.toISOString(),
+      whenLabel
+    });
+
+    this.studyState.recent = deduped.slice(0, 20);
+    this.saveStudyRecent(this.studyState.recent);
+  }
+
+  // Bible tab: show verse text for reference. Uses bolls.life directly (same as other Bible helpers).
+  async renderStudyBible(reference) {
+    const ref = String(reference || '').trim();
+    if (!ref) {
+      this.setStudyContent(`<div class="text-sm text-gray-600 dark:text-gray-400">Enter a Bible reference to begin.</div>`);
+      return;
+    }
+
+    const parsed = this.parseBibleReference(ref);
+    if (!parsed) {
+      this.setStudyContent(`<div class="text-sm text-gray-600 dark:text-gray-400">Could not parse reference. Try “John 3:16”.</div>`);
+      return;
+    }
+
+    const translation = String(this.studyState?.translation || this.getUserPreferredTranslation() || 'NASB').toUpperCase();
+    this.studyState.translation = translation;
+
+    this.setStudyContent(`<div class="text-sm text-gray-600 dark:text-gray-400">Loading Bible text…</div>`);
+    try {
+      const bollsTranslation = this.getBollsTranslationId(translation);
+      const apiUrl = `https://bolls.life/get-verse/${bollsTranslation}/${parsed.book}/${parsed.chapter}/${parsed.verse}/`;
+      const response = await fetch(apiUrl);
+      if (!response.ok) throw new Error(`Bible fetch failed: ${response.status}`);
+      const data = await response.json();
+
+      const text = this.escapeHtml(String(data.text || data.verse_text || data.content || '')).replace(/\n/g, '<br>');
+      const safeRef = this.escapeHtml(ref);
+
+      this.setStudyContent(`
+        <div class="space-y-3">
+          <div class="text-sm font-semibold text-primary-600 dark:text-primary-400">${safeRef}</div>
+          <blockquote id="studyBibleText" class="verse-text text-gray-800 dark:text-gray-200 leading-relaxed border-l-4 border-primary-500 pl-4 size-${this.textSize}">
+            ${text || '<span class="text-gray-600 dark:text-gray-400">Verse text not available.</span>'}
+          </blockquote>
+          <div class="text-xs text-gray-500 dark:text-gray-400">${this.escapeHtml(translation)}</div>
+          <div id="studyDefineChipHost"></div>
+        </div>
+      `);
+
+      // Track recent
+      this.pushStudyRecent({
+        type: 'Bible',
+        key: `bible:${ref}:${translation}`,
+        label: `Bible • ${ref} (${translation})`,
+        mode: 'bible',
+        translation,
+        ref
+      });
+
+      // Attach define affordance (Option A UX): show chip, switch to Dictionary on confirm
+      const verseEl = document.getElementById('studyBibleText');
+      if (verseEl) this.attachStudyDefineAffordance(verseEl);
+    } catch (e) {
+      this.setStudyContent(`<div class="text-sm text-gray-600 dark:text-gray-400">Unable to load Bible text.</div>`);
+    }
+  }
+
+  attachStudyDefineAffordance(containerEl) {
+    if (!containerEl || !containerEl.addEventListener) return;
+    if (containerEl.dataset && containerEl.dataset.studyDefine === '1') return;
+    if (containerEl.dataset) containerEl.dataset.studyDefine = '1';
+
+    const clearChip = () => {
+      const host = document.getElementById('studyDefineChipHost');
+      if (host) host.innerHTML = '';
+    };
+
+    const showChip = (word) => {
+      const host = document.getElementById('studyDefineChipHost');
+      if (!host) return;
+      const safe = this.escapeHtml(word);
+      host.innerHTML = `
+          <div class="mt-3 inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-1.5 shadow-sm">
+          <span class="text-xs text-gray-700 dark:text-gray-200">Define “${safe}”</span>
+          <button class="text-xs px-2 py-1 rounded-full bg-primary-600 hover:bg-primary-700 text-white"
+                  onclick="window.churchTapApp.studyDefineSelectedWord('${safe}')">Define</button>
+          <button class="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                  onclick="window.churchTapApp.clearStudyDefineChip()">Cancel</button>
+        </div>
+      `;
+    };
+
+    containerEl.addEventListener('mouseup', () => {
+      const word = this.getSelectedSingleWord();
+      if (!word) return clearChip();
+      showChip(word);
+    });
+    containerEl.addEventListener('touchend', () => {
+      const word = this.getSelectedSingleWord();
+      if (!word) return clearChip();
+      showChip(word);
+    });
+
+    // dismiss chip on scroll/tap elsewhere
+    const dismissOnScroll = () => clearChip();
+    containerEl.addEventListener('scroll', dismissOnScroll, { passive: true });
+  }
+
+  clearStudyDefineChip() {
+    const host = document.getElementById('studyDefineChipHost');
+    if (host) host.innerHTML = '';
+  }
+
+  studyDefineSelectedWord(word) {
+    const w = String(word || '').trim();
+    if (!w) return;
+    this.studyState.word = w;
+    this.studyState.mode = 'dictionary';
+    this.renderStudyPage();
+  }
+
+  async renderStudyCommentary(reference) {
+    const ref = String(reference || '').trim();
+    if (!ref) {
+      this.setStudyContent(`<div class="text-sm text-gray-600 dark:text-gray-400">Enter a Bible reference to load commentary.</div>`);
+      return;
+    }
+    this.setStudyContent(`<div class="text-sm text-gray-600 dark:text-gray-400">Loading commentary…</div>`);
+    try {
+      const sourceKey = String(this.studyState?.commentarySourceKey || '').trim();
+      const sourceParam = sourceKey ? `&source=${encodeURIComponent(sourceKey)}` : '';
+      const res = await fetch(this.buildApiUrl(`/api/commentary/lookup?ref=${encodeURIComponent(ref)}${sourceParam}`), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        const msg = this.escapeHtml(data?.error || 'Commentary unavailable');
+        this.setStudyContent(`<div class="text-sm text-gray-600 dark:text-gray-400">${msg}</div>`);
+        return;
+      }
+
+      const entry = data.entry;
+      if (!entry) {
+        this.setStudyContent(`<div class="text-sm text-gray-600 dark:text-gray-400">No commentary found for ${this.escapeHtml(ref)}.</div>`);
+        return;
+      }
+
+      const title = this.escapeHtml(entry.reference || ref);
+      const bodyHtml = this.sanitizeImportedHtml(entry.content || '');
+      const source = this.escapeHtml(entry.source_name || '');
+      const chosen = sourceKey ? this.escapeHtml(sourceKey) : '';
+
+      this.setStudyContent(`
+        <div class="space-y-3">
+          <div class="text-sm font-semibold text-gray-900 dark:text-white">${title}</div>
+          <div class="text-sm text-gray-800 dark:text-gray-200 leading-relaxed space-y-2">
+            ${bodyHtml || '<div class="text-gray-600 dark:text-gray-400">No content.</div>'}
+          </div>
+          ${source ? `<div class="text-xs text-gray-500 dark:text-gray-400">Source: ${source}${chosen && !source.includes(chosen) ? ` (${chosen})` : ''}</div>` : ''}
+        </div>
+      `);
+
+      this.pushStudyRecent({
+        type: 'Commentary',
+        key: `commentary:${ref}:${sourceKey || 'auto'}`,
+        label: `Commentary • ${ref}${source ? ` (${source})` : ''}`,
+        mode: 'commentary',
+        ref
+      });
+    } catch (e) {
+      this.setStudyContent(`<div class="text-sm text-gray-600 dark:text-gray-400">Commentary unavailable.</div>`);
+    }
+  }
+
+  async renderStudyDictionary(term) {
+    const q = String(term || '').trim();
+    if (!q) {
+      this.setStudyContent(`<div class="text-sm text-gray-600 dark:text-gray-400">Type a word to look up.</div>`);
+      return;
+    }
+    this.setStudyContent(`<div class="text-sm text-gray-600 dark:text-gray-400">Loading dictionary…</div>`);
+    try {
+      const sourceKey = String(this.studyState?.dictionarySourceKey || '').trim();
+      const sourceParam = sourceKey ? `&source=${encodeURIComponent(sourceKey)}` : '';
+      const res = await fetch(this.buildApiUrl(`/api/dictionary/lookup?term=${encodeURIComponent(q)}${sourceParam}`), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        const msg = this.escapeHtml(data?.error || 'Dictionary unavailable');
+        this.setStudyContent(`<div class="text-sm text-gray-600 dark:text-gray-400">${msg}</div>`);
+        return;
+      }
+
+      const entry = data.entry;
+      if (!entry) {
+        this.setStudyContent(`<div class="text-sm text-gray-600 dark:text-gray-400">No dictionary entry found for “${this.escapeHtml(q)}”.</div>`);
+        return;
+      }
+
+      const headword = this.escapeHtml(entry.headword || q);
+      const bodyHtml = this.sanitizeImportedHtml(entry.definition || '');
+      const source = this.escapeHtml(entry.source_name || '');
+      const chosen = sourceKey ? this.escapeHtml(sourceKey) : '';
+
+      this.setStudyContent(`
+        <div class="space-y-3">
+          <div class="text-sm font-semibold text-gray-900 dark:text-white">${headword}</div>
+          <div class="text-sm text-gray-800 dark:text-gray-200 leading-relaxed space-y-2">
+            ${bodyHtml || '<div class="text-gray-600 dark:text-gray-400">No content.</div>'}
+          </div>
+          ${source ? `<div class="text-xs text-gray-500 dark:text-gray-400">Source: ${source}${chosen && !source.includes(chosen) ? ` (${chosen})` : ''}</div>` : ''}
+        </div>
+      `);
+
+      this.pushStudyRecent({
+        type: 'Dictionary',
+        key: `dictionary:${q.toLowerCase()}:${sourceKey || 'auto'}`,
+        label: `Dictionary • ${q}${source ? ` (${source})` : ''}`,
+        mode: 'dictionary',
+        word: q
+      });
+    } catch (e) {
+      this.setStudyContent(`<div class="text-sm text-gray-600 dark:text-gray-400">Dictionary unavailable.</div>`);
+    }
   }
 
   updateCommunityPreview() {
@@ -2414,6 +3033,173 @@ class ChurchTapApp {
     });
   }
 
+  // ===========================
+  // Study Mode (progressive disclosure)
+  // ===========================
+  getLocalStudyModeEnabled() {
+    return localStorage.getItem('studyMode') === 'true';
+  }
+
+  isStudyModeEnabled() {
+    const userValue = this.currentUser?.studyModeEnabled;
+    if (typeof userValue === 'boolean') return userValue;
+    // Guest / fallback
+    return this.studyMode === true || this.getLocalStudyModeEnabled();
+  }
+
+  syncStudyModeFromUser() {
+    const userValue = this.currentUser?.studyModeEnabled;
+    if (typeof userValue !== 'boolean') return false;
+    this.studyMode = userValue;
+    localStorage.setItem('studyMode', userValue ? 'true' : 'false');
+    return true;
+  }
+
+  async setStudyModeEnabled(enabled) {
+    const next = !!enabled;
+    this.studyMode = next;
+    localStorage.setItem('studyMode', next ? 'true' : 'false');
+
+    // If logged in, persist server-side (cross-device).
+    if (this.currentUser) {
+      // Keep UI consistent immediately.
+      this.currentUser.studyModeEnabled = next;
+      if (this.currentUser.preferences && typeof this.currentUser.preferences === 'object') {
+        this.currentUser.preferences.studyModeEnabled = next;
+      }
+
+      try {
+        const res = await fetch(this.buildApiUrl('/api/auth/preferences'), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ studyModeEnabled: next })
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.success) {
+          const msg = data?.error || 'Unable to save Study Mode preference';
+          this.showToast(msg);
+        } else {
+          // Best-effort hydrate so other sessions/devices stay consistent on next load.
+          this.refreshCurrentUserFromServer?.().catch(() => {});
+        }
+      } catch (e) {
+        this.showToast('Unable to save Study Mode preference');
+      }
+    }
+
+    return next;
+  }
+
+  async handleStudyModeToggle(enabled) {
+    await this.setStudyModeEnabled(enabled);
+    this.showToast(`Study Mode: ${this.isStudyModeEnabled() ? 'On' : 'Off'}`);
+    // If we're on the Me page, re-render so the toggle stays in sync.
+    if (String(window.location.pathname || '') === '/me') {
+      this.renderMePage();
+    }
+  }
+
+  // ---------------------------
+  // Word selection definitions (Study Mode)
+  // ---------------------------
+  getSelectedSingleWord() {
+    try {
+      const sel = window.getSelection?.();
+      if (!sel || sel.isCollapsed) return null;
+      const raw = String(sel.toString() || '').trim();
+      if (!raw) return null;
+      if (raw.length > 48) return null;
+      // Only a single token (no whitespace)
+      if (/\s/.test(raw)) return null;
+      // Basic token validation (letters + apostrophes/hyphens)
+      if (!/^[A-Za-z][A-Za-z’'\-]*$/.test(raw)) return null;
+      return raw;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  attachStudyWordSelectionHandlers(containerEl) {
+    if (!containerEl || !containerEl.addEventListener) return;
+    if (containerEl.dataset && containerEl.dataset.studyWordTap === '1') return;
+    if (containerEl.dataset) containerEl.dataset.studyWordTap = '1';
+
+    const handler = async () => {
+      if (!this.isStudyModeEnabled()) return;
+      const word = this.getSelectedSingleWord();
+      if (!word) return;
+
+      // Debounce repeated triggers for the same selection
+      const now = Date.now();
+      if (this._studyLastWord === word && now - (this._studyLastWordAt || 0) < 1200) return;
+      this._studyLastWord = word;
+      this._studyLastWordAt = now;
+
+      await this.showDefinitionForWord(word);
+    };
+
+    containerEl.addEventListener('mouseup', handler);
+    containerEl.addEventListener('touchend', handler);
+  }
+
+  async fetchDictionaryEntry(term) {
+    const q = String(term || '').trim();
+    if (!q) return null;
+
+    this._dictionaryCache = this._dictionaryCache || new Map();
+    if (this._dictionaryCache.has(q.toLowerCase())) return this._dictionaryCache.get(q.toLowerCase());
+
+    const res = await fetch(this.buildApiUrl(`/api/dictionary/lookup?term=${encodeURIComponent(q)}`), { credentials: 'include' });
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || !data?.success) {
+      const err = new Error(data?.error || 'Dictionary lookup failed');
+      err.status = res.status;
+      throw err;
+    }
+
+    const entry = data.entry || null;
+    this._dictionaryCache.set(q.toLowerCase(), entry);
+    return entry;
+  }
+
+  async showDefinitionForWord(word) {
+    const term = String(word || '').trim();
+    if (!term) return;
+
+    try {
+      const entry = await this.fetchDictionaryEntry(term);
+      if (!entry) {
+        this.showModal('Definition', `
+          <div class="text-sm text-gray-700 dark:text-gray-200">
+            <div class="font-semibold">${this.escapeHtml(term)}</div>
+            <div class="mt-2 text-gray-600 dark:text-gray-400">No dictionary entry found.</div>
+          </div>
+        `);
+        return;
+      }
+
+      const headword = this.escapeHtml(entry.headword || term);
+      const definitionHtml = this.sanitizeImportedHtml(entry.definition || '');
+      const source = this.escapeHtml(entry.source_name || '');
+
+      this.showModal('Definition', `
+        <div class="text-sm text-gray-700 dark:text-gray-200">
+          <div class="font-semibold">${headword}</div>
+          ${definitionHtml ? `<div class="mt-2 leading-relaxed space-y-2">${definitionHtml}</div>` : ''}
+          ${source ? `<div class="mt-2 text-xs text-gray-500 dark:text-gray-400">Source: ${source}</div>` : ''}
+        </div>
+      `);
+    } catch (e) {
+      if (e && e.status === 403) {
+        this.showToast('Study tools are disabled for this group');
+      } else {
+        this.showToast('Definition unavailable');
+      }
+    }
+  }
+
   toggleQuickMenu() {
     const menu = document.getElementById('quickMenu');
     menu.classList.toggle('hidden');
@@ -3489,6 +4275,12 @@ class ChurchTapApp {
     });
     
     document.body.appendChild(modal);
+
+    // Study Mode: allow selecting a word to define it
+    if (this.isStudyModeEnabled()) {
+      const verseContainer = modal.querySelector('.verse-text') || modal;
+      this.attachStudyWordSelectionHandlers(verseContainer);
+    }
   }
 
   async fetchTranslation(reference, selectedTranslation) {
@@ -3656,6 +4448,12 @@ class ChurchTapApp {
     });
     
     document.body.appendChild(modal);
+
+    // Study Mode: allow selecting a word to define it
+    if (this.isStudyModeEnabled()) {
+      const scrollEl = modal.querySelector('[data-chapter-scroll]') || modal;
+      this.attachStudyWordSelectionHandlers(scrollEl);
+    }
 
     if (scrollVerse) {
       // Defer until after layout so scrollIntoView can compute positions.
@@ -4078,6 +4876,215 @@ class ChurchTapApp {
     });
     
     document.body.appendChild(modal);
+  }
+
+  showStudyToolsModal() {
+    if (!this.isStudyModeEnabled()) {
+      this.showToast('Turn on Study Mode in Me to unlock Study tools');
+      this.navigate('/me');
+      return;
+    }
+
+    this.showModal('Study Tools', `
+      <div class="space-y-5">
+        <div class="p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/20">
+          <div class="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <div class="text-sm font-semibold text-gray-900 dark:text-white">Dictionary</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">Look up a word</div>
+            </div>
+          </div>
+
+          <form id="studyDictionaryForm" class="flex items-center gap-2">
+            <input id="studyDictionaryTerm" type="text" autocomplete="off"
+                   placeholder="e.g. faith"
+                   class="flex-1 min-w-0 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" />
+            <button type="submit" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm whitespace-nowrap">
+              Search
+            </button>
+          </form>
+
+          <div id="studyDictionaryResults" class="mt-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/30 p-3 text-sm text-gray-700 dark:text-gray-200 hidden"></div>
+        </div>
+
+        <div class="p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/20">
+          <div class="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <div class="text-sm font-semibold text-gray-900 dark:text-white">Commentary</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">Look up a verse</div>
+            </div>
+            <button type="button"
+                    class="px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors whitespace-nowrap"
+                    onclick="window.churchTapApp.lookupCommentaryForReference(window.churchTapApp.currentVerse?.bible_reference)">
+              Use today’s verse
+            </button>
+          </div>
+
+          <form id="studyCommentaryForm" class="flex items-center gap-2">
+            <input id="studyCommentaryRef" type="text" autocomplete="off"
+                   placeholder="e.g. John 3:16"
+                   class="flex-1 min-w-0 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" />
+            <button type="submit" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm whitespace-nowrap">
+              Search
+            </button>
+          </form>
+
+          <div id="studyCommentaryResults" class="mt-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/30 p-3 text-sm text-gray-700 dark:text-gray-200 max-h-64 overflow-y-auto hidden"></div>
+        </div>
+
+        <div class="text-xs text-gray-500 dark:text-gray-400">
+          Tip: In Read/Translation views, select a single word to see a definition.
+        </div>
+      </div>
+    `);
+
+    // Wire dictionary search
+    document.getElementById('studyDictionaryForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const term = String(document.getElementById('studyDictionaryTerm')?.value || '').trim();
+      await this.lookupDictionaryTerm(term);
+    });
+
+    // Wire commentary search
+    document.getElementById('studyCommentaryForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const ref = String(document.getElementById('studyCommentaryRef')?.value || '').trim();
+      await this.lookupCommentaryForReference(ref);
+    });
+  }
+
+  sanitizeImportedHtml(html) {
+    const raw = String(html || '');
+    if (!raw) return '';
+
+    // Very small allow-list sanitizer: keep basic formatting, remove all attributes.
+    // This prevents arbitrary HTML/script execution while still rendering imported markup nicely.
+    const allowed = new Set(['P', 'BR', 'B', 'STRONG', 'I', 'EM', 'UL', 'OL', 'LI', 'SUP', 'SUB', 'BLOCKQUOTE', 'CODE']);
+
+    const tpl = document.createElement('template');
+    tpl.innerHTML = raw;
+
+    const walk = (node) => {
+      const children = Array.from(node.childNodes || []);
+      for (const child of children) {
+        if (child.nodeType === Node.ELEMENT_NODE) {
+          const tag = child.tagName;
+          if (!allowed.has(tag)) {
+            // Replace disallowed element with its text content (keeps readability).
+            const text = document.createTextNode(child.textContent || '');
+            child.replaceWith(text);
+            continue;
+          }
+
+          // Strip all attributes (including event handlers).
+          const attrs = Array.from(child.attributes || []);
+          for (const a of attrs) child.removeAttribute(a.name);
+
+          walk(child);
+        } else if (child.nodeType === Node.COMMENT_NODE) {
+          child.remove();
+        } else {
+          // Text / others: keep
+        }
+      }
+    };
+
+    walk(tpl.content);
+    return tpl.innerHTML;
+  }
+
+  async lookupDictionaryTerm(term) {
+    const resultsEl = document.getElementById('studyDictionaryResults');
+    if (resultsEl) {
+      resultsEl.textContent = '';
+      resultsEl.classList.add('hidden');
+    }
+
+    const q = String(term || '').trim();
+    if (!q) {
+      this.showToast('Type a word to look up');
+      return;
+    }
+
+    try {
+      if (resultsEl) {
+        resultsEl.textContent = 'Loading…';
+        resultsEl.classList.remove('hidden');
+      }
+      const res = await fetch(this.buildApiUrl(`/api/dictionary/lookup?term=${encodeURIComponent(q)}`), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        const msg = data?.error || 'Dictionary lookup unavailable';
+        if (resultsEl) resultsEl.textContent = msg;
+        return;
+      }
+
+      const entry = data.entry;
+      if (!entry) {
+        if (resultsEl) resultsEl.textContent = 'No entry found.';
+        return;
+      }
+
+      const headword = this.escapeHtml(entry.headword || q);
+      const definitionHtml = this.sanitizeImportedHtml(entry.definition || '');
+      const source = this.escapeHtml(entry.source_name || '');
+      if (resultsEl) {
+        resultsEl.innerHTML = `
+          <div class="font-semibold">${headword}</div>
+          ${definitionHtml ? `<div class="mt-2 leading-relaxed space-y-2">${definitionHtml}</div>` : ''}
+          ${source ? `<div class="mt-2 text-xs text-gray-500 dark:text-gray-400">Source: ${source}</div>` : ''}
+        `;
+      }
+    } catch (e) {
+      if (resultsEl) resultsEl.textContent = 'Dictionary lookup unavailable';
+    }
+  }
+
+  async lookupCommentaryForReference(reference) {
+    const resultsEl = document.getElementById('studyCommentaryResults');
+    if (resultsEl) {
+      resultsEl.textContent = '';
+      resultsEl.classList.add('hidden');
+    }
+
+    const ref = String(reference || '').trim();
+    if (!ref) {
+      this.showToast('No Bible reference available');
+      return;
+    }
+
+    try {
+      if (resultsEl) {
+        resultsEl.textContent = 'Loading…';
+        resultsEl.classList.remove('hidden');
+      }
+      const res = await fetch(this.buildApiUrl(`/api/commentary/lookup?ref=${encodeURIComponent(ref)}`), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        const msg = data?.error || 'Commentary lookup unavailable';
+        if (resultsEl) resultsEl.textContent = msg;
+        return;
+      }
+
+      const entry = data.entry;
+      if (!entry) {
+        if (resultsEl) resultsEl.textContent = 'No commentary found.';
+        return;
+      }
+
+      const title = this.escapeHtml(entry.reference || ref);
+      const bodyHtml = this.sanitizeImportedHtml(entry.content || '');
+      const source = this.escapeHtml(entry.source_name || '');
+      if (resultsEl) {
+        resultsEl.innerHTML = `
+          <div class="font-semibold">${title}</div>
+          ${bodyHtml ? `<div class="mt-2 leading-relaxed space-y-2">${bodyHtml}</div>` : ''}
+          ${source ? `<div class="mt-3 text-xs text-gray-500 dark:text-gray-400">Source: ${source}</div>` : ''}
+        `;
+      }
+    } catch (e) {
+      if (resultsEl) resultsEl.textContent = 'Commentary lookup unavailable';
+    }
   }
 
   showLocalSearchModal() {
@@ -5531,6 +6538,7 @@ class ChurchTapApp {
       lifeStage: user.lifeStage ?? prefs.lifeStage ?? null,
       prayerFrequency: user.prayerFrequency ?? prefs.prayerFrequency ?? null,
       preferredTranslation: user.preferredTranslation ?? prefs.preferredTranslation ?? null,
+      studyModeEnabled: user.studyModeEnabled ?? prefs.studyModeEnabled,
       interests,
       struggles
     };
@@ -5542,6 +6550,7 @@ class ChurchTapApp {
     const data = await response.json().catch(() => null);
     if (!data?.success) return false;
     this.currentUser = this.normalizeUser(data.user);
+    this.syncStudyModeFromUser?.();
     this.updateTranslationButtons();
     return true;
   }
@@ -5556,6 +6565,7 @@ class ChurchTapApp {
         const data = await response.json();
         if (data.success) {
           this.currentUser = this.normalizeUser(data.user);
+          this.syncStudyModeFromUser?.();
           this.updateUIForLoggedInUser();
           // Load memberships + active group for group switcher/community gating UI
           this.membershipContext = await this.fetchMembershipContext();
