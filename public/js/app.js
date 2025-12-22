@@ -56,6 +56,9 @@ class ChurchTapApp {
     this.orgFeatures = null;
     this.translationCatalog = [];
 
+    // Bible metadata (lazy-loaded): chapter/verse counts by book+chapter
+    this.bibleStructureByNumber = null;
+
     // Emergency Topics + Fundraising + Playlist helpers
     this._topics = null;
     this._fundraising = null;
@@ -70,6 +73,57 @@ class ChurchTapApp {
       this.showCriticalError('Application failed to initialize. Please refresh the page.');
       this.hideSplashScreen();
     });
+  }
+
+  async ensureBibleStructureLoaded() {
+    if (this.bibleStructureByNumber) return this.bibleStructureByNumber;
+    try {
+      const res = await fetch('/data/bible_verse_counts.json', { cache: 'force-cache' });
+      if (!res.ok) throw new Error(`Failed to load bible structure: ${res.status}`);
+      const rows = await res.json();
+      if (!Array.isArray(rows)) throw new Error('Invalid bible structure JSON');
+
+      const nameToNumber = {};
+      for (let i = 1; i <= 66; i++) nameToNumber[this.getBookName(i)] = i;
+
+      const byNum = {};
+      rows.forEach(row => {
+        const bookName = String(row?.book || '').trim();
+        const bookNum = nameToNumber[bookName];
+        if (!bookNum) return;
+
+        const chapters = Array.isArray(row?.chapters) ? row.chapters : [];
+        const verseCounts = chapters
+          .map(c => parseInt(String(c?.verses || '0'), 10))
+          .filter(n => Number.isFinite(n) && n > 0);
+
+        byNum[bookNum] = {
+          name: bookName,
+          abbr: String(row?.abbr || '').trim(),
+          verseCounts
+        };
+      });
+
+      this.bibleStructureByNumber = byNum;
+      return byNum;
+    } catch (e) {
+      console.error('Failed to load bible structure', e);
+      this.bibleStructureByNumber = {}; // cache failure to avoid repeated fetch loops
+      return this.bibleStructureByNumber;
+    }
+  }
+
+  resolveBookNumberFromInput(bookInput) {
+    const s = String(bookInput || '').trim();
+    if (!s) return null;
+    if (/^\d+$/.test(s)) {
+      const n = parseInt(s, 10);
+      if (Number.isFinite(n) && n >= 1 && n <= 66) return n;
+      return null;
+    }
+    // Reuse our robust book-name parsing by faking a reference.
+    const parsed = this.parseBibleReference(`${s} 1:1`);
+    return parsed?.book || null;
   }
 
   async init() {
@@ -177,7 +231,7 @@ class ChurchTapApp {
   applyFeatureTogglesToUI() {
     // Links
     if (!this.isFeatureEnabled('group_links_enabled')) {
-      const linksBtn = document.getElementById('linksBtn');
+      const linksBtn = document.getElementById('tabLinksBtn');
       if (linksBtn) linksBtn.style.display = 'none';
       const menu = document.getElementById('quickLinksMenu');
       if (menu) menu.classList.add('hidden');
@@ -185,10 +239,8 @@ class ChurchTapApp {
 
     // Calendar
     if (!this.isFeatureEnabled('group_calendar_enabled')) {
-      const calBtn = document.getElementById('calendarBtn');
-      if (calBtn) calBtn.style.display = 'none';
-      const indicator = document.getElementById('calendarIndicator');
-      if (indicator) indicator.classList.add('hidden');
+      const todayPill = document.getElementById('todayEventPill');
+      if (todayPill) todayPill.classList.add('hidden');
     }
 
     // Community action buttons
@@ -251,9 +303,47 @@ class ChurchTapApp {
   routeTo(pathname) {
     const path = String(pathname || '/');
 
+    // Tab: Explore
+    if (path === '/explore') {
+      this.setActiveTab('explore');
+      this.showPageContainer();
+      this.renderExplorePage();
+      return;
+    }
+
+    // Tab: Community (shortcut to the community section on Today)
+    if (path === '/community') {
+      this.setActiveTab('community');
+      this.showVerseContainer();
+      this.loadVerse(this.currentDate).catch(() => {});
+      this.loadCommunity(this.currentDate).catch(() => {});
+      setTimeout(() => {
+        document.getElementById('communitySection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+      return;
+    }
+
+    // Tab: Saved
+    if (path === '/saved') {
+      // "Saved" lives under Me now, so keep bottom nav highlight on Me.
+      this.setActiveTab('me');
+      this.showPageContainer();
+      this.renderSavedPage();
+      return;
+    }
+
+    // Tab: Me
+    if (path === '/me') {
+      this.setActiveTab('me');
+      this.showPageContainer();
+      this.renderMePage();
+      return;
+    }
+
     // Tap route: /t/<UID> (show main verse view for this tag session)
     const tapMatch = path.match(/^\/t\/([^\/?#]+)$/);
     if (tapMatch) {
+      this.setActiveTab('today');
       this.showVerseContainer();
       this.loadVerse(this.currentDate).catch(() => {});
       this.loadCommunity(this.currentDate).catch(() => {});
@@ -263,24 +353,28 @@ class ChurchTapApp {
     // Collections detail: /collections/:id
     const collectionMatch = path.match(/^\/collections\/(\d+)$/);
     if (collectionMatch) {
+      this.setActiveTab('me');
       this.showPageContainer();
       this.renderCollectionDetailPage(Number(collectionMatch[1]));
       return;
     }
 
     if (path === '/favorites') {
+      this.setActiveTab('me');
       this.showPageContainer();
       this.renderFavoritesPage();
       return;
     }
 
     if (path === '/collections') {
+      this.setActiveTab('me');
       this.showPageContainer();
       this.renderCollectionsPage();
       return;
     }
 
     if (path === '/my-prayers') {
+      this.setActiveTab('me');
       this.showPageContainer();
       this.renderMyPrayersPage();
       return;
@@ -291,6 +385,7 @@ class ChurchTapApp {
     if (verseMatch) {
       const date = verseMatch[1];
       this.currentDate = date;
+      this.setActiveTab('today');
       this.showVerseContainer();
       this.loadVerse(date).catch(() => {});
       this.loadCommunity(date).catch(() => {});
@@ -298,6 +393,7 @@ class ChurchTapApp {
     }
 
     // Default: main verse view
+    this.setActiveTab('today');
     this.showVerseContainer();
   }
 
@@ -329,6 +425,209 @@ class ChurchTapApp {
 
     const verseContainer = document.getElementById('verseContainer');
     if (verseContainer) verseContainer.classList.remove('hidden');
+
+    const engagementActions = document.getElementById('engagementActions');
+    if (engagementActions) engagementActions.classList.remove('hidden');
+
+    // Community renders inline on Today
+    const communitySection = document.getElementById('communitySection');
+    if (communitySection) communitySection.classList.remove('hidden');
+
+    this.hideQuickMenu();
+  }
+
+  // ===========================
+  // Mobile-first bottom tabs
+  // ===========================
+  setActiveTab(tabName) {
+    const tab = String(tabName || '').toLowerCase();
+    const all = ['today', 'explore', 'community', 'saved', 'me'];
+    all.forEach(t => {
+      const icon = document.querySelector(`[data-tab-icon="${t}"]`);
+      const label = document.querySelector(`[data-tab-label="${t}"]`);
+      const isActive = t === tab;
+      if (icon) {
+        icon.classList.toggle('text-primary-600', isActive);
+        icon.classList.toggle('dark:text-primary-400', isActive);
+        icon.classList.toggle('text-gray-600', !isActive);
+        icon.classList.toggle('dark:text-gray-400', !isActive);
+      }
+      if (label) {
+        label.classList.toggle('text-primary-600', isActive);
+        label.classList.toggle('dark:text-primary-400', isActive);
+        label.classList.toggle('text-gray-600', !isActive);
+        label.classList.toggle('dark:text-gray-400', !isActive);
+      }
+    });
+  }
+
+  renderExplorePage() {
+    this.setPageContent(`
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Explore</h2>
+          <button class="btn-secondary text-sm" onclick="window.churchTapApp.goToToday()">Today</button>
+        </div>
+
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Search, browse history, or discover something new.
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <button class="p-4 rounded-lg bg-white dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+                  onclick="window.churchTapApp.showBibleReadModal()">
+            <div class="text-lg">📖</div>
+            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Read</div>
+            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Book • Chapter • Verse</div>
+          </button>
+
+          <button class="p-4 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-100 dark:border-primary-800 text-left hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
+                  onclick="window.churchTapApp.showVerseSearchModal()">
+            <div class="text-lg">🔍</div>
+            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Search</div>
+            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Verses & Bible</div>
+          </button>
+
+          <button class="p-4 rounded-lg bg-white dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+                  onclick="window.churchTapApp.showHistory()">
+            <div class="text-lg">🕐</div>
+            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">History</div>
+            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Last 60 days</div>
+          </button>
+
+          <button class="p-4 rounded-lg bg-white dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+                  onclick="window.churchTapApp.openCalendarModal()">
+            <div class="text-lg">📅</div>
+            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Calendar</div>
+            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Pick a date</div>
+          </button>
+
+          <button class="p-4 rounded-lg bg-white dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+                  onclick="window.churchTapApp.showRandomVerse()">
+            <div class="text-lg">🎲</div>
+            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Random</div>
+            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Surprise me</div>
+          </button>
+        </div>
+
+        <div class="mt-4">
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.showTopicsWordCloud()">
+            🏷️ Browse Topics
+          </button>
+        </div>
+      </div>
+    `);
+  }
+
+  renderSavedPage() {
+    this.setPageContent(`
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Saved</h2>
+          <button class="btn-secondary text-sm" onclick="window.churchTapApp.goToToday()">Today</button>
+        </div>
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Your collections and personal prayers.
+        </div>
+
+        <div class="space-y-3">
+          <button class="w-full p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+                  onclick="window.churchTapApp.navigate('/collections')">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white">📚 Collections</div>
+                <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Group verses by theme</div>
+              </div>
+              <div class="text-gray-400">›</div>
+            </div>
+          </button>
+
+          <button class="w-full p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+                  onclick="window.churchTapApp.navigate('/my-prayers')">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white">🙏 My Prayers</div>
+                <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Personal prayer list</div>
+              </div>
+              <div class="text-gray-400">›</div>
+            </div>
+          </button>
+        </div>
+      </div>
+    `);
+  }
+
+  renderMePage() {
+    const name = this.currentUser?.displayName || this.currentUser?.firstName || null;
+    const title = name ? this.escapeHtml(String(name)) : 'Account';
+    const isLoggedIn = !!this.currentUser;
+
+    this.setPageContent(`
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Me</h2>
+          <button class="btn-secondary text-sm" onclick="window.churchTapApp.goToToday()">Today</button>
+        </div>
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          ${isLoggedIn ? `Signed in as <span class="font-medium text-gray-900 dark:text-gray-200">${title}</span>` : 'Sign in to sync favorites and join groups.'}
+        </div>
+
+        <div class="space-y-3">
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/saved')">
+            🔖 Saved
+          </button>
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.toggleTheme(); window.churchTapApp.updateMenuIndicators();">
+            🌓 Toggle Theme
+          </button>
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.cycleTextSize(); window.churchTapApp.updateMenuIndicators();">
+            📝 Text Size
+          </button>
+        </div>
+
+        <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3">
+          <button class="w-full btn-secondary" onclick="window.location.href='/choose-organization'">
+            🔄 Switch / Join Group
+          </button>
+
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.showProfileModal()">
+            👤 Profile
+          </button>
+
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.openFeedback()">
+            💬 Send Feedback
+          </button>
+
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.installApp?.()">
+            📱 Install App
+          </button>
+
+          ${isLoggedIn ? `
+            <button class="w-full btn-secondary" onclick="window.location.href='/admin'">
+              🛠️ Admin Panel
+            </button>
+            <button class="w-full px-4 py-2 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 transition-colors"
+                    onclick="window.churchTapApp.handleLogout()">
+              🚪 Logout
+            </button>
+          ` : `
+            <button class="w-full btn-primary" onclick="window.churchTapApp.showLoginModal()">
+              🔑 Sign in
+            </button>
+            <button class="w-full btn-secondary" onclick="window.churchTapApp.showRegisterModal()">
+              ✨ Create account
+            </button>
+          `}
+        </div>
+      </div>
+    `);
+  }
+
+  updateCommunityPreview() {
+    // No-op: preview removed; community renders inline on Today
+  }
+
+  updateCommunityPreviewLocked(reason) {
+    // No-op: preview removed; community renders inline on Today
   }
 
   setPageContent(html) {
@@ -384,15 +683,16 @@ class ChurchTapApp {
       const rows = favorites.length
         ? favorites.map(v => {
             const ref = this.escapeHtml(v.bible_reference || 'Bible');
-            const date = this.escapeHtml(String(v.date || ''));
+            const dateKey = this.escapeHtml(this.normalizeDateKey(v.date));
+            const dateLabel = this.escapeHtml(this.formatDisplayDate(v.date) || dateKey);
             const previewText = v.verse_text ? this.plainTextFromVerseText(v.verse_text) : '';
             const preview = previewText ? this.escapeHtml(previewText.slice(0, 120)) : '';
             return `
               <div class="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                 <div class="flex items-start justify-between space-x-3">
-                  <button class="text-left flex-1" onclick="window.churchTapApp.navigate('/verse/${date}')">
+                  <button class="text-left flex-1" onclick="window.churchTapApp.navigate('/verse/${dateKey}')">
                     <div class="font-medium text-primary-600 dark:text-primary-400">${ref}</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">${date}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">${dateLabel}</div>
                     ${preview ? `<div class="text-sm text-gray-700 dark:text-gray-200 mt-2">${preview}${previewText.length > 120 ? '…' : ''}</div>` : ''}
                   </button>
                   <button class="btn-secondary text-xs" onclick="window.churchTapApp.toggleFavoriteById(${Number(v.id)})">Remove</button>
@@ -419,15 +719,18 @@ class ChurchTapApp {
 
   async renderCollectionsPage() {
     if (!this.currentUser) {
-      this.renderAuthRequired('My Collections', 'Login to create collections synced across devices.');
+      this.renderAuthRequired('My Categories', 'Login to create categories synced across devices.');
       return;
     }
 
     this.setPageContent(`
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">My Collections</h2>
-          <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/')">Back</button>
+          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">My Categories</h2>
+          <div class="flex items-center gap-2">
+            <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/')">Back</button>
+            <button class="btn-secondary text-sm" onclick="window.churchTapApp.showCreateCollectionModal()" aria-label="Create category">+</button>
+          </div>
         </div>
         <div class="text-sm text-gray-600 dark:text-gray-400">Loading…</div>
       </div>
@@ -438,7 +741,7 @@ class ChurchTapApp {
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
         const msg = data?.error || 'Unable to load collections.';
-        this.renderAuthRequired('My Collections', msg);
+        this.renderAuthRequired('My Categories', msg);
         return;
       }
 
@@ -456,41 +759,65 @@ class ChurchTapApp {
               </div>
             `;
           }).join('')
-        : `<div class="text-sm text-gray-600 dark:text-gray-400">No collections yet. Create one below.</div>`;
+        : `<div class="text-sm text-gray-600 dark:text-gray-400">No categories yet. Tap “+” to add one.</div>`;
 
       this.setPageContent(`
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">My Collections</h2>
-            <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/')">Back</button>
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">My Categories</h2>
+            <div class="flex items-center gap-2">
+              <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/')">Back</button>
+              <button class="btn-secondary text-sm" onclick="window.churchTapApp.showCreateCollectionModal()" aria-label="Create category">+</button>
+            </div>
           </div>
 
-          <div class="space-y-3 mb-6">${listHtml}</div>
-
-          <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-            <h3 class="text-sm font-semibold text-gray-800 dark:text-white mb-2">Create a collection</h3>
-            <form id="createCollectionForm" class="space-y-2">
-              <input id="collectionName" type="text" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Collection name" required>
-              <input id="collectionDesc" type="text" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Description (optional)">
-              <button type="submit" class="w-full btn-primary">Create</button>
-            </form>
-          </div>
+          <div class="space-y-3">${listHtml}</div>
         </div>
       `);
-
-      const form = document.getElementById('createCollectionForm');
-      if (form) {
-        form.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const name = document.getElementById('collectionName')?.value;
-          const description = document.getElementById('collectionDesc')?.value;
-          await this.createCollection(name, description);
-        });
-      }
     } catch (e) {
       console.error('Collections page error:', e);
-      this.renderAuthRequired('My Collections', 'Unable to load collections.');
+      this.renderAuthRequired('My Categories', 'Unable to load categories.');
     }
+  }
+
+  showCreateCollectionModal() {
+    if (!this.currentUser) {
+      this.showToast('Please login to create categories');
+      this.showLoginModal();
+      return;
+    }
+
+    this.showModal('New Category', `
+      <form id="createCollectionModalForm" class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+          <input id="collectionNameModal" type="text"
+                 class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                 placeholder="e.g., Trials, Peace, Gratitude"
+                 required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description (optional)</label>
+          <input id="collectionDescModal" type="text"
+                 class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                 placeholder="A short note about what belongs here">
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button type="submit" class="btn-primary flex-1">Create</button>
+          <button type="button" class="btn-secondary" onclick="window.churchTapApp.closeModal()">Cancel</button>
+        </div>
+      </form>
+    `);
+
+    const form = document.getElementById('createCollectionModalForm');
+    if (!form) return;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('collectionNameModal')?.value;
+      const description = document.getElementById('collectionDescModal')?.value;
+      this.closeModal();
+      await this.createCollection(name, description);
+    });
   }
 
   async renderCollectionDetailPage(collectionId) {
@@ -530,15 +857,16 @@ class ChurchTapApp {
       const rows = verses.length
         ? verses.map(v => {
             const ref = this.escapeHtml(v.bible_reference || 'Bible');
-            const date = this.escapeHtml(String(v.date || ''));
+            const dateKey = this.escapeHtml(this.normalizeDateKey(v.date));
+            const dateLabel = this.escapeHtml(this.formatDisplayDate(v.date) || dateKey);
             const previewText = v.verse_text ? this.plainTextFromVerseText(v.verse_text) : '';
             const preview = previewText ? this.escapeHtml(previewText.slice(0, 120)) : '';
             return `
               <div class="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                 <div class="flex items-start justify-between space-x-3">
-                  <button class="text-left flex-1" onclick="window.churchTapApp.navigate('/verse/${date}')">
+                  <button class="text-left flex-1" onclick="window.churchTapApp.navigate('/verse/${dateKey}')">
                     <div class="font-medium text-primary-600 dark:text-primary-400">${ref}</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">${date}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">${dateLabel}</div>
                     ${preview ? `<div class="text-sm text-gray-700 dark:text-gray-200 mt-2">${preview}${previewText.length > 120 ? '…' : ''}</div>` : ''}
                   </button>
                   <button class="btn-secondary text-xs" onclick="window.churchTapApp.removeVerseFromCollection(${collectionId}, ${Number(v.id)})">Remove</button>
@@ -802,18 +1130,16 @@ class ChurchTapApp {
       });
     }
 
-    // Navigation
-    on('prevDay', 'click', () => {
-      this.navigateDay(-1);
-    });
+    // Day navigation is swipe-based (arrows removed from UI)
 
-    on('nextDay', 'click', () => {
-      this.navigateDay(1);
+    // Bottom tab navigation (mobile-first)
+    on('tabTodayBtn', 'click', () => this.goToToday());
+    on('tabExploreBtn', 'click', () => this.navigate('/explore'));
+    on('tabLinksBtn', 'click', () => {
+      this.hideQuickMenu();
+      this.toggleLinksMenu();
     });
-
-    on('todayBtn', 'click', () => {
-      this.goToToday();
-    });
+    on('tabMeBtn', 'click', () => this.navigate('/me'));
 
     on('backToToday', 'click', () => {
       this.goToToday();
@@ -824,19 +1150,8 @@ class ChurchTapApp {
       this.toggleQuickMenu();
     });
 
-    // Organization Links toggle
-    const linksBtn = document.getElementById('linksBtn');
-    if (linksBtn) {
-      linksBtn.addEventListener('click', () => {
-        this.toggleLinksMenu();
-      });
-    }
-
     // Calendar controls
-    const calendarBtn = document.getElementById('calendarBtn');
-    if (calendarBtn) {
-      calendarBtn.addEventListener('click', () => this.openCalendarModal());
-    }
+    on('datePickerBtn', 'click', () => this.openCalendarModal());
     const closeCalendarBtn = document.getElementById('closeCalendarBtn');
     if (closeCalendarBtn) {
       closeCalendarBtn.addEventListener('click', () => this.closeCalendarModal());
@@ -921,18 +1236,11 @@ class ChurchTapApp {
       });
     }
 
-    document.getElementById('feedbackBtn').addEventListener('click', () => {
-      this.openFeedback();
-    });
+    on('feedbackBtn', 'click', () => this.openFeedback());
 
     // Engagement actions
-    document.getElementById('heartBtn').addEventListener('click', () => {
-      this.toggleHeart();
-    });
-
-    document.getElementById('favoriteBtn').addEventListener('click', () => {
-      this.toggleFavorite();
-    });
+    on('heartBtn', 'click', () => this.toggleHeart());
+    on('favoriteBtn', 'click', () => this.toggleFavorite());
 
     const addToCollectionBtn = document.getElementById('addToCollectionBtn');
     if (addToCollectionBtn) {
@@ -941,17 +1249,6 @@ class ChurchTapApp {
       });
     }
 
-    document.getElementById('qrBtn').addEventListener('click', () => {
-      this.showQRCode();
-    });
-
-    document.getElementById('refreshBtn').addEventListener('click', () => {
-      this.refreshVerse();
-    });
-
-    document.getElementById('historyBtn').addEventListener('click', () => {
-      this.showHistory();
-    });
 
     // Community event listeners
     const submitPrayerBtn = document.getElementById('submitPrayerBtn');
@@ -983,24 +1280,29 @@ class ChurchTapApp {
       });
     }
 
-    document.getElementById('loginMenuBtn').addEventListener('click', () => {
+    on('loginMenuBtn', 'click', () => {
       this.showLoginModal();
       this.toggleQuickMenu();
     });
 
-    document.getElementById('registerMenuBtn').addEventListener('click', () => {
+    on('registerMenuBtn', 'click', () => {
       this.showRegisterModal();
       this.toggleQuickMenu();
     });
 
-    document.getElementById('logoutBtn').addEventListener('click', () => {
+    on('logoutBtn', 'click', () => {
       this.handleLogout();
       this.toggleQuickMenu();
     });
 
-    document.getElementById('profileBtn').addEventListener('click', () => {
+    on('profileBtn', 'click', () => {
       this.showProfileModal();
       this.toggleQuickMenu();
+    });
+
+    // Community preview (Today tab)
+    on('openCommunityFromPreview', 'click', () => {
+      this.navigate('/community');
     });
 
     // Close menus when clicking outside
@@ -1014,7 +1316,7 @@ class ChurchTapApp {
       
       // Links menu
       const linksMenu = document.getElementById('quickLinksMenu');
-      const linksToggle = document.getElementById('linksBtn');
+      const linksToggle = document.getElementById('tabLinksBtn');
       if (linksMenu && linksToggle && !linksMenu.contains(e.target) && !linksToggle.contains(e.target)) {
         this.hideLinksMenu();
       }
@@ -1388,6 +1690,9 @@ class ChurchTapApp {
   }
 
   navigateDay(direction) {
+    // Only allow day-to-day navigation from the verse (Today) view.
+    if (!this.isVerseRoute(window.location.pathname)) return;
+
     const currentDateObj = new Date(this.currentDate + 'T00:00:00');
     currentDateObj.setDate(currentDateObj.getDate() + direction);
     
@@ -1435,9 +1740,20 @@ class ChurchTapApp {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
     const today = `${year}-${month}-${day}`;
-    this.currentDate = today;
-    this.loadVerse(today);
-    this.loadCommunity(today);
+
+    // If we're in a tap-based session (/t/<uid>), keep the URL stable for tracking
+    // but still show today's verse content.
+    if (/^\/t\/[^\/?#]+$/.test(String(window.location.pathname || ''))) {
+      this.currentDate = today;
+      this.setActiveTab('today');
+      this.showVerseContainer();
+      this.loadVerse(today).catch(() => {});
+      this.loadCommunity(today).catch(() => {});
+      return;
+    }
+
+    // Otherwise, route to the canonical date URL (keeps routing/tab shell consistent)
+    this.navigate(`/verse/${today}`);
   }
 
   // ===========================
@@ -2105,7 +2421,7 @@ class ChurchTapApp {
 
   toggleLinksMenu() {
     const menu = document.getElementById('quickLinksMenu');
-    const linksBtn = document.getElementById('linksBtn');
+    const linksBtn = document.getElementById('tabLinksBtn');
     
     menu.classList.toggle('hidden');
     
@@ -2117,7 +2433,7 @@ class ChurchTapApp {
 
   hideLinksMenu() {
     const menu = document.getElementById('quickLinksMenu');
-    const linksBtn = document.getElementById('linksBtn');
+    const linksBtn = document.getElementById('tabLinksBtn');
     
     menu.classList.add('hidden');
     
@@ -2592,6 +2908,8 @@ class ChurchTapApp {
   }
 
   refreshVerse() {
+    // Only refresh on the verse (Today) view.
+    if (!this.isVerseRoute(window.location.pathname)) return;
     this.loadVerse(this.currentDate);
     this.showToast('🔄 Refreshed!');
   }
@@ -2926,7 +3244,7 @@ class ChurchTapApp {
       if (response.ok) {
         const data = await response.json();
         console.log('Chapter data:', data);
-        this.showChapterModal(data, reference, translation);
+        this.showChapterModal(data, reference, translation, { scrollVerse: parsedRef.verse });
       } else {
         console.log('Chapter API failed, falling back to external app');
         this.openExternalBibleApp(reference, translation);
@@ -3284,10 +3602,11 @@ class ChurchTapApp {
     document.body.appendChild(modal);
   }
 
-  showChapterModal(chapterData, reference, translation) {
+  showChapterModal(chapterData, reference, translation, options = {}) {
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4';
     modal.style.zIndex = '9999';
+    const scrollVerse = Number.isFinite(Number(options?.scrollVerse)) ? Number(options.scrollVerse) : null;
     
     // Parse reference to get book and chapter for title
     const parsedRef = this.parseBibleReference(reference);
@@ -3297,7 +3616,7 @@ class ChurchTapApp {
     let versesHtml = '';
     if (Array.isArray(chapterData)) {
       versesHtml = chapterData.map(verse => `
-        <div class="mb-3">
+        <div class="mb-3 scroll-mt-24 rounded-lg px-2 py-1 -mx-2" data-verse="${verse.verse}">
           <span class="text-sm font-medium text-primary-600 dark:text-primary-400 mr-2">${verse.verse}</span>
           <span class="verse-text text-gray-800 dark:text-gray-200 size-${this.textSize}">${verse.text}</span>
         </div>
@@ -3316,7 +3635,7 @@ class ChurchTapApp {
             </svg>
           </button>
         </div>
-        <div class="p-4 overflow-y-auto flex-1 min-h-0">
+        <div class="p-4 overflow-y-auto flex-1 min-h-0" data-chapter-scroll>
           <div class="space-y-3 leading-relaxed">
             ${versesHtml}
           </div>
@@ -3337,6 +3656,230 @@ class ChurchTapApp {
     });
     
     document.body.appendChild(modal);
+
+    if (scrollVerse) {
+      // Defer until after layout so scrollIntoView can compute positions.
+      requestAnimationFrame(() => {
+        const target = modal.querySelector(`[data-verse="${scrollVerse}"]`);
+        if (!target) return;
+        target.classList.add(
+          'bg-primary-50',
+          'dark:bg-primary-900/20',
+          'ring-1',
+          'ring-primary-200',
+          'dark:ring-primary-800'
+        );
+        target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      });
+    }
+  }
+
+  showBibleReadModal() {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.style.zIndex = '9999';
+
+    const preferredTranslation = this.getUserPreferredTranslation();
+    const catalog = (this.translationCatalog && this.translationCatalog.length > 0)
+      ? this.translationCatalog
+      : [
+          { code: 'NASB', name: 'New American Standard Bible' },
+          { code: 'ESV', name: 'English Standard Version' },
+          { code: 'NIV', name: 'New International Version' },
+          { code: 'NLT', name: 'New Living Translation' },
+          { code: 'KJV', name: 'King James Version' },
+          { code: 'MSG', name: 'The Message' },
+          { code: 'CSB', name: 'Christian Standard Bible' },
+          { code: 'AMP', name: 'Amplified Bible' },
+          { code: 'ASV', name: 'American Standard Version' },
+          { code: 'WEB', name: 'World English Bible' }
+        ];
+
+    const enabledSet = new Set(this.getEnabledTranslationCodes().map(c => String(c).toUpperCase()));
+    const availableTranslations = catalog
+      .map(t => ({ code: String(t.code || '').toUpperCase(), name: t.name || String(t.code || '').toUpperCase() }))
+      .filter(t => enabledSet.has(t.code));
+
+    const translationOptions = availableTranslations.length
+      ? availableTranslations.map(t => `<option value="${this.escapeHtml(t.code)}">${this.escapeHtml(t.code)} — ${this.escapeHtml(t.name)}</option>`).join('')
+      : `<option value="${this.escapeHtml(preferredTranslation)}">${this.escapeHtml(preferredTranslation)}</option>`;
+
+    modal.innerHTML = `
+      <div class="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6 shadow-xl">
+        <div class="flex justify-between items-center mb-4">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">📖 Read</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Pick a book, chapter, and verse.</p>
+          </div>
+          <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  aria-label="Close"
+                  onclick="this.closest('.fixed').remove()">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <form id="bibleReadForm" class="space-y-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Book</label>
+            <input id="readBook" type="text" autocomplete="off" inputmode="text"
+                   placeholder="e.g. John or 43"
+                   class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" />
+            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Tip: you can type a book name (e.g. <span class="font-medium">1 Corinthians</span>) or a number (<span class="font-medium">1–66</span>).
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Chapter</label>
+              <input id="readChapter" inputmode="numeric" type="number" min="1" step="1"
+                     class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                     value="1" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Verse</label>
+              <input id="readVerse" inputmode="numeric" type="number" min="1" step="1"
+                     class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                     value="1" />
+            </div>
+          </div>
+
+          <div id="readLimits" class="text-xs text-gray-600 dark:text-gray-400"></div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Translation</label>
+            <select id="readTranslation" class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+              ${translationOptions}
+            </select>
+            ${availableTranslations.length === 0 ? `<div class="mt-1 text-xs text-gray-500 dark:text-gray-400">Translations are disabled for this group (or not configured). Using your default.</div>` : ''}
+          </div>
+
+          <div class="pt-2 flex items-center justify-end gap-2">
+            <button type="button" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                    onclick="this.closest('.fixed').remove()">
+              Cancel
+            </button>
+            <button type="submit" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+              Read Chapter
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) document.body.removeChild(modal);
+    });
+
+    document.body.appendChild(modal);
+
+    const bookEl = modal.querySelector('#readBook');
+    const chapterEl = modal.querySelector('#readChapter');
+    const verseEl = modal.querySelector('#readVerse');
+    const translationEl = modal.querySelector('#readTranslation');
+    const limitsEl = modal.querySelector('#readLimits');
+    const form = modal.querySelector('#bibleReadForm');
+
+    // Defaults: John 3:16 (classic)
+    if (bookEl) bookEl.value = 'John';
+    if (chapterEl) chapterEl.value = '3';
+    if (verseEl) verseEl.value = '16';
+    if (translationEl && availableTranslations.length) {
+      const preferred = String(preferredTranslation).toUpperCase();
+      if (availableTranslations.some(t => t.code === preferred)) translationEl.value = preferred;
+    }
+
+    const clampInt = (v, min, max) => {
+      const n = parseInt(String(v || ''), 10);
+      if (!Number.isFinite(n)) return min;
+      return Math.min(max, Math.max(min, n));
+    };
+
+    const updateLimits = async () => {
+      const bookNum = this.resolveBookNumberFromInput(bookEl?.value);
+      if (!bookNum) {
+        if (limitsEl) limitsEl.textContent = 'Enter a valid book (name or 1–66).';
+        if (chapterEl) chapterEl.removeAttribute('max');
+        if (verseEl) verseEl.removeAttribute('max');
+        return;
+      }
+
+      await this.ensureBibleStructureLoaded();
+      const meta = this.bibleStructureByNumber?.[bookNum];
+      if (!meta || !Array.isArray(meta.verseCounts) || meta.verseCounts.length === 0) {
+        if (limitsEl) limitsEl.textContent = 'Limits unavailable (still can try reading).';
+        if (chapterEl) chapterEl.removeAttribute('max');
+        if (verseEl) verseEl.removeAttribute('max');
+        return;
+      }
+
+      const maxChapter = meta.verseCounts.length;
+      const newChapter = clampInt(chapterEl?.value, 1, maxChapter);
+      if (chapterEl) {
+        chapterEl.max = String(maxChapter);
+        chapterEl.value = String(newChapter);
+      }
+
+      const maxVerse = meta.verseCounts[newChapter - 1] || 1;
+      const newVerse = clampInt(verseEl?.value, 1, maxVerse);
+      if (verseEl) {
+        verseEl.max = String(maxVerse);
+        verseEl.value = String(newVerse);
+      }
+
+      if (limitsEl) {
+        limitsEl.textContent = `${this.getBookName(bookNum)} has ${maxChapter} chapters. Chapter ${newChapter} has ${maxVerse} verses.`;
+      }
+    };
+
+    // Load metadata and keep max values in sync with user input
+    updateLimits().catch(() => {});
+    bookEl?.addEventListener('input', () => updateLimits().catch(() => {}));
+    chapterEl?.addEventListener('input', () => updateLimits().catch(() => {}));
+    verseEl?.addEventListener('input', () => updateLimits().catch(() => {}));
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const book = this.resolveBookNumberFromInput(bookEl?.value);
+      const chapter = parseInt(String(chapterEl?.value || '0'), 10);
+      const verse = parseInt(String(verseEl?.value || '0'), 10);
+      const translation = String(translationEl?.value || preferredTranslation).toUpperCase();
+
+      if (!Number.isFinite(book) || book < 1 || book > 66) {
+        this.showToast('Please choose a valid book.');
+        return;
+      }
+      if (!Number.isFinite(chapter) || chapter < 1) {
+        this.showToast('Please enter a valid chapter.');
+        return;
+      }
+      if (!Number.isFinite(verse) || verse < 1) {
+        this.showToast('Please enter a valid verse.');
+        return;
+      }
+
+      // Enforce known chapter/verse limits if available
+      await this.ensureBibleStructureLoaded();
+      const meta = this.bibleStructureByNumber?.[book];
+      if (meta?.verseCounts?.length) {
+        const maxChapter = meta.verseCounts.length;
+        if (chapter > maxChapter) {
+          this.showToast(`${this.getBookName(book)} only has ${maxChapter} chapters.`);
+          return;
+        }
+        const maxVerse = meta.verseCounts[chapter - 1] || 1;
+        if (verse > maxVerse) {
+          this.showToast(`Chapter ${chapter} only has ${maxVerse} verses.`);
+          return;
+        }
+      }
+
+      const reference = `${this.getBookName(book)} ${chapter}:${verse}`;
+      modal.remove();
+      await this.readFullChapterInTranslation(reference, translation);
+    });
   }
 
   updateTranslationButtons() {
@@ -4364,24 +4907,25 @@ class ChurchTapApp {
   // Community Functions
   async loadCommunity(date) {
     try {
+      const shouldRenderCommunity = window.location.pathname === '/community' || this.isVerseRoute(window.location.pathname);
       const response = await fetch(this.buildApiUrl(`/api/community/${date}`), {
         credentials: 'include'
       });
 
       // Option B: community is locked unless logged-in + active membership.
       if (response.status === 401) {
-        this.showCommunityLocked('LOGIN_REQUIRED');
+        if (shouldRenderCommunity) this.showCommunityLocked('LOGIN_REQUIRED');
         return;
       }
       if (response.status === 403) {
         const errData = await response.json().catch(() => null);
         const code = errData?.code || 'FORBIDDEN';
         if (code === 'NO_ACTIVE_GROUP') {
-          this.showCommunityLocked('NO_ACTIVE_GROUP');
+          if (shouldRenderCommunity) this.showCommunityLocked('NO_ACTIVE_GROUP');
         } else if (code === 'MEMBERSHIP_PENDING') {
-          this.showCommunityLocked('MEMBERSHIP_PENDING');
+          if (shouldRenderCommunity) this.showCommunityLocked('MEMBERSHIP_PENDING');
         } else {
-          this.showCommunityLocked('NOT_A_MEMBER');
+          if (shouldRenderCommunity) this.showCommunityLocked('NOT_A_MEMBER');
         }
         return;
       }
@@ -4391,7 +4935,7 @@ class ChurchTapApp {
       if (data.success) {
         this.currentCommunity = data.community;
         this.updateCommunityHeader(date);
-        this.displayCommunity(data.community);
+        if (shouldRenderCommunity) this.displayCommunity(data.community);
       } else {
         this.showEmptyCommunity();
       }
@@ -5813,7 +6357,7 @@ class ChurchTapApp {
 
   displayOrganizationLinks(links) {
     const linksContainer = document.getElementById('quickLinksList');
-    const linksButton = document.getElementById('linksBtn');
+    const linksButton = document.getElementById('tabLinksBtn');
     
     console.log('DisplayOrganizationLinks called with:', links);
     console.log('Links container found:', !!linksContainer);
@@ -5891,16 +6435,50 @@ class ChurchTapApp {
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
   }
+
+  normalizeDateKey(dateInput) {
+    // Prefer YYYY-MM-DD if already provided
+    const raw = String(dateInput || '').trim();
+    if (!raw) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+    // If it starts with YYYY-MM-DD, take that (handles ISO timestamps)
+    const prefix = raw.slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(prefix)) return prefix;
+
+    // Fall back to local date parsing
+    try {
+      const d = new Date(raw);
+      if (!Number.isNaN(d.getTime())) return this.formatLocalDateString(d);
+    } catch (_) {
+      // ignore
+    }
+    return '';
+  }
+
+  formatDisplayDate(dateInput) {
+    const key = this.normalizeDateKey(dateInput);
+    if (!key) return '';
+    const d = new Date(`${key}T00:00:00`);
+    // Short, human-friendly date (no time)
+    return d.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+  }
   async updateCalendarIndicatorForToday() {
     try {
       const today = new Date().toISOString().split('T')[0];
       const res = await fetch(this.withOrg('/api/organization/calendar/daily', { date: today }));
       const data = await res.json();
       console.log('[Calendar] daily events for', today, data);
-      const dot = document.getElementById('calendarIndicator');
-      if (dot) {
-        if (data?.success && (data.events || []).length > 0) dot.classList.remove('hidden');
-        else dot.classList.add('hidden');
+      const pill = document.getElementById('todayEventPill');
+      const pillText = document.getElementById('todayEventPillText');
+      if (!pill) return;
+
+      const count = data?.success ? (data.events || []).length : 0;
+      if (count > 0) {
+        pill.classList.remove('hidden');
+        if (pillText) pillText.textContent = count === 1 ? '1 event today' : `${count} events today`;
+      } else {
+        pill.classList.add('hidden');
       }
     } catch (e) {
       // ignore
@@ -5908,6 +6486,11 @@ class ChurchTapApp {
   }
 
   async openCalendarModal() {
+    // Respect org feature flag if loaded
+    if (this.orgFeatures && !this.isFeatureEnabled('group_calendar_enabled')) {
+      this.showToast('Calendar is disabled for this group', 'info');
+      return;
+    }
     this.trackAnalytics && this.trackAnalytics('calendar_open');
     const now = new Date();
     const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
@@ -5993,11 +6576,24 @@ class ChurchTapApp {
     this._calendar.selectedDate = dateStr;
     const list = document.getElementById('calendarEventList');
     if (!list) return;
+
+    // Render a stable shell immediately (verse preview + events)
+    list.innerHTML = `
+      <div class="mb-3">
+        <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Verse</div>
+        <div id="calendarVerseDetails" class="p-3 bg-white border border-gray-200 rounded-lg text-sm dark:bg-gray-900/40 dark:border-gray-700">
+          <div class="text-gray-600 dark:text-gray-400">Loading verse…</div>
+        </div>
+      </div>
+      <div>
+        <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Events</div>
+        <div id="calendarEventsForDay"></div>
+      </div>
+    `;
+
+    const eventsContainer = document.getElementById('calendarEventsForDay');
     const items = this._calendar.events.filter(ev => this.formatLocalDateString(ev.start_at) === dateStr);
-    if (items.length === 0) {
-      list.innerHTML = `<div class="text-sm text-gray-500 dark:text-gray-400 py-2">No events on ${dateStr}</div>`;
-      return;
-    }
+
     const fmtTime = (ev) => {
       if (ev.all_day) return 'All day';
       const s = new Date(ev.start_at);
@@ -6005,25 +6601,88 @@ class ChurchTapApp {
       const f = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
       return e ? `${f(s)} – ${f(e)}` : f(s);
     };
-    list.innerHTML = items.map(ev => {
-      const dateLabel = new Date(ev.start_at).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
-      const timeLabel = fmtTime(ev);
-      const addressAnchor = ev.address ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.address)}" target="_blank" class="underline">${ev.address}</a>` : '';
-      const directionsBtn = ev.address ? `<a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(ev.address)}" target="_blank" class="px-2 py-1 rounded-md text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600">Directions</a>` : '';
-      const detailsBtn = ev.link ? `<a href="${ev.link}" target="_blank" class="px-2 py-1 rounded-md text-xs bg-primary-600 hover:bg-primary-700 text-white" onclick="app.trackAnalytics && app.trackAnalytics('calendar_details_click')">Details</a>` : '';
-      return `
-        <div class="p-3 mb-2 bg-gray-50 border border-gray-200 rounded-lg text-sm dark:bg-gray-900/40 dark:border-gray-700">
-          <div class="font-semibold text-gray-900 dark:text-gray-100">${ev.title}</div>
-          <div class="mt-1 space-y-1 text-gray-700 dark:text-gray-300">
-            <div class="flex items-start gap-2"><span>🗓️</span><span>${dateLabel} • ${timeLabel}</span></div>
-            ${ev.location ? `<div class="flex items-start gap-2"><span>🏛️</span><span>${ev.location}</span></div>` : ''}
-            ${ev.address ? `<div class="flex items-start gap-2"><span>📍</span><span>${addressAnchor}</span></div>` : ''}
+    if (eventsContainer) {
+      if (items.length === 0) {
+        eventsContainer.innerHTML = `<div class="text-sm text-gray-500 dark:text-gray-400 py-2">No events on ${this.escapeHtml(dateStr)}</div>`;
+      } else {
+        eventsContainer.innerHTML = items.map(ev => {
+          const dateLabel = new Date(ev.start_at).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+          const timeLabel = fmtTime(ev);
+          const addressAnchor = ev.address ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.address)}" target="_blank" class="underline">${this.escapeHtml(ev.address)}</a>` : '';
+          const directionsBtn = ev.address ? `<a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(ev.address)}" target="_blank" class="px-2 py-1 rounded-md text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600">Directions</a>` : '';
+          const detailsBtn = ev.link ? `<a href="${this.escapeHtml(ev.link)}" target="_blank" class="px-2 py-1 rounded-md text-xs bg-primary-600 hover:bg-primary-700 text-white" onclick="app.trackAnalytics && app.trackAnalytics('calendar_details_click')">Details</a>` : '';
+          return `
+            <div class="p-3 mb-2 bg-gray-50 border border-gray-200 rounded-lg text-sm dark:bg-gray-900/40 dark:border-gray-700">
+              <div class="font-semibold text-gray-900 dark:text-gray-100">${this.escapeHtml(ev.title || '')}</div>
+              <div class="mt-1 space-y-1 text-gray-700 dark:text-gray-300">
+                <div class="flex items-start gap-2"><span>🗓️</span><span>${this.escapeHtml(dateLabel)} • ${this.escapeHtml(timeLabel)}</span></div>
+                ${ev.location ? `<div class="flex items-start gap-2"><span>🏛️</span><span>${this.escapeHtml(ev.location)}</span></div>` : ''}
+                ${ev.address ? `<div class="flex items-start gap-2"><span>📍</span><span>${addressAnchor}</span></div>` : ''}
+              </div>
+              ${ev.description ? `<div class="mt-2 text-gray-600 dark:text-gray-400">${this.escapeHtml(ev.description)}</div>` : ''}
+              ${(detailsBtn || directionsBtn) ? `<div class="mt-3 flex items-center gap-2">${detailsBtn}${directionsBtn}</div>` : ''}
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    // Load verse preview async
+    this.loadCalendarVersePreview(dateStr).catch(() => {});
+  }
+
+  async loadCalendarVersePreview(dateStr) {
+    const container = document.getElementById('calendarVerseDetails');
+    if (!container) return;
+
+    container.innerHTML = `<div class="text-gray-600 dark:text-gray-400">Loading verse…</div>`;
+
+    try {
+      const res = await fetch(this.buildApiUrl(`/api/verse/${dateStr}`));
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success || !data?.verse) {
+        container.innerHTML = `
+          <div class="flex items-center justify-between gap-3">
+            <div class="text-gray-600 dark:text-gray-400">No verse for ${this.escapeHtml(dateStr)}.</div>
+            <button class="px-3 py-1.5 rounded-lg text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
+                    onclick="window.churchTapApp.navigate('/verse/${this.escapeHtml(dateStr)}'); window.churchTapApp.closeCalendarModal();">
+              Open
+            </button>
           </div>
-          ${ev.description ? `<div class="mt-2 text-gray-600 dark:text-gray-400">${ev.description}</div>` : ''}
-          ${(detailsBtn || directionsBtn) ? `<div class="mt-3 flex items-center gap-2">${detailsBtn}${directionsBtn}</div>` : ''}
+        `;
+        return;
+      }
+
+      const verse = data.verse;
+      const ref = this.escapeHtml(verse.bible_reference || 'Bible Verse');
+      const isText = verse.content_type === 'text';
+      const excerpt = isText && verse.verse_text
+        ? this.escapeHtml(this.plainTextFromVerseText(verse.verse_text).slice(0, 120) + (this.plainTextFromVerseText(verse.verse_text).length > 120 ? '…' : ''))
+        : '';
+
+      const media = isText
+        ? `<div class="mt-2 text-gray-700 dark:text-gray-200">${excerpt || ''}</div>`
+        : (verse.image_path
+          ? `<img src="${this.escapeHtml(verse.image_path)}" alt="${ref}" class="mt-2 w-full max-h-40 object-cover rounded-lg border border-gray-200 dark:border-gray-700">`
+          : '');
+
+      container.innerHTML = `
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <div class="font-semibold text-gray-900 dark:text-gray-100 truncate">${ref}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">${this.escapeHtml(dateStr)}</div>
+          </div>
+          <button class="px-3 py-1.5 rounded-lg text-xs bg-primary-600 hover:bg-primary-700 text-white"
+                  onclick="window.churchTapApp.navigate('/verse/${this.escapeHtml(dateStr)}'); window.churchTapApp.closeCalendarModal();">
+            Open
+          </button>
         </div>
+        ${media}
       `;
-    }).join('');
+    } catch (e) {
+      container.innerHTML = `<div class="text-gray-600 dark:text-gray-400">Unable to load verse.</div>`;
+    }
   }
 
   async initCTA() {
