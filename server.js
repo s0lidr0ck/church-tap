@@ -17,6 +17,15 @@ const { VerseImportService } = require('./services/verseService');
 const CalendarSyncService = require('./services/calendarSyncService');
 const { db } = require('./config/database');
 
+// Lightweight schema guard for newly added, backwards-compatible columns.
+// (Prevents runtime errors if migrations haven't been applied yet.)
+db.query(`ALTER TABLE ct_organizations ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'approved'`)
+  .catch((e) => console.warn('Schema guard: unable to add ct_organizations.review_status (continuing):', e.message));
+db.query(`ALTER TABLE ct_organizations ADD COLUMN IF NOT EXISTS created_by_bracelet_uid TEXT`)
+  .catch((e) => console.warn('Schema guard: unable to add ct_organizations.created_by_bracelet_uid (continuing):', e.message));
+db.query(`ALTER TABLE ct_organizations ADD COLUMN IF NOT EXISTS created_via TEXT`)
+  .catch((e) => console.warn('Schema guard: unable to add ct_organizations.created_via (continuing):', e.message));
+
 // Import route modules
 const staticRoutes = require('./routes/static.routes');
 const verseRoutes = require('./routes/verse.routes');
@@ -46,6 +55,11 @@ const collectionsRoutes = require('./routes/collections.routes');
 const personalPrayersRoutes = require('./routes/personalPrayers.routes');
 const dictionaryRoutes = require('./routes/dictionary.routes');
 const commentaryRoutes = require('./routes/commentary.routes');
+const highlightsRoutes = require('./routes/highlights.routes');
+const verseNotesRoutes = require('./routes/verseNotes.routes');
+const meSearchRoutes = require('./routes/meSearch.routes');
+const scriptureHighlightsRoutes = require('./routes/scriptureHighlights.routes');
+const scriptureNotesRoutes = require('./routes/scriptureNotes.routes');
 
 // Initialize Express app
 const app = express();
@@ -128,6 +142,11 @@ app.use('/api/collections', collectionsRoutes);
 app.use('/api/personal-prayers', personalPrayersRoutes);
 app.use('/api/dictionary', dictionaryRoutes);
 app.use('/api/commentary', commentaryRoutes);
+app.use('/api/highlights', highlightsRoutes);
+app.use('/api/verse-notes', verseNotesRoutes);
+app.use('/api/me', meSearchRoutes);
+app.use('/api/scripture-highlights', scriptureHighlightsRoutes);
+app.use('/api/scripture-notes', scriptureNotesRoutes);
 
 // Tap routes - must come before static routes to handle /t/<uid>
 app.use('/', tapRoutes);

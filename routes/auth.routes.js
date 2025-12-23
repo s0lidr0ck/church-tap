@@ -229,6 +229,8 @@ router.get('/me', authenticateUser, (req, res) => {
           struggles: user.struggles ? JSON.parse(user.struggles) : [],
           prayerFrequency: user.prayer_frequency,
           preferredTranslation: user.preferred_translation,
+          defaultCommentarySourceKey: user.default_commentary_source_key,
+          defaultDictionarySourceKey: user.default_dictionary_source_key,
           studyModeEnabled: user.study_mode_enabled,
           notificationEnabled: user.notification_enabled,
           notificationTime: user.notification_time,
@@ -284,6 +286,8 @@ router.put('/preferences', authenticateUser, (req, res) => {
     'struggles',
     'prayerFrequency',
     'preferredTranslation',
+    'defaultCommentarySourceKey',
+    'defaultDictionarySourceKey',
     'notificationEnabled',
     'notificationTime',
     'timezone',
@@ -311,6 +315,8 @@ router.put('/preferences', authenticateUser, (req, res) => {
   if (Object.prototype.hasOwnProperty.call(patch, 'struggles')) addSet('struggles', JSON.stringify(patch.struggles || []));
   if (Object.prototype.hasOwnProperty.call(patch, 'prayerFrequency')) addSet('prayer_frequency', patch.prayerFrequency || null);
   if (Object.prototype.hasOwnProperty.call(patch, 'preferredTranslation')) addSet('preferred_translation', patch.preferredTranslation || null);
+  if (Object.prototype.hasOwnProperty.call(patch, 'defaultCommentarySourceKey')) addSet('default_commentary_source_key', patch.defaultCommentarySourceKey || null);
+  if (Object.prototype.hasOwnProperty.call(patch, 'defaultDictionarySourceKey')) addSet('default_dictionary_source_key', patch.defaultDictionarySourceKey || null);
   if (Object.prototype.hasOwnProperty.call(patch, 'notificationEnabled')) addSet('notification_enabled', patch.notificationEnabled);
   if (Object.prototype.hasOwnProperty.call(patch, 'notificationTime')) addSet('notification_time', patch.notificationTime || null);
   if (Object.prototype.hasOwnProperty.call(patch, 'timezone')) addSet('timezone', patch.timezone || null);

@@ -34,6 +34,44 @@ async function resolveOrgIdFromRequest(req) {
   return 1;
 }
 
+function slugifySubdomainBase(name) {
+  const raw = (name || '').toString().trim().toLowerCase();
+  // Keep alphanumerics; convert whitespace to hyphens; collapse hyphens.
+  const slug = raw
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  // Fallback if empty/too short
+  if (!slug || slug.length < 3) return 'group';
+  return slug.slice(0, 50);
+}
+
+async function subdomainExists(client, subdomain) {
+  const s = subdomain.toLowerCase();
+  const r = await client.query(`
+    SELECT 1 FROM ct_organizations WHERE subdomain = $1
+    UNION
+    SELECT 1 FROM ct_organization_requests WHERE requested_subdomain = $1 AND status IN ('pending', 'under_review')
+    LIMIT 1
+  `, [s]);
+  return (r.rows?.length || 0) > 0;
+}
+
+async function generateUniqueSubdomain(client, orgName) {
+  const base = slugifySubdomainBase(orgName);
+  let candidate = base;
+  for (let i = 0; i < 20; i++) {
+    // eslint-disable-next-line no-await-in-loop
+    const exists = await subdomainExists(client, candidate);
+    if (!exists) return candidate;
+    const suffix = Math.random().toString(36).slice(2, 6);
+    candidate = `${base}-${suffix}`.slice(0, 63);
+  }
+  // Worst-case fallback
+  return `${base}-${Date.now().toString(36).slice(-6)}`.slice(0, 63);
+}
+
 async function fetchPassageFromBolls({ translation, book_number, chapter, verse_start, verse_end }) {
   const start = parseInt(verse_start, 10);
   const end = parseInt(verse_end, 10);
@@ -616,7 +654,7 @@ router.get('/public', (req, res) => {
 });
 
 // Submit new organization request
-router.post('/request', (req, res) => {
+router.post('/request', async (req, res) => {
   const {
     tag_id,
     organization_name,
@@ -639,6 +677,14 @@ router.post('/request', (req, res) => {
     return res.status(400).json({
       success: false,
       error: 'Missing required fields: tag_id, organization_name, organization_type, street_address, city, state, zip_code, first_name, last_name, contact_email'
+    });
+  }
+
+  const { acknowledge_review, acknowledge_removal } = req.body;
+  if (!acknowledge_review || !acknowledge_removal) {
+    return res.status(400).json({
+      success: false,
+      error: 'You must acknowledge the review and removal terms to create a group.'
     });
   }
 
@@ -670,47 +716,116 @@ router.post('/request', (req, res) => {
     tag_id
   });
 
-  db.query(`
-    INSERT INTO ct_organization_requests (
-      org_name, org_type, description, address, contact_name,
-      contact_email, contact_phone, requested_subdomain,
-      submitted_at, status, bracelet_uid, street_address, city, state, zip_code, country,
-      first_name, last_name, website
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), 'pending', $9, $10, $11, $12, $13, $14, $15, $16, $17)
-    RETURNING id
-  `, [
-    organization_name,
-    organization_type,
-    description || '',
-    full_address,
-    contact_name,
-    contact_email,
-    phone || null,
-    suggested_subdomain,
-    tag_id,
-    street_address,
-    city,
-    state,
-    zip_code,
-    country || 'United States',
-    first_name,
-    last_name,
-    website || null
-  ], (err, result) => {
-    if (err) {
-      console.error('Error submitting organization request:', err);
-      return res.status(500).json({ success: false, error: 'Failed to submit request' });
+  let client;
+  try {
+    client = await db.connect();
+    await client.query('BEGIN');
+
+    const uniqueSubdomain = await generateUniqueSubdomain(client, organization_name);
+
+    // Create organization immediately (pending review).
+    const orgInsert = await client.query(`
+      INSERT INTO ct_organizations (
+        name, subdomain, plan_type, contact_email, contact_phone, address,
+        org_type, city, state, zip_code, country, join_type, is_active,
+        review_status, created_by_bracelet_uid, created_via
+      ) VALUES ($1, $2, 'basic', $3, $4, $5, $6, $7, $8, $9, $10, 'open', TRUE, 'pending_review', $11, 'self_serve_request_form')
+      RETURNING id
+    `, [
+      organization_name,
+      uniqueSubdomain,
+      contact_email.toLowerCase().trim(),
+      phone || null,
+      full_address,
+      organization_type,
+      city,
+      state,
+      zip_code,
+      (country || 'United States'),
+      tag_id
+    ]);
+
+    const organizationId = orgInsert.rows[0].id;
+
+    // Record request for master review (still shows up in Master Portal).
+    const requestInsert = await client.query(`
+      INSERT INTO ct_organization_requests (
+        org_name, org_type, description, address, contact_name,
+        contact_email, contact_phone, requested_subdomain,
+        submitted_at, status, bracelet_uid, street_address, city, state, zip_code, country,
+        first_name, last_name, website, organization_id, source_ip, user_agent
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), 'pending', $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+      RETURNING id
+    `, [
+      organization_name,
+      organization_type,
+      description || '',
+      full_address,
+      contact_name,
+      contact_email.toLowerCase().trim(),
+      phone || null,
+      uniqueSubdomain,
+      tag_id,
+      street_address,
+      city,
+      state,
+      zip_code,
+      country || 'United States',
+      first_name,
+      last_name,
+      website || null,
+      organizationId,
+      req.ip,
+      req.get('user-agent') || null
+    ]);
+
+    const requestId = requestInsert.rows[0].id;
+
+    // Auto-claim: associate this bracelet UID to the new organization for immediate use.
+    // (This follows the same logic as `routes/bracelets.routes.js` without assuming a UNIQUE constraint.)
+    const existingMembership = await client.query(
+      `SELECT id, organization_id FROM ct_bracelet_memberships WHERE bracelet_uid = $1`,
+      [tag_id]
+    );
+
+    if (existingMembership.rows.length > 0) {
+      await client.query(
+        `UPDATE ct_bracelet_memberships
+         SET organization_id = $1, status = 'approved', created_at = NOW()
+         WHERE bracelet_uid = $2`,
+        [organizationId, tag_id]
+      );
+    } else {
+      await client.query(
+        `INSERT INTO ct_bracelet_memberships (bracelet_uid, organization_id, status, created_at)
+         VALUES ($1, $2, 'approved', NOW())`,
+        [tag_id, organizationId]
+      );
     }
 
-    const requestId = result.rows[0].id;
-    console.log('✅ Organization request submitted with ID:', requestId);
+    await client.query('COMMIT');
 
-    res.json({
+    console.log('✅ Organization created (pending review) with ID:', organizationId, 'request:', requestId);
+    return res.json({
       success: true,
-      message: 'Organization request submitted successfully',
-      request_id: requestId
+      message: 'Organization created (pending review).',
+      request_id: requestId,
+      organization: {
+        id: organizationId,
+        subdomain: uniqueSubdomain,
+        name: organization_name,
+        review_status: 'pending_review'
+      }
     });
-  });
+  } catch (err) {
+    if (client) {
+      try { await client.query('ROLLBACK'); } catch (e) { /* ignore */ }
+    }
+    console.error('Error creating organization from request:', err);
+    return res.status(500).json({ success: false, error: 'Failed to create organization' });
+  } finally {
+    if (client) client.release();
+  }
 });
 
 module.exports = router;

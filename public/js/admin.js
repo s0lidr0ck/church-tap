@@ -330,12 +330,12 @@ class AdminDashboard {
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
         const defaults = {
-          primary: '#345995',
-          accent: '#EAC435',
-          bg: '#FCF7FF',
+          primary: '#055089',
+          accent: '#eb5e28',
+          bg: '#FDFEF9',
           muted: '#C4CAD0',
-          success: '#53917E',
-          black: '#101916'
+          success: '#04b7b1',
+          black: '#14080e'
         };
         this.setCssVars(defaults);
         try { localStorage.removeItem('brandTheme'); } catch (e) {}
@@ -2012,7 +2012,7 @@ class AdminDashboard {
           </div>
           <div>
             <label class="text-sm">BG Color</label>
-            <input id="cta_bg" class="w-full px-3 py-2 border rounded-md" value="${cta?.bg_color || '#0ea5e9'}">
+            <input id="cta_bg" class="w-full px-3 py-2 border rounded-md" value="${cta?.bg_color || '#055089'}">
           </div>
           <div>
             <label class="text-sm">Text Color</label>

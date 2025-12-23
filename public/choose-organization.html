@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-  <meta name="theme-color" content="#0ea5e9">
+  <meta name="theme-color" content="#055089">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Church Tap">
@@ -267,9 +267,9 @@
           <!-- Request New Organization -->
           <div id="requestSection" class="hidden mt-8 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Don't see your group?</h3>
-            <p class="text-gray-600 dark:text-gray-400 mb-4">You can request to add a new organization to ChurchTap.</p>
+            <p class="text-gray-600 dark:text-gray-400 mb-4">Create it now. Your group will be visible immediately, and pending review ChurchTap may contact you to verify.</p>
             <button id="requestOrgBtn" class="w-full px-4 py-2 border border-blue-300 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20">
-              📝 Request New Organization
+              ➕ Create a New Group
             </button>
           </div>
         </div>
@@ -564,6 +564,12 @@
         const emoji = typeEmoji[org.type] || '⛪';
         const distanceText = org.distance !== null ? `${org.distance} mi` : '';
 
+        const pendingBadge = (org.reviewStatus === 'pending_review') ? `
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200">
+            Pending review
+          </span>
+        ` : '';
+
         return `
           <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer transition-colors group"
                onclick="organizationChooser.selectOrganization(event, ${org.id}, '${org.name.replace(/'/g, '\\\'')}')"
@@ -575,6 +581,7 @@
                   <h3 class="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                     ${org.name}
                   </h3>
+                  ${pendingBadge}
                 </div>
 
                 ${org.location ? `

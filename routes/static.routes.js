@@ -64,6 +64,16 @@ router.get('/me', (req, res) => {
   res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
 
+router.get('/links', (req, res) => {
+  setNoStore(res);
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
+router.get('/menu', (req, res) => {
+  setNoStore(res);
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
 router.get('/study', (req, res) => {
   setNoStore(res);
   res.sendFile(path.join(__dirname, '../public', 'index.html'));

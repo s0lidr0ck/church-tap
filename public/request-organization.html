@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-  <meta name="theme-color" content="#0ea5e9">
+  <meta name="theme-color" content="#055089">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Church Tap">
 
-  <title>Request a Group - Church Tap</title>
+  <title>Create a Group - Church Tap</title>
   <meta name="description" content="Request to add your church or ministry group to Church Tap.">
 
   <!-- PWA Manifest -->
@@ -92,8 +92,8 @@
         <div class="flex items-center space-x-2">
           <span class="text-2xl">📝</span>
           <div>
-            <h1 class="text-lg font-semibold text-gray-800 dark:text-white">Request a Group</h1>
-            <p class="text-xs text-gray-600 dark:text-gray-400">Add your organization</p>
+            <h1 class="text-lg font-semibold text-gray-800 dark:text-white">Create a Group</h1>
+            <p class="text-xs text-gray-600 dark:text-gray-400">Start your organization in ChurchTap</p>
           </div>
         </div>
 
@@ -117,10 +117,15 @@
           <!-- Success State -->
           <div id="successState" class="hidden text-center py-12">
             <div class="text-6xl mb-4">✅</div>
-            <h3 class="text-lg font-semibold text-green-800 dark:text-green-300 mb-2">Request Submitted!</h3>
-            <p class="text-green-600 dark:text-green-400 mb-6">Your organization request has been submitted. We'll review it and get back to you soon.</p>
+            <h3 class="text-lg font-semibold text-green-800 dark:text-green-300 mb-2">Group Created!</h3>
+            <p class="text-green-600 dark:text-green-400 mb-4">Your group is live now and marked <span class="font-semibold">pending review</span>.</p>
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 text-left mb-6">
+              <div class="text-sm text-gray-700 dark:text-gray-300 font-medium mb-1">Share link</div>
+              <div class="text-sm text-gray-600 dark:text-gray-400 break-all" id="createdGroupLink">churchtap.app/…</div>
+              <div class="text-xs text-gray-500 dark:text-gray-500 mt-2">ChurchTap may contact you to verify. Groups may be removed by ChurchTap at any time.</div>
+            </div>
             <button onclick="window.location.href = '/choose-organization?uid=' + getTagIdFromUrl()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
-              ← Back to Groups
+              Continue
             </button>
           </div>
 
@@ -131,8 +136,8 @@
             <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
               <div class="text-center mb-4">
                 <div class="text-4xl mb-2">⛪</div>
-                <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Request Your Organization</h2>
-                <p class="text-gray-600 dark:text-gray-400">Help us add your church, ministry, or group to Church Tap so others can connect with you.</p>
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Create Your Group</h2>
+                <p class="text-gray-600 dark:text-gray-400">Create your church, ministry, or group now. Your group will appear immediately, but is pending review.</p>
               </div>
             </div>
 
@@ -344,6 +349,19 @@
                 ></textarea>
               </div>
 
+              <!-- Terms -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <div class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Before you create your group</div>
+                <label class="flex items-start space-x-3 text-sm text-gray-600 dark:text-gray-400">
+                  <input id="ackReview" name="ackReview" type="checkbox" required class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                  <span>I understand my group is <span class="font-medium">pending review</span> and ChurchTap may contact me to verify.</span>
+                </label>
+                <label class="flex items-start space-x-3 text-sm text-gray-600 dark:text-gray-400 mt-3">
+                  <input id="ackRemoval" name="ackRemoval" type="checkbox" required class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                  <span>I understand groups may be removed by ChurchTap at any time.</span>
+                </label>
+              </div>
+
               <!-- Submit Button -->
               <div class="pt-4">
                 <button
@@ -351,7 +369,7 @@
                   id="submitBtn"
                   class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  Submit Request
+                  Create Group
                 </button>
               </div>
 
@@ -367,10 +385,9 @@
             <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
               <h3 class="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">What happens next?</h3>
               <ul class="text-sm text-blue-700 dark:text-blue-400 space-y-1">
-                <li>• We'll review your request within 1-2 business days</li>
-                <li>• You'll receive an email with setup instructions</li>
-                <li>• Once approved, people can find and join your group</li>
-                <li>• You'll get admin access to manage your group's content</li>
+                <li>• Your group is created immediately and visible in search</li>
+                <li>• Pending review, ChurchTap may contact you to verify details</li>
+                <li>• Groups may be removed by ChurchTap at any time</li>
               </ul>
             </div>
 
@@ -456,7 +473,9 @@
             contact_email: formData.get('contactEmail'),
             phone: formData.get('phone'),
             website: formData.get('website'),
-            description: formData.get('description')
+            description: formData.get('description'),
+            acknowledge_review: document.getElementById('ackReview')?.checked || false,
+            acknowledge_removal: document.getElementById('ackRemoval')?.checked || false
           };
 
           const response = await fetch('/api/organization/request', {
@@ -474,7 +493,7 @@
             throw new Error(errorData.error || 'Failed to submit request');
           }
 
-          this.showSuccess();
+          this.showSuccess((await response.json()).organization);
 
         } catch (error) {
           console.error('Error submitting organization request:', error);
@@ -494,10 +513,15 @@
         document.getElementById('submitBtn').disabled = false;
       }
 
-      showSuccess() {
+      showSuccess(organization) {
         document.getElementById('requestForm').classList.add('hidden');
         document.getElementById('errorState').classList.add('hidden');
         document.getElementById('successState').classList.remove('hidden');
+
+        const linkEl = document.getElementById('createdGroupLink');
+        if (linkEl && organization?.subdomain) {
+          linkEl.textContent = `${window.location.host}/${organization.subdomain}`;
+        }
       }
 
       showError(message) {

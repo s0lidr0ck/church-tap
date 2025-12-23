@@ -28,8 +28,11 @@ logs/
 public/uploads/
 database.db
 backups/
+exports/
 
 # Misc
 *.sqlite
 *.sqlite3
 *.log
+*.mybible
+*.mybible.gz

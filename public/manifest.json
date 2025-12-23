@@ -4,8 +4,8 @@
   "description": "NFC-powered engagement for your church",
   "start_url": "/verse",
   "display": "standalone",
-  "background_color": "#0ea5e9",
-  "theme_color": "#0ea5e9",
+  "background_color": "#FDFEF9",
+  "theme_color": "#055089",
   "orientation": "portrait",
   "icons": [
     {

@@ -652,7 +652,61 @@ router.post('/organization-requests/:id/approve', requireMasterAuth, async (req,
       const request = result.rows[0];
       const subdomain = custom_subdomain || request.requested_subdomain;
       const planType = custom_plan_type || 'standard';
-      
+
+      // If the org was already created via self-serve flow, reuse it.
+      const existingOrganizationId = request.organization_id || null;
+      if (existingOrganizationId) {
+        try {
+          await db.query(`UPDATE ct_organizations SET review_status = 'approved' WHERE id = $1`, [existingOrganizationId]);
+        } catch (e) {
+          console.error('Error marking organization approved:', e);
+          // non-fatal; continue
+        }
+
+        // Generate setup token for admin account creation
+        const setupToken = require('crypto').randomBytes(32).toString('hex');
+        const tokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+        db.query(`
+          UPDATE ct_organization_requests 
+          SET status = 'approved', reviewed_at = NOW(), reviewed_by = $1,
+              organization_id = $2, setup_token = $3, setup_token_expires_at = $4
+          WHERE id = $5
+        `, [req.session.masterAdminId, existingOrganizationId, setupToken, tokenExpires, id], (updateErr) => {
+          if (updateErr) {
+            console.error('Error updating request:', updateErr);
+            return res.status(500).json({ success: false, error: 'Failed to update request' });
+          }
+
+          // Log activity
+          db.query(`
+            INSERT INTO CT_master_admin_activity (
+              master_admin_id, action, resource_type, resource_id, details, ip_address
+            ) VALUES ($1, $2, $3, $4, $5, $6)
+          `, [
+            req.session.masterAdminId,
+            'approve_org_request',
+            'organization_request',
+            id,
+            JSON.stringify({ organizationId: existingOrganizationId, subdomain, planType, reusedExistingOrganization: true }),
+            req.ip
+          ], (logErr) => {
+            if (logErr) console.error('Error logging activity:', logErr);
+          });
+
+          return res.json({ 
+            success: true, 
+            organization_id: existingOrganizationId,
+            setup_token: setupToken,
+            setup_url: `${req.protocol}://${req.get('host')}/setup/${setupToken}`,
+            message: 'Organization approved successfully.'
+          });
+        });
+
+        return;
+      }
+
+      // Otherwise, create the org the legacy way.
       // Check subdomain availability one more time
       db.query(`
         SELECT id FROM CT_organizations WHERE subdomain = $1
@@ -670,8 +724,8 @@ router.post('/organization-requests/:id/approve', requireMasterAuth, async (req,
         db.query(`
           INSERT INTO CT_organizations (
             name, subdomain, plan_type, contact_email, contact_phone, 
-            address, org_type, city, state, zip_code, country, join_type
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            address, org_type, city, state, zip_code, country, join_type, review_status, created_via
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'approved', 'master_approval')
           RETURNING id
         `, [
           request.org_name,

@@ -57,6 +57,10 @@ class ChurchTapApp {
     this.membershipContext = null;
     this.adminOrganizations = null;
 
+    // Private study artifacts (per-verse, per-user)
+    this.currentHighlightKey = null;
+    this.currentNotesCount = 0;
+
     // Per-group feature flags (loaded from /api/organization/features)
     this.orgFeatures = null;
     this.translationCatalog = [];
@@ -78,6 +82,685 @@ class ChurchTapApp {
       this.showCriticalError('Application failed to initialize. Please refresh the page.');
       this.hideSplashScreen();
     });
+  }
+
+  // ===========================
+  // Private Verse Study Tools (Highlights + Notes)
+  // ===========================
+
+  canUsePrivateVerseTools() {
+    return !!(this.currentUser && this.membershipContext?.active_organization_id);
+  }
+
+  getVerseContainerEl() {
+    return document.querySelector('.verse-container') || null;
+  }
+
+  clearVerseHighlightClasses() {
+    const el = this.getVerseContainerEl();
+    if (!el) return;
+    const classes = Array.from(el.classList || []);
+    for (const c of classes) {
+      if (c.startsWith('ct-highlight-')) el.classList.remove(c);
+    }
+  }
+
+  applyVerseHighlight(colorKey) {
+    this.clearVerseHighlightClasses();
+    const el = this.getVerseContainerEl();
+    if (!el) return;
+    const key = String(colorKey || '').trim().toLowerCase();
+    if (!key) return;
+    el.classList.add(`ct-highlight-${key}`);
+  }
+
+  updateNotesBadge(count) {
+    const n = Number(count) || 0;
+    const badges = [
+      document.getElementById('notesCountBadge'),   // legacy (today action row)
+      document.getElementById('meNotesCountBadge')  // Me tab
+    ].filter(Boolean);
+
+    for (const badge of badges) {
+      if (n > 0) {
+        badge.textContent = String(n);
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+        badge.textContent = '0';
+      }
+    }
+  }
+
+  updateVersePrivateToolsVisibility() {
+    const canUse = this.canUsePrivateVerseTools();
+    const favoriteBtn = document.getElementById('favoriteBtn');
+
+    // Match how "Favorites" are intended to behave: only show when logged in with an active group.
+    if (favoriteBtn) favoriteBtn.classList.toggle('hidden', !canUse);
+
+    if (!canUse) {
+      this.currentHighlightKey = null;
+      this.currentNotesCount = 0;
+      this.clearVerseHighlightClasses();
+      this.updateNotesBadge(0);
+    }
+  }
+
+  async refreshVersePrivateToolsState() {
+    // Called after loading/displaying the current verse.
+    if (!this.currentVerse) return;
+    if (!this.canUsePrivateVerseTools()) {
+      this.updateVersePrivateToolsVisibility();
+      return;
+    }
+
+    const verseId = Number(this.currentVerse.id);
+    if (!verseId || Number.isNaN(verseId)) return;
+
+    try {
+      // Highlight
+      const hlRes = await fetch(this.buildApiUrl(`/api/highlights/verse/${verseId}`), { credentials: 'include' });
+      const hlData = await hlRes.json().catch(() => null);
+      const colorKey = hlRes.ok && hlData?.success ? (hlData.highlight?.color_key || null) : null;
+      this.currentHighlightKey = colorKey;
+      if (colorKey) this.applyVerseHighlight(colorKey);
+      else this.clearVerseHighlightClasses();
+    } catch (e) {
+      // ignore
+    }
+
+    try {
+      // Notes (we use list endpoint and just count rows)
+      const notesRes = await fetch(this.buildApiUrl(`/api/verse-notes/verse/${verseId}`), { credentials: 'include' });
+      const notesData = await notesRes.json().catch(() => null);
+      const notes = notesRes.ok && notesData?.success && Array.isArray(notesData.notes) ? notesData.notes : [];
+      this.currentNotesCount = notes.length;
+      this.updateNotesBadge(notes.length);
+    } catch (e) {
+      this.currentNotesCount = 0;
+      this.updateNotesBadge(0);
+    }
+  }
+
+  openHighlightFromMe() {
+    if (!this.canUsePrivateVerseTools()) {
+      this.showToast('Please login to use highlights');
+      this.showLoginModal();
+      return;
+    }
+    if (!this.currentVerse) {
+      this.showToast('Open Today’s verse first');
+      this.goToToday();
+      return;
+    }
+    this.showHighlightPicker();
+  }
+
+  openNotesFromMe() {
+    if (!this.canUsePrivateVerseTools()) {
+      this.showToast('Please login to use notes');
+      this.showLoginModal();
+      return;
+    }
+    if (!this.currentVerse) {
+      this.showToast('Open Today’s verse first');
+      this.goToToday();
+      return;
+    }
+    this.showVerseNotesModal();
+  }
+
+  showHighlightPicker() {
+    if (!this.currentVerse) return;
+    if (!this.canUsePrivateVerseTools()) {
+      this.showToast('Please login to use highlights');
+      this.showLoginModal();
+      return;
+    }
+
+    const colors = [
+      { key: 'yellow', label: 'Yellow', swatch: 'var(--hl-yellow-bg)' },
+      { key: 'amber', label: 'Amber', swatch: 'var(--hl-amber-bg)' },
+      { key: 'orange', label: 'Orange', swatch: 'var(--hl-orange-bg)' },
+      { key: 'red', label: 'Red', swatch: 'var(--hl-red-bg)' },
+      { key: 'pink', label: 'Pink', swatch: 'var(--hl-pink-bg)' },
+      { key: 'purple', label: 'Purple', swatch: 'var(--hl-purple-bg)' },
+      { key: 'blue', label: 'Blue', swatch: 'var(--hl-blue-bg)' },
+      { key: 'green', label: 'Green', swatch: 'var(--hl-green-bg)' }
+    ];
+
+    const current = String(this.currentHighlightKey || '').trim().toLowerCase();
+
+    const buttons = colors.map(c => {
+      const isActive = current === c.key;
+      return `
+        <button
+          class="flex items-center justify-between w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+          onclick="window.churchTapApp.setVerseHighlight('${c.key}')"
+          aria-label="Set highlight ${c.label}"
+        >
+          <div class="flex items-center gap-3">
+            <span class="inline-block w-5 h-5 rounded-md border border-gray-300 dark:border-gray-600" style="background:${c.swatch};"></span>
+            <span class="text-sm text-gray-800 dark:text-gray-200">${c.label}</span>
+          </div>
+          ${isActive ? `<span class="text-xs font-semibold text-primary-600 dark:text-primary-400">Selected</span>` : `<span class="text-xs text-gray-400">›</span>`}
+        </button>
+      `;
+    }).join('');
+
+    const clearBtn = current
+      ? `<button class="w-full px-3 py-2 rounded-lg border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                 onclick="window.churchTapApp.setVerseHighlight(null)">
+            Clear highlight
+         </button>`
+      : '';
+
+    const ref = this.escapeHtml(this.currentVerse?.bible_reference || '');
+
+    this.showModal('Highlight', `
+      <div class="space-y-3">
+        <div class="text-xs text-gray-500 dark:text-gray-400">${ref ? `For ${ref}` : 'Choose a color'}</div>
+        <div class="space-y-2">${buttons}</div>
+        ${clearBtn}
+        <div class="flex justify-end">
+          <button class="btn-secondary" onclick="window.churchTapApp.closeModal()">Close</button>
+        </div>
+      </div>
+    `);
+  }
+
+  async setVerseHighlight(colorKey) {
+    if (!this.currentVerse) return;
+    if (!this.canUsePrivateVerseTools()) return;
+    const verseId = Number(this.currentVerse.id);
+    if (!verseId || Number.isNaN(verseId)) return;
+
+    try {
+      const res = await fetch(this.buildApiUrl(`/api/highlights/verse/${verseId}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ color_key: colorKey })
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        this.showToast(data?.error || 'Failed to update highlight');
+        return;
+      }
+
+      this.currentHighlightKey = data.highlight?.color_key || null;
+      if (this.currentHighlightKey) this.applyVerseHighlight(this.currentHighlightKey);
+      else this.clearVerseHighlightClasses();
+    } catch (e) {
+      console.error('setVerseHighlight error:', e);
+      this.showToast('Failed to update highlight');
+    }
+  }
+
+  markdownToSafeHtml(markdown) {
+    // Minimal markdown renderer (safe-by-construction).
+    // - Escapes input first
+    // - Emits only a small allowlist of tags used elsewhere (plus PRE)
+    const raw = String(markdown ?? '').replace(/\r\n/g, '\n');
+    if (!raw.trim()) return '';
+
+    const esc = (s) => this.escapeHtml(s);
+    const lines = raw.split('\n');
+    const out = [];
+
+    let inCode = false;
+    let codeBuf = [];
+    let inUl = false;
+    let inOl = false;
+    let paraBuf = [];
+
+    const flushPara = () => {
+      const text = paraBuf.join('\n').trim();
+      paraBuf = [];
+      if (!text) return;
+      out.push(`<p>${this.renderInlineMarkdown(text)}</p>`);
+    };
+
+    const closeLists = () => {
+      if (inUl) { out.push(`</ul>`); inUl = false; }
+      if (inOl) { out.push(`</ol>`); inOl = false; }
+    };
+
+    for (const lineRaw of lines) {
+      const line = lineRaw ?? '';
+
+      if (line.trim().startsWith('```')) {
+        if (!inCode) {
+          flushPara();
+          closeLists();
+          inCode = true;
+          codeBuf = [];
+        } else {
+          const code = esc(codeBuf.join('\n'));
+          out.push(`<pre><code>${code}</code></pre>`);
+          inCode = false;
+          codeBuf = [];
+        }
+        continue;
+      }
+
+      if (inCode) {
+        codeBuf.push(line);
+        continue;
+      }
+
+      // Blank line breaks paragraphs/lists
+      if (!line.trim()) {
+        flushPara();
+        closeLists();
+        continue;
+      }
+
+      // Blockquote
+      if (line.trim().startsWith('> ')) {
+        flushPara();
+        closeLists();
+        const q = line.trim().slice(2);
+        out.push(`<blockquote>${this.renderInlineMarkdown(q)}</blockquote>`);
+        continue;
+      }
+
+      // Ordered list
+      const olMatch = line.match(/^\s*(\d+)\.\s+(.*)$/);
+      if (olMatch) {
+        flushPara();
+        if (!inOl) {
+          closeLists();
+          out.push('<ol>');
+          inOl = true;
+        }
+        out.push(`<li>${this.renderInlineMarkdown(olMatch[2])}</li>`);
+        continue;
+      }
+
+      // Unordered list
+      const ulMatch = line.match(/^\s*[-*]\s+(.*)$/);
+      if (ulMatch) {
+        flushPara();
+        if (!inUl) {
+          closeLists();
+          out.push('<ul>');
+          inUl = true;
+        }
+        out.push(`<li>${this.renderInlineMarkdown(ulMatch[1])}</li>`);
+        continue;
+      }
+
+      // Normal paragraph line
+      paraBuf.push(line);
+    }
+
+    if (inCode) {
+      const code = esc(codeBuf.join('\n'));
+      out.push(`<pre><code>${code}</code></pre>`);
+    }
+    flushPara();
+    closeLists();
+
+    // Sanitize the generated HTML using existing allowlist sanitizer (now supports PRE).
+    return this.sanitizeImportedHtml(out.join('\n'));
+  }
+
+  renderInlineMarkdown(text) {
+    // Inline formatting on already-escaped text.
+    // We escape first, then replace markdown tokens with tags.
+    let s = this.escapeHtml(String(text ?? ''));
+
+    // Inline code: `code`
+    s = s.replace(/`([^`]+)`/g, (_m, code) => `<code>${code}</code>`);
+
+    // Bold: **text**
+    s = s.replace(/\*\*([^*]+)\*\*/g, (_m, inner) => `<strong>${inner}</strong>`);
+
+    // Italic: *text* (simple)
+    s = s.replace(/\*([^*]+)\*/g, (_m, inner) => `<em>${inner}</em>`);
+
+    // Line breaks inside paragraphs
+    s = s.replace(/\n/g, '<br>');
+    return s;
+  }
+
+  async showVerseNotesModal() {
+    if (!this.currentVerse) return;
+    if (!this.canUsePrivateVerseTools()) {
+      this.showToast('Please login to use notes');
+      this.showLoginModal();
+      return;
+    }
+
+    const verseId = Number(this.currentVerse.id);
+    if (!verseId || Number.isNaN(verseId)) return;
+
+    const ref = this.escapeHtml(this.currentVerse?.bible_reference || 'Verse');
+
+    this.showModal('Notes', `
+      <div class="space-y-3">
+        <div class="text-xs text-gray-500 dark:text-gray-400">Private notes for ${ref}</div>
+        <div class="flex items-center gap-2">
+          <button class="btn-primary text-sm" onclick="window.churchTapApp.openNoteEditor(${verseId})">+ New Note</button>
+          <button class="btn-secondary text-sm" onclick="window.churchTapApp.refreshNotesList(${verseId})">Refresh</button>
+        </div>
+        <div id="verseNotesList" class="space-y-2">
+          <div class="text-sm text-gray-600 dark:text-gray-400">Loading…</div>
+        </div>
+      </div>
+    `);
+
+    await this.refreshNotesList(verseId);
+  }
+
+  async refreshNotesList(verseId) {
+    const listEl = document.getElementById('verseNotesList');
+    if (!listEl) return;
+
+    try {
+      const res = await fetch(this.buildApiUrl(`/api/verse-notes/verse/${Number(verseId)}`), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        listEl.innerHTML = `<div class="text-sm text-red-600">${this.escapeHtml(data?.error || 'Unable to load notes')}</div>`;
+        return;
+      }
+
+      const notes = Array.isArray(data.notes) ? data.notes : [];
+      this.currentNotesCount = notes.length;
+      this.updateNotesBadge(notes.length);
+
+      if (notes.length === 0) {
+        listEl.innerHTML = `<div class="text-sm text-gray-600 dark:text-gray-400">No notes yet. Add one!</div>`;
+        return;
+      }
+
+      listEl.innerHTML = notes.map(n => {
+        const id = Number(n.id);
+        const title = this.escapeHtml(n.title || 'Untitled');
+        const preview = this.escapeHtml(String(n.body_markdown || '').split('\n').slice(0, 2).join(' ').slice(0, 140));
+        const created = n.created_at ? new Date(n.created_at).toLocaleString() : '';
+        return `
+          <div class="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/30">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="text-sm font-semibold text-gray-900 dark:text-white truncate">${title}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">${this.escapeHtml(created)}</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button class="btn-secondary text-xs" onclick="window.churchTapApp.openNoteEditor(${Number(verseId)}, ${id})">Edit</button>
+                <button class="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 transition-colors text-xs"
+                        onclick="window.churchTapApp.deleteNote(${id}, ${Number(verseId)})">Delete</button>
+              </div>
+            </div>
+            ${preview ? `<div class="mt-2 text-sm text-gray-700 dark:text-gray-200">${preview}</div>` : ''}
+            <div class="mt-2">
+              <button class="text-xs text-primary-700 dark:text-primary-300 hover:underline" onclick="window.churchTapApp.previewNote(${id})">Preview</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (e) {
+      console.error('refreshNotesList error:', e);
+      listEl.innerHTML = `<div class="text-sm text-red-600">Unable to load notes.</div>`;
+    }
+  }
+
+  async previewNote(noteId) {
+    const id = Number(noteId);
+    if (!id || Number.isNaN(id)) return;
+    if (!this.canUsePrivateVerseTools()) return;
+
+    // We don't have a "get note by id" endpoint; fetch verse notes list and find it (keeps backend simple).
+    const verseId = Number(this.currentVerse?.id);
+    if (!verseId) return;
+    const res = await fetch(this.buildApiUrl(`/api/verse-notes/verse/${verseId}`), { credentials: 'include' });
+    const data = await res.json().catch(() => null);
+    const notes = res.ok && data?.success && Array.isArray(data.notes) ? data.notes : [];
+    const note = notes.find(n => Number(n.id) === id);
+    if (!note) return;
+
+    const title = this.escapeHtml(note.title || 'Untitled');
+    const html = this.markdownToSafeHtml(note.body_markdown || '');
+
+    this.showModal('Note Preview', `
+      <div class="space-y-3">
+        <div class="text-sm font-semibold text-gray-900 dark:text-white">${title}</div>
+        <div class="text-sm text-gray-700 dark:text-gray-200 leading-relaxed space-y-2">${html || '<p>(empty)</p>'}</div>
+        <div class="flex justify-end gap-2">
+          <button class="btn-secondary" onclick="window.churchTapApp.closeModal()">Close</button>
+        </div>
+      </div>
+    `);
+  }
+
+  async openNoteEditor(verseId, noteId = null) {
+    if (!this.canUsePrivateVerseTools()) return;
+    const vid = Number(verseId);
+    if (!vid || Number.isNaN(vid)) return;
+
+    let existing = null;
+    if (noteId) {
+      const res = await fetch(this.buildApiUrl(`/api/verse-notes/verse/${vid}`), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      const notes = res.ok && data?.success && Array.isArray(data.notes) ? data.notes : [];
+      existing = notes.find(n => Number(n.id) === Number(noteId)) || null;
+    }
+
+    const initTitle = this.escapeHtml(existing?.title || '');
+    const initBody = this.escapeHtml(existing?.body_markdown || '');
+
+    this.showModal(noteId ? 'Edit Note' : 'New Note', `
+      <div class="space-y-3">
+        <div class="space-y-2">
+          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Title (optional)</label>
+          <input id="noteTitleInput" type="text" value="${initTitle}"
+                 class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm" />
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('**','**')"><strong>B</strong></button>
+          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('*','*')"><em>I</em></button>
+          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('\\n- ','')">• List</button>
+          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('\\n> ','')">❝ Quote</button>
+          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown(String.fromCharCode(96), String.fromCharCode(96))">{ } Code</button>
+          <button class="btn-secondary text-xs" onclick="window.churchTapApp.toggleNotePreview()">Preview</button>
+        </div>
+
+        <div id="noteEditorWrap" class="space-y-2">
+          <textarea id="noteBodyInput" rows="8"
+                    class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                    placeholder="Write your note in markdown…">${initBody}</textarea>
+          <div class="text-xs text-gray-500 dark:text-gray-400">Tip: Use **bold**, *italic*, \`code\`, lists, and blockquotes.</div>
+        </div>
+
+        <div id="notePreviewWrap" class="hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/30 p-3 text-sm text-gray-700 dark:text-gray-200 leading-relaxed"></div>
+
+        <div class="flex justify-end gap-2">
+          <button class="btn-secondary" onclick="window.churchTapApp.closeModal()">Cancel</button>
+          <button class="btn-primary" onclick="window.churchTapApp.saveNote(${vid}, ${noteId ? Number(noteId) : 'null'})">Save</button>
+        </div>
+      </div>
+    `);
+  }
+
+  insertMarkdown(prefix, suffix) {
+    const ta = document.getElementById('noteBodyInput');
+    if (!ta) return;
+    const start = ta.selectionStart || 0;
+    const end = ta.selectionEnd || 0;
+    const val = String(ta.value || '');
+    const selected = val.slice(start, end);
+    const next = val.slice(0, start) + prefix + selected + suffix + val.slice(end);
+    ta.value = next;
+    const cursor = start + prefix.length + selected.length + suffix.length;
+    ta.focus();
+    ta.setSelectionRange(cursor, cursor);
+  }
+
+  toggleNotePreview() {
+    const editor = document.getElementById('noteEditorWrap');
+    const preview = document.getElementById('notePreviewWrap');
+    const ta = document.getElementById('noteBodyInput');
+    if (!editor || !preview || !ta) return;
+
+    const showingPreview = !preview.classList.contains('hidden');
+    if (showingPreview) {
+      preview.classList.add('hidden');
+      editor.classList.remove('hidden');
+      return;
+    }
+
+    const html = this.markdownToSafeHtml(ta.value || '');
+    preview.innerHTML = html || '<p class="text-gray-500">(empty)</p>';
+    editor.classList.add('hidden');
+    preview.classList.remove('hidden');
+  }
+
+  async saveNote(verseId, noteId) {
+    if (!this.canUsePrivateVerseTools()) return;
+    const vid = Number(verseId);
+    if (!vid || Number.isNaN(vid)) return;
+
+    const title = String(document.getElementById('noteTitleInput')?.value || '').trim();
+    const body = String(document.getElementById('noteBodyInput')?.value || '').replace(/\r\n/g, '\n').trim();
+    if (!body) {
+      this.showToast('Please write something first');
+      return;
+    }
+
+    try {
+      if (noteId) {
+        const res = await fetch(this.buildApiUrl(`/api/verse-notes/${Number(noteId)}`), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ title: title || null, body_markdown: body })
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.success) {
+          this.showToast(data?.error || 'Failed to save note');
+          return;
+        }
+      } else {
+        const res = await fetch(this.buildApiUrl(`/api/verse-notes/verse/${vid}`), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ title: title || null, body_markdown: body })
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.success) {
+          this.showToast(data?.error || 'Failed to save note');
+          return;
+        }
+      }
+
+      this.showToast('Saved');
+      // Return to notes list
+      await this.showVerseNotesModal();
+    } catch (e) {
+      console.error('saveNote error:', e);
+      this.showToast('Failed to save note');
+    }
+  }
+
+  async deleteNote(noteId, verseId) {
+    const id = Number(noteId);
+    const vid = Number(verseId);
+    if (!id || Number.isNaN(id) || !vid || Number.isNaN(vid)) return;
+    if (!window.confirm('Delete this note?')) return;
+
+    try {
+      const res = await fetch(this.buildApiUrl(`/api/verse-notes/${id}`), {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        this.showToast(data?.error || 'Failed to delete note');
+        return;
+      }
+      this.showToast('Deleted');
+      await this.refreshNotesList(vid);
+      await this.refreshVersePrivateToolsState();
+    } catch (e) {
+      console.error('deleteNote error:', e);
+      this.showToast('Failed to delete note');
+    }
+  }
+
+  showMyStuffSearchModal() {
+    if (!this.canUsePrivateVerseTools()) {
+      this.showToast('Please login to search your content');
+      this.showLoginModal();
+      return;
+    }
+
+    this.showModal('Search My Stuff', `
+      <div class="space-y-3">
+        <form id="myStuffSearchForm" class="flex items-center gap-2">
+          <input id="myStuffSearchInput" type="text" autocomplete="off" placeholder="Search notes, collections, prayers…"
+                 class="flex-1 min-w-0 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm" />
+          <button type="submit" class="btn-primary text-sm">Search</button>
+        </form>
+        <div id="myStuffSearchResults" class="space-y-2"></div>
+      </div>
+    `);
+
+    document.getElementById('myStuffSearchForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const q = String(document.getElementById('myStuffSearchInput')?.value || '').trim();
+      await this.runMyStuffSearch(q);
+    });
+
+    setTimeout(() => document.getElementById('myStuffSearchInput')?.focus(), 50);
+  }
+
+  async runMyStuffSearch(query) {
+    const q = String(query || '').trim();
+    const resultsEl = document.getElementById('myStuffSearchResults');
+    if (!resultsEl) return;
+
+    if (!q || q.length < 2) {
+      resultsEl.innerHTML = `<div class="text-sm text-gray-600 dark:text-gray-400">Type at least 2 characters.</div>`;
+      return;
+    }
+
+    resultsEl.innerHTML = `<div class="text-sm text-gray-600 dark:text-gray-400">Searching…</div>`;
+
+    try {
+      const res = await fetch(this.buildApiUrl(`/api/me/search?q=${encodeURIComponent(q)}&limit=25`), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        resultsEl.innerHTML = `<div class="text-sm text-red-600">${this.escapeHtml(data?.error || 'Search failed')}</div>`;
+        return;
+      }
+
+      const results = Array.isArray(data.results) ? data.results : [];
+      if (results.length === 0) {
+        resultsEl.innerHTML = `<div class="text-sm text-gray-600 dark:text-gray-400">No matches.</div>`;
+        return;
+      }
+
+      resultsEl.innerHTML = results.map(r => {
+        const type = this.escapeHtml(r.type || '');
+        const title = this.escapeHtml(r.title || '');
+        const snippet = this.escapeHtml(r.snippet || '');
+        const meta = r.type === 'note' && r.bible_reference ? this.escapeHtml(r.bible_reference) : '';
+        return `
+          <div class="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/30">
+            <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">${type}${meta ? ` • ${meta}` : ''}</div>
+            <div class="text-sm font-semibold text-gray-900 dark:text-white mt-1">${title}</div>
+            ${snippet ? `<div class="text-sm text-gray-700 dark:text-gray-200 mt-1">${snippet}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+    } catch (e) {
+      console.error('runMyStuffSearch error:', e);
+      resultsEl.innerHTML = `<div class="text-sm text-red-600">Search failed.</div>`;
+    }
   }
 
   // ===========================
@@ -104,13 +787,14 @@ class ChurchTapApp {
   loadStudyState() {
     let translation = '';
     try {
-      translation = String(localStorage.getItem('studyTranslation.v1') || '').toUpperCase();
+      // Defaults should come from Menu; Study page can override in-memory only.
+      translation = String(localStorage.getItem('defaultTranslation.v1') || '').toUpperCase();
     } catch (e) {}
     let commentarySourceKey = '';
     let dictionarySourceKey = '';
     try {
-      commentarySourceKey = String(localStorage.getItem('studyCommentarySource.v1') || '');
-      dictionarySourceKey = String(localStorage.getItem('studyDictionarySource.v1') || '');
+      commentarySourceKey = String(localStorage.getItem('defaultCommentarySource.v1') || '');
+      dictionarySourceKey = String(localStorage.getItem('defaultDictionarySource.v1') || '');
     } catch (e) {}
 
     return {
@@ -147,6 +831,7 @@ class ChurchTapApp {
     }
     await Promise.all(tasks);
     this.updateStudyPickerOptions();
+    this.updateMenuDefaultPickers?.();
   }
 
   updateStudyPickerOptions() {
@@ -201,18 +886,15 @@ class ChurchTapApp {
     const v = String(value || '').trim();
     if (mode === 'bible') {
       this.studyState.translation = v.toUpperCase();
-      try { localStorage.setItem('studyTranslation.v1', this.studyState.translation); } catch (e) {}
       this.runStudyLookup().catch(() => {});
       return;
     }
     if (mode === 'commentary') {
       this.studyState.commentarySourceKey = v;
-      try { localStorage.setItem('studyCommentarySource.v1', v); } catch (e) {}
       this.runStudyLookup().catch(() => {});
       return;
     }
     this.studyState.dictionarySourceKey = v;
-    try { localStorage.setItem('studyDictionarySource.v1', v); } catch (e) {}
     this.runStudyLookup().catch(() => {});
   }
 
@@ -490,6 +1172,38 @@ class ChurchTapApp {
       return;
     }
 
+    // Tab: Links
+    if (path === '/links') {
+      this.setActiveTab('links');
+      this.showPageContainer();
+      this.renderLinksPage();
+      return;
+    }
+
+    // Tab: Menu (Settings + Tools)
+    if (path === '/menu') {
+      this.setActiveTab('menu');
+      this.showPageContainer();
+      this.renderMenuPage();
+      return;
+    }
+
+    // Me: My Notes
+    if (path === '/my-notes') {
+      this.setActiveTab('me');
+      this.showPageContainer();
+      this.renderMyNotesPage();
+      return;
+    }
+
+    // Me: My Highlights
+    if (path === '/my-highlights') {
+      this.setActiveTab('me');
+      this.showPageContainer();
+      this.renderMyHighlightsPage();
+      return;
+    }
+
     // Tap route: /t/<UID> (show main verse view for this tag session)
     const tapMatch = path.match(/^\/t\/([^\/?#]+)$/);
     if (tapMatch) {
@@ -591,7 +1305,7 @@ class ChurchTapApp {
   // ===========================
   setActiveTab(tabName) {
     const tab = String(tabName || '').toLowerCase();
-    const all = ['today', 'explore', 'community', 'saved', 'me'];
+    const all = ['today', 'explore', 'community', 'links', 'menu', 'saved', 'me'];
     all.forEach(t => {
       const icon = document.querySelector(`[data-tab-icon="${t}"]`);
       const label = document.querySelector(`[data-tab-label="${t}"]`);
@@ -615,7 +1329,7 @@ class ChurchTapApp {
     const studyEnabled = this.isStudyModeEnabled();
     const studyTile = studyEnabled
       ? `
-          <button class="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-gray-200 dark:border-gray-700 text-left hover:bg-purple-100 dark:hover:bg-purple-800 transition-colors"
+          <button id="exploreStudyTile" class="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-gray-200 dark:border-gray-700 text-left hover:bg-purple-100 dark:hover:bg-purple-800 transition-colors"
                   onclick="window.churchTapApp.navigate('/study')">
             <div class="text-lg">📚</div>
             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Study</div>
@@ -623,11 +1337,11 @@ class ChurchTapApp {
           </button>
         `
       : `
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  onclick="window.churchTapApp.navigate('/me'); window.churchTapApp.showToast('Turn on Study Mode in Me to unlock Study tools')">
+          <button id="exploreStudyTile" class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  onclick="window.churchTapApp.navigate('/menu'); window.churchTapApp.showToast('Turn on Study Mode in Menu to unlock Study tools')">
             <div class="text-lg">🔒</div>
             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Study</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Turn on Study Mode in Me</div>
+            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Turn on Study Mode in Menu</div>
           </button>
         `;
 
@@ -643,14 +1357,14 @@ class ChurchTapApp {
         </div>
 
         <div class="grid grid-cols-2 gap-3">
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          <button id="exploreReadTile" class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   onclick="window.churchTapApp.showBibleReadModal()">
             <div class="text-lg">📖</div>
             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Read</div>
             <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Book • Chapter • Verse</div>
           </button>
 
-          <button class="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 text-left hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors"
+          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   onclick="window.churchTapApp.showVerseSearchModal()">
             <div class="text-lg">🔍</div>
             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Search</div>
@@ -682,7 +1396,7 @@ class ChurchTapApp {
         </div>
 
         <div class="mt-4">
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.showTopicsWordCloud()">
+          <button class="w-full btn-primary" onclick="window.churchTapApp.showTopicsWordCloud()">
             🏷️ Browse Topics
           </button>
         </div>
@@ -723,6 +1437,17 @@ class ChurchTapApp {
               <div class="text-gray-400">›</div>
             </div>
           </button>
+
+          <button class="w-full p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+                  onclick="window.churchTapApp.showMyStuffSearchModal()">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white">🔍 Search My Stuff</div>
+                <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Notes, collections, and prayers</div>
+              </div>
+              <div class="text-gray-400">›</div>
+            </div>
+          </button>
         </div>
       </div>
     `);
@@ -747,48 +1472,33 @@ class ChurchTapApp {
           <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/saved')">
             🔖 Saved
           </button>
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.toggleTheme(); window.churchTapApp.updateMenuIndicators();">
-            🌓 Toggle Theme
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/favorites')">
+            ❤️ Favorites
           </button>
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.cycleTextSize(); window.churchTapApp.updateMenuIndicators();">
-            📝 Text Size
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/collections')">
+            📚 My Categories
           </button>
-          <label class="w-full flex items-center justify-between px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/30">
-            <div class="min-w-0">
-              <div class="text-sm font-medium text-gray-900 dark:text-white">📚 Study Mode</div>
-              <div class="text-xs text-gray-600 dark:text-gray-400">Unlock definitions and commentary tools</div>
-            </div>
-            <input
-              type="checkbox"
-              class="h-5 w-5 accent-primary-600"
-              ${this.isStudyModeEnabled() ? 'checked' : ''}
-              onchange="window.churchTapApp.handleStudyModeToggle(this.checked)"
-              aria-label="Toggle Study Mode"
-            />
-          </label>
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/my-prayers')">
+            🙏 My Prayers
+          </button>
+
+          <div class="pt-2 border-t border-gray-200 dark:border-gray-700"></div>
+
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/my-highlights')">
+            🖍️ My Highlights
+          </button>
+
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/my-notes')">
+            📝 My Notes
+          </button>
+
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.currentUser ? window.churchTapApp.showProfileModal() : window.churchTapApp.showLoginModal()">
+            👤 Profile
+          </button>
         </div>
 
         <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3">
-          <button class="w-full btn-secondary" onclick="window.location.href='/choose-organization'">
-            🔄 Switch / Join Group
-          </button>
-
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.showProfileModal()">
-            👤 Profile
-          </button>
-
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.openFeedback()">
-            💬 Send Feedback
-          </button>
-
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.installApp?.()">
-            📱 Install App
-          </button>
-
           ${isLoggedIn ? `
-            <button class="w-full btn-secondary" onclick="window.location.href='/admin'">
-              🛠️ Admin Panel
-            </button>
             <button class="w-full px-4 py-2 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 transition-colors"
                     onclick="window.churchTapApp.handleLogout()">
               🚪 Logout
@@ -804,6 +1514,509 @@ class ChurchTapApp {
         </div>
       </div>
     `);
+
+    // These controls only make sense when logged in with an active group.
+    // (The buttons are hidden otherwise.)
+    this.updateVersePrivateToolsVisibility();
+    if (this.currentVerse) this.refreshVersePrivateToolsState().catch(() => {});
+  }
+
+  // ===========================
+  // Links Page (/links)
+  // ===========================
+  renderLinksPage() {
+    this.setPageContent(`
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Links</h2>
+          <button class="btn-secondary text-sm" onclick="window.churchTapApp.goToToday()">Today</button>
+        </div>
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Quick links from your current group.
+        </div>
+
+        <!-- Fundraising (if active) -->
+        <button id="fundraisingCard" class="hidden w-full text-left px-3 py-3 mb-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+                onclick="window.churchTapApp.openFundraisingModal()">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <div class="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                  🎯 <span id="fundraisingTitle">Fundraising</span>
+                </div>
+                <div id="fundraisingPct" class="text-xs font-semibold text-green-700 dark:text-green-300 tabular-nums whitespace-nowrap">0%</div>
+              </div>
+
+              <div class="mt-2 flex items-center gap-2">
+                <div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                  <div id="fundraisingProgressBar" class="h-1.5 bg-green-600" style="width:0%"></div>
+                </div>
+                <div id="fundraisingAmounts" class="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">--</div>
+              </div>
+
+              <div id="fundraisingDeadline" class="mt-2 text-xs text-gray-500 dark:text-gray-400"></div>
+            </div>
+          </div>
+        </button>
+
+        <button id="playlistBtn" class="hidden w-full text-left px-3 py-2 mb-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+                onclick="window.churchTapApp.openPlaylistModal()">
+          📺 Worship Playlist
+        </button>
+
+        <div id="linksPageList" class="space-y-1">
+          <div class="text-sm text-gray-500 dark:text-gray-400 py-2">Loading…</div>
+        </div>
+      </div>
+    `);
+
+    this.loadFundraising().catch(() => {});
+    this.loadWorshipPlaylist().catch(() => {});
+    this.loadOrganizationLinks().catch(() => {});
+  }
+
+  // ===========================
+  // Menu Page (/menu)
+  // ===========================
+  renderMenuPage() {
+    this.setPageContent(`
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Menu</h2>
+          <button class="btn-secondary text-sm" onclick="window.churchTapApp.goToToday()">Today</button>
+        </div>
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Tools and settings.
+        </div>
+
+        <div class="mb-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/20">
+          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+            Defaults
+          </div>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Bible Translation</label>
+              <select id="menuDefaultTranslationSelect"
+                      class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                      onchange="window.churchTapApp.handleMenuDefaultTranslationChange(this.value)">
+                <option value="">Loading…</option>
+              </select>
+              <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">Used for “View in Translation” and full chapter reading.</div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Commentary</label>
+                <select id="menuDefaultCommentarySelect"
+                        class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                        onchange="window.churchTapApp.handleMenuDefaultCommentaryChange(this.value)">
+                  <option value="">Loading…</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Dictionary</label>
+                <select id="menuDefaultDictionarySelect"
+                        class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                        onchange="window.churchTapApp.handleMenuDefaultDictionaryChange(this.value)">
+                  <option value="">Loading…</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <button class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  onclick="window.location.href='/store'">
+            🛍️ Store
+          </button>
+        </div>
+
+        <div id="groupSection" class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
+          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-1">
+            Current Group
+          </div>
+
+          <div id="currentGroupDisplay" class="px-1 mb-2">
+            <div class="text-sm font-medium text-gray-700 dark:text-gray-300" id="currentGroupName">Loading...</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">Tap a chip to switch quickly</div>
+          </div>
+
+          <div id="groupQuickList" class="mb-2"></div>
+
+          <button id="changeGroupBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  onclick="window.churchTapApp.changeGroup()">
+            🔄 Switch Group
+          </button>
+          <button id="requestGroupBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  onclick="window.churchTapApp.requestGroup()">
+            ➕ Join a Group
+          </button>
+        </div>
+
+        <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
+          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-1">
+            Settings
+          </div>
+
+          <button class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center justify-between"
+                  onclick="window.churchTapApp.cycleTextSize(); window.churchTapApp.updateMenuIndicators();">
+            <span class="flex items-center space-x-2"><span>📝</span><span>Text Size</span></span>
+            <span id="textSizeIndicator" class="text-sm text-gray-500 dark:text-gray-400">Medium</span>
+          </button>
+
+          <button class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center justify-between"
+                  onclick="window.churchTapApp.toggleTheme(); window.churchTapApp.updateMenuIndicators();">
+            <span class="flex items-center space-x-2"><span id="themeMenuIcon">🌙</span><span>Theme</span></span>
+            <span id="themeIndicator" class="text-sm text-gray-500 dark:text-gray-400">Light</span>
+          </button>
+
+          <label class="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            <span class="flex items-center space-x-2"><span>📚</span><span>Study Mode</span></span>
+            <input id="studyModeMenuToggle" type="checkbox" class="h-5 w-5 accent-primary-600"
+                   onchange="window.churchTapApp.handleStudyModeToggle(this.checked); window.churchTapApp.updateMenuIndicators();"
+                   aria-label="Toggle Study Mode" />
+          </label>
+
+          <div id="menuInstallInsertPoint"></div>
+        </div>
+
+        <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
+          <button id="adminPanelBtn" class="hidden w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-indigo-700 dark:text-indigo-300"
+                  onclick="window.location.href='/admin'">
+            🛠️ Admin Panel
+          </button>
+
+          <div id="tagSessionInfo" class="hidden pt-2">
+            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-1">
+              NFC Session
+            </div>
+            <div class="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg mb-2">
+              <div class="flex items-center justify-between">
+                <div class="text-sm">
+                  <span class="text-blue-600 dark:text-blue-400">🏷️</span>
+                  <span class="text-gray-700 dark:text-gray-300">NFC Connected</span>
+                </div>
+              </div>
+              <div class="hidden">
+                <span id="tagSessionId">NFC Connected</span>
+              </div>
+            </div>
+          </div>
+
+          <button class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  onclick="window.churchTapApp.openFeedback()">
+            💬 Send Feedback
+          </button>
+        </div>
+      </div>
+    `);
+
+    // Sync indicators + conditional items when entering the page
+    this.updateMenuIndicators();
+    this.updateMenuDefaultPickers();
+    this.ensureStudySourcesLoaded().catch(() => {});
+    this.updateGroupDisplay();
+    this.updateTagSessionUI();
+    this.loadFundraising().catch(() => {});
+    this.loadWorshipPlaylist().catch(() => {});
+    if (this.deferredPrompt) this.showInstallButton();
+  }
+
+  // ===========================
+  // Menu: My Notes (/my-notes)
+  // ===========================
+  async renderMyNotesPage() {
+    if (!this.currentUser) {
+      this.renderAuthRequired('My Notes', 'Login to view your private notes.');
+      return;
+    }
+    if (!this.membershipContext?.active_organization_id) {
+      this.setPageContent(`
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">My Notes</h2>
+            <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/me')">Me</button>
+          </div>
+          <div class="text-sm text-gray-600 dark:text-gray-400">
+            Select an active group to view your notes.
+          </div>
+        </div>
+      `);
+      return;
+    }
+
+    this.setPageContent(`
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">My Notes</h2>
+          <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/me')">Me</button>
+        </div>
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Your private notes across daily verses and Bible reading.
+        </div>
+
+        <div class="mb-4">
+          <input id="myNotesSearch"
+                 type="text"
+                 placeholder="Search notes…"
+                 class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm" />
+        </div>
+
+        <div id="myNotesList" class="space-y-2">
+          <div class="text-sm text-gray-600 dark:text-gray-400">Loading…</div>
+        </div>
+      </div>
+    `);
+
+    await this.loadMyNotes();
+
+    const input = document.getElementById('myNotesSearch');
+    if (input) {
+      input.addEventListener('input', () => {
+        const q = String(input.value || '').trim();
+        this.renderMyNotesList(q);
+      });
+      input.focus();
+    }
+  }
+
+  async loadMyNotes() {
+    try {
+      const res = await fetch(this.buildApiUrl('/api/me/notes?limit=500'), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        const el = document.getElementById('myNotesList');
+        if (el) el.innerHTML = `<div class="text-sm text-red-600">${this.escapeHtml(data?.error || 'Unable to load notes')}</div>`;
+        this._myNotesAll = [];
+        return;
+      }
+      this._myNotesAll = Array.isArray(data.notes) ? data.notes : [];
+      this.renderMyNotesList('');
+    } catch (e) {
+      console.error('loadMyNotes error:', e);
+      const el = document.getElementById('myNotesList');
+      if (el) el.innerHTML = `<div class="text-sm text-red-600">Unable to load notes.</div>`;
+      this._myNotesAll = [];
+    }
+  }
+
+  renderMyNotesList(query) {
+    const el = document.getElementById('myNotesList');
+    if (!el) return;
+    const q = String(query || '').toLowerCase();
+    const notes = Array.isArray(this._myNotesAll) ? this._myNotesAll : [];
+
+    const filtered = q
+      ? notes.filter(n => {
+          const title = String(n.title || '').toLowerCase();
+          const body = String(n.body_markdown || '').toLowerCase();
+          const ref = String(this.formatNoteReference(n) || '').toLowerCase();
+          return title.includes(q) || body.includes(q) || ref.includes(q);
+        })
+      : notes;
+
+    if (filtered.length === 0) {
+      el.innerHTML = `<div class="text-sm text-gray-600 dark:text-gray-400">No notes found.</div>`;
+      return;
+    }
+
+    el.innerHTML = filtered.map(n => {
+      const ref = this.escapeHtml(this.formatNoteReference(n) || 'Verse');
+      const title = this.escapeHtml(n.title || '');
+      const snippet = this.escapeHtml(String(n.body_markdown || '').replace(/\s+/g, ' ').trim().slice(0, 160));
+      const when = n.updated_at || n.created_at;
+      const whenText = when ? this.escapeHtml(new Date(when).toLocaleString()) : '';
+
+      const actionBtn = n.kind === 'daily'
+        ? `<button class="btn-secondary text-xs" onclick="window.churchTapApp.openNoteEditor(${Number(n.verse_id)}, ${Number(n.id)})">Edit</button>`
+        : `<button class="btn-secondary text-xs" onclick="window.churchTapApp.openScriptureNoteEditor(${Number(n.book)}, ${Number(n.chapter)}, ${Number(n.verse)}, ${Number(n.id)})">Edit</button>`;
+
+      const openBtn = n.kind === 'daily'
+        ? `<button class="btn-secondary text-xs" onclick="window.churchTapApp.openDailyVerseFromNote('${this.escapeHtml(String(n.verse_date || ''))}')">Open</button>`
+        : `<button class="btn-secondary text-xs" onclick="window.churchTapApp.readFullChapterInTranslation('${this.escapeHtml(ref)}', window.churchTapApp.getUserPreferredTranslation())">Open</button>`;
+
+      return `
+        <div class="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/30">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-xs text-gray-500 dark:text-gray-400">${ref}</div>
+              ${title ? `<div class="text-sm font-semibold text-gray-900 dark:text-white mt-0.5 truncate">${title}</div>` : ''}
+              ${snippet ? `<div class="text-sm text-gray-700 dark:text-gray-200 mt-1">${snippet}</div>` : ''}
+              ${whenText ? `<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">${whenText}</div>` : ''}
+            </div>
+            <div class="flex flex-col gap-2">
+              ${openBtn}
+              ${actionBtn}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  formatNoteReference(n) {
+    if (!n || typeof n !== 'object') return '';
+    if (n.kind === 'daily') return n.bible_reference || '';
+    const book = Number(n.book);
+    const chapter = Number(n.chapter);
+    const verse = Number(n.verse);
+    if (!book || !chapter || !verse) return '';
+    return `${this.getBookName(book)} ${chapter}:${verse}`;
+  }
+
+  openDailyVerseFromNote(dateValue) {
+    const raw = String(dateValue || '').trim();
+    if (!raw) {
+      this.showToast('Verse not available');
+      return;
+    }
+    const d = raw.includes('T') ? raw.split('T')[0] : raw;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      this.showToast('Verse not available');
+      return;
+    }
+    this.navigate(`/verse/${d}`);
+  }
+
+  // ===========================
+  // Menu: My Highlights (/my-highlights)
+  // ===========================
+  async renderMyHighlightsPage() {
+    if (!this.currentUser) {
+      this.renderAuthRequired('My Highlights', 'Login to view your private highlights.');
+      return;
+    }
+    if (!this.membershipContext?.active_organization_id) {
+      this.setPageContent(`
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-white">My Highlights</h2>
+            <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/me')">Me</button>
+          </div>
+          <div class="text-sm text-gray-600 dark:text-gray-400">
+            Select an active group to view your highlights.
+          </div>
+        </div>
+      `);
+      return;
+    }
+
+    this.setPageContent(`
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">My Highlights</h2>
+          <button class="btn-secondary text-sm" onclick="window.churchTapApp.navigate('/me')">Me</button>
+        </div>
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Your private highlights across daily verses and Bible reading.
+        </div>
+
+        <div class="mb-4">
+          <input id="myHighlightsSearch"
+                 type="text"
+                 placeholder="Search highlights…"
+                 class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm" />
+        </div>
+
+        <div id="myHighlightsList" class="space-y-2">
+          <div class="text-sm text-gray-600 dark:text-gray-400">Loading…</div>
+        </div>
+      </div>
+    `);
+
+    await this.loadMyHighlights();
+
+    const input = document.getElementById('myHighlightsSearch');
+    if (input) {
+      input.addEventListener('input', () => {
+        const q = String(input.value || '').trim();
+        this.renderMyHighlightsList(q);
+      });
+      input.focus();
+    }
+  }
+
+  async loadMyHighlights() {
+    try {
+      const res = await fetch(this.buildApiUrl('/api/me/highlights?limit=500'), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        const el = document.getElementById('myHighlightsList');
+        if (el) el.innerHTML = `<div class="text-sm text-red-600">${this.escapeHtml(data?.error || 'Unable to load highlights')}</div>`;
+        this._myHighlightsAll = [];
+        return;
+      }
+      this._myHighlightsAll = Array.isArray(data.highlights) ? data.highlights : [];
+      this.renderMyHighlightsList('');
+    } catch (e) {
+      console.error('loadMyHighlights error:', e);
+      const el = document.getElementById('myHighlightsList');
+      if (el) el.innerHTML = `<div class="text-sm text-red-600">Unable to load highlights.</div>`;
+      this._myHighlightsAll = [];
+    }
+  }
+
+  renderMyHighlightsList(query) {
+    const el = document.getElementById('myHighlightsList');
+    if (!el) return;
+    const q = String(query || '').toLowerCase();
+    const items = Array.isArray(this._myHighlightsAll) ? this._myHighlightsAll : [];
+
+    const filtered = q
+      ? items.filter(h => {
+          const ref = String(this.formatHighlightReference(h) || '').toLowerCase();
+          const color = String(h.color_key || '').toLowerCase();
+          return ref.includes(q) || color.includes(q);
+        })
+      : items;
+
+    if (filtered.length === 0) {
+      el.innerHTML = `<div class="text-sm text-gray-600 dark:text-gray-400">No highlights found.</div>`;
+      return;
+    }
+
+    el.innerHTML = filtered.map(h => {
+      const ref = this.escapeHtml(this.formatHighlightReference(h) || 'Verse');
+      const colorKey = this.escapeHtml(String(h.color_key || ''));
+      const when = h.updated_at || h.created_at;
+      const whenText = when ? this.escapeHtml(new Date(when).toLocaleString()) : '';
+
+      const swatchVar = `var(--hl-${String(h.color_key || '').trim().toLowerCase()}-bg)`;
+
+      const openBtn = h.kind === 'daily'
+        ? `<button class="btn-secondary text-xs" onclick="window.churchTapApp.openDailyVerseFromNote('${this.escapeHtml(String(h.verse_date || ''))}')">Open</button>`
+        : `<button class="btn-secondary text-xs" onclick="window.churchTapApp.readFullChapterInTranslation('${this.escapeHtml(ref)}', window.churchTapApp.getUserPreferredTranslation())">Open</button>`;
+
+      return `
+        <div class="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/30">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="inline-block w-4 h-4 rounded border border-gray-300 dark:border-gray-600" style="background:${swatchVar};"></span>
+                <div class="text-xs text-gray-500 dark:text-gray-400">${ref}</div>
+              </div>
+              <div class="text-sm font-semibold text-gray-900 dark:text-white mt-1 capitalize">${colorKey}</div>
+              ${whenText ? `<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">${whenText}</div>` : ''}
+            </div>
+            <div class="flex flex-col gap-2">
+              ${openBtn}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  formatHighlightReference(h) {
+    if (!h || typeof h !== 'object') return '';
+    if (h.kind === 'daily') return h.bible_reference || '';
+    const book = Number(h.book);
+    const chapter = Number(h.chapter);
+    const verse = Number(h.verse);
+    if (!book || !chapter || !verse) return '';
+    return `${this.getBookName(book)} ${chapter}:${verse}`;
   }
 
   // ===========================
@@ -820,7 +2033,7 @@ class ChurchTapApp {
           <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
             Study Mode is turned off.
           </div>
-          <button class="w-full btn-primary" onclick="window.churchTapApp.navigate('/me')">Turn on Study Mode</button>
+          <button class="w-full btn-primary" onclick="window.churchTapApp.navigate('/menu')">Open Menu to Turn on Study Mode</button>
         </div>
       `);
       return;
@@ -982,7 +2195,6 @@ class ChurchTapApp {
     if (it.word) this.studyState.word = it.word;
     if (it.translation) {
       this.studyState.translation = String(it.translation).toUpperCase();
-      try { localStorage.setItem('studyTranslation.v1', this.studyState.translation); } catch (e) {}
     }
     this.closeStudyRecent();
     this.renderStudyPage();
@@ -1716,30 +2928,12 @@ class ChurchTapApp {
       this.updateMenuIndicators();
     });
 
-    // Account/Login button (now in menu)
-    on('loginMenuBtnNew', 'click', () => {
-      document.getElementById('loginMenuBtn')?.click(); // Reuse existing login functionality
+    // Study mode toggle (now in menu)
+    on('studyModeMenuToggle', 'change', (e) => {
+      const checked = !!e?.target?.checked;
+      this.handleStudyModeToggle(checked);
+      this.updateMenuIndicators();
     });
-
-    // Menu navigation (Favorites / Collections / My Prayers)
-    const favoritesMenuBtn = document.getElementById('favoritesBtn');
-    if (favoritesMenuBtn) {
-      favoritesMenuBtn.addEventListener('click', () => {
-        this.navigate('/favorites');
-      });
-    }
-    const collectionsMenuBtn = document.getElementById('collectionsBtn');
-    if (collectionsMenuBtn) {
-      collectionsMenuBtn.addEventListener('click', () => {
-        this.navigate('/collections');
-      });
-    }
-    const personalPrayersMenuBtn = document.getElementById('personalPrayersBtn');
-    if (personalPrayersMenuBtn) {
-      personalPrayersMenuBtn.addEventListener('click', () => {
-        this.navigate('/my-prayers');
-      });
-    }
 
     // Store
     const storeBtn = document.getElementById('storeBtn');
@@ -1754,10 +2948,7 @@ class ChurchTapApp {
     // Bottom tab navigation (mobile-first)
     on('tabTodayBtn', 'click', () => this.goToToday());
     on('tabExploreBtn', 'click', () => this.navigate('/explore'));
-    on('tabLinksBtn', 'click', () => {
-      this.hideQuickMenu();
-      this.toggleLinksMenu();
-    });
+    on('tabLinksBtn', 'click', () => this.navigate('/links'));
     on('tabMeBtn', 'click', () => this.navigate('/me'));
 
     on('backToToday', 'click', () => {
@@ -1765,9 +2956,7 @@ class ChurchTapApp {
     });
 
     // Menu toggle
-    on('menuToggle', 'click', () => {
-      this.toggleQuickMenu();
-    });
+    on('menuToggle', 'click', () => this.navigate('/menu'));
 
     // Calendar controls
     on('datePickerBtn', 'click', () => this.openCalendarModal());
@@ -1868,6 +3057,8 @@ class ChurchTapApp {
       });
     }
 
+    // Note: Notes + Highlights live under the Me tab now.
+
 
     // Community event listeners
     const submitPrayerBtn = document.getElementById('submitPrayerBtn');
@@ -1899,47 +3090,14 @@ class ChurchTapApp {
       });
     }
 
-    on('loginMenuBtn', 'click', () => {
-      this.showLoginModal();
-      this.toggleQuickMenu();
-    });
-
-    on('registerMenuBtn', 'click', () => {
-      this.showRegisterModal();
-      this.toggleQuickMenu();
-    });
-
-    on('logoutBtn', 'click', () => {
-      this.handleLogout();
-      this.toggleQuickMenu();
-    });
-
-    on('profileBtn', 'click', () => {
-      this.showProfileModal();
-      this.toggleQuickMenu();
-    });
+    // Note: account/auth actions live under the Me tab now.
 
     // Community preview (Today tab)
     on('openCommunityFromPreview', 'click', () => {
       this.navigate('/community');
     });
 
-    // Close menus when clicking outside
-    document.addEventListener('click', (e) => {
-      // Quick menu
-      const menu = document.getElementById('quickMenu');
-      const toggle = document.getElementById('menuToggle');
-      if (!menu.contains(e.target) && !toggle.contains(e.target)) {
-        menu.classList.add('hidden');
-      }
-      
-      // Links menu
-      const linksMenu = document.getElementById('quickLinksMenu');
-      const linksToggle = document.getElementById('tabLinksBtn');
-      if (linksMenu && linksToggle && !linksMenu.contains(e.target) && !linksToggle.contains(e.target)) {
-        this.hideLinksMenu();
-      }
-    });
+    // Note: Menu + Links are full pages now (no popover close-on-outside-click needed).
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
@@ -2110,38 +3268,52 @@ class ChurchTapApp {
     const textVerse = document.getElementById('textVerse');
     const imageVerse = document.getElementById('imageVerse');
     const engagementActions = document.getElementById('engagementActions');
+
+    // If the DOM is missing (stale cached HTML / partial shell), fail safely.
+    if (!verseContent || !textVerse || !imageVerse || !engagementActions) return;
+
+    const setText = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value ?? '';
+    };
     
     this.hideLoading();
     
     if (verse.content_type === 'text') {
-      document.getElementById('verseText').textContent = this.normalizeVerseText(verse.verse_text);
-      document.getElementById('verseReference').textContent = verse.bible_reference || '';
-      document.getElementById('verseReferenceDesktop').textContent = verse.bible_reference || '';
+      setText('verseText', this.normalizeVerseText(verse.verse_text));
+      setText('verseReference', verse.bible_reference || '');
+      setText('verseReferenceDesktop', verse.bible_reference || '');
       
       const contextEl = document.getElementById('verseContext');
-      if (this.isFeatureEnabled('verse_commentary_enabled') && verse.context && !this.shouldHideContext(verse.context)) {
-        contextEl.textContent = verse.context;
-        contextEl.classList.remove('hidden');
-      } else {
-        contextEl.classList.add('hidden');
+      if (contextEl) {
+        if (this.isFeatureEnabled('verse_commentary_enabled') && verse.context && !this.shouldHideContext(verse.context)) {
+          contextEl.textContent = verse.context;
+          contextEl.classList.remove('hidden');
+        } else {
+          contextEl.classList.add('hidden');
+        }
       }
       
       textVerse.classList.remove('hidden');
       imageVerse.classList.add('hidden');
     } else {
       const img = document.getElementById('verseImage');
-      img.src = verse.image_path;
-      img.alt = verse.bible_reference || 'Church Tap image';
+      if (img) {
+        img.src = verse.image_path;
+        img.alt = verse.bible_reference || 'Church Tap image';
+      }
       
-      document.getElementById('imageReference').textContent = verse.bible_reference || '';
-      document.getElementById('imageReferenceDesktop').textContent = verse.bible_reference || '';
+      setText('imageReference', verse.bible_reference || '');
+      setText('imageReferenceDesktop', verse.bible_reference || '');
       
       const contextEl = document.getElementById('imageContext');
-      if (this.isFeatureEnabled('verse_commentary_enabled') && verse.context && !this.shouldHideContext(verse.context)) {
-        contextEl.textContent = verse.context;
-        contextEl.classList.remove('hidden');
-      } else {
-        contextEl.classList.add('hidden');
+      if (contextEl) {
+        if (this.isFeatureEnabled('verse_commentary_enabled') && verse.context && !this.shouldHideContext(verse.context)) {
+          contextEl.textContent = verse.context;
+          contextEl.classList.remove('hidden');
+        } else {
+          contextEl.classList.add('hidden');
+        }
       }
       
       imageVerse.classList.remove('hidden');
@@ -2150,12 +3322,14 @@ class ChurchTapApp {
     
     // Display personalization badge if applicable
     const personalizationBadge = document.getElementById('personalizationBadge');
-    if (verse.personalized) {
-      const personalizationText = document.getElementById('personalizationText');
-      personalizationText.textContent = verse.reason || 'Personalized for you';
-      personalizationBadge.classList.remove('hidden');
-    } else {
-      personalizationBadge.classList.add('hidden');
+    if (personalizationBadge) {
+      if (verse.personalized) {
+        const personalizationText = document.getElementById('personalizationText');
+        if (personalizationText) personalizationText.textContent = verse.reason || 'Personalized for you';
+        personalizationBadge.classList.remove('hidden');
+      } else {
+        personalizationBadge.classList.add('hidden');
+      }
     }
     
     // Display tags
@@ -2168,7 +3342,141 @@ class ChurchTapApp {
     engagementActions.classList.remove('hidden');
     
     // Update heart count
-    document.getElementById('heartCount').textContent = verse.hearts || 0;
+    setText('heartCount', verse.hearts || 0);
+
+    // Study Mode: allow tapping a word in today's verse to define it.
+    // Only applies to the verse-of-the-day view (not the Study page).
+    this.attachVerseOfDayWordTapHandlers();
+    this.attachDailyVerseReferenceCommentaryHandlers();
+
+    // Private user verse tools (highlight + notes)
+    this.updateVersePrivateToolsVisibility();
+    this.refreshVersePrivateToolsState().catch(() => {});
+  }
+
+  // ===========================
+  // Study Mode: word tap on today's verse
+  // ===========================
+  attachDailyVerseReferenceCommentaryHandlers() {
+    // Make the verse reference act like a "open commentary" link.
+    // Works for both text and image verse layouts (mobile + desktop).
+    const ids = ['verseReference', 'verseReferenceDesktop', 'imageReference', 'imageReferenceDesktop'];
+    const els = ids.map(id => document.getElementById(id)).filter(Boolean);
+    if (!els.length) return;
+
+    for (const el of els) {
+      if (el.dataset && el.dataset.ctRefCommentary === '1') continue;
+      if (el.dataset) el.dataset.ctRefCommentary = '1';
+
+      // Basic affordance + accessibility
+      try {
+        el.style.cursor = 'pointer';
+        el.setAttribute('role', 'button');
+        el.setAttribute('tabindex', '0');
+        el.setAttribute('aria-label', 'Open commentary for today’s verse');
+      } catch (e) {}
+
+      const open = () => {
+        const ref = String(this.currentVerse?.bible_reference || el.textContent || '').trim();
+        if (!ref) return;
+        this.openCommentaryForRef(ref);
+      };
+
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        open();
+      });
+
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          open();
+        }
+      });
+    }
+  }
+
+  getDefaultCommentarySourceKey() {
+    const userK = String(this.currentUser?.defaultCommentarySourceKey || this.currentUser?.preferences?.defaultCommentarySourceKey || '').trim();
+    if (userK) return userK;
+    try {
+      return String(localStorage.getItem('defaultCommentarySource.v1') || '').trim();
+    } catch (e) {
+      return '';
+    }
+  }
+
+  getDefaultDictionarySourceKey() {
+    const userK = String(this.currentUser?.defaultDictionarySourceKey || this.currentUser?.preferences?.defaultDictionarySourceKey || '').trim();
+    if (userK) return userK;
+    try {
+      return String(localStorage.getItem('defaultDictionarySource.v1') || '').trim();
+    } catch (e) {
+      return '';
+    }
+  }
+
+  getWordFromPoint(clientX, clientY) {
+    try {
+      let node = null;
+      let offset = null;
+
+      if (document.caretPositionFromPoint) {
+        const pos = document.caretPositionFromPoint(clientX, clientY);
+        node = pos?.offsetNode || null;
+        offset = typeof pos?.offset === 'number' ? pos.offset : null;
+      } else if (document.caretRangeFromPoint) {
+        const range = document.caretRangeFromPoint(clientX, clientY);
+        node = range?.startContainer || null;
+        offset = typeof range?.startOffset === 'number' ? range.startOffset : null;
+      }
+
+      if (!node || node.nodeType !== Node.TEXT_NODE) return null;
+      const text = String(node.textContent || '');
+      if (!text) return null;
+      if (offset === null) return null;
+
+      const isWordChar = (ch) => /[A-Za-z’'\-]/.test(ch);
+      let i = Math.min(Math.max(offset, 0), text.length);
+
+      // If offset points between chars, prefer the char before.
+      if (i > 0 && !isWordChar(text[i]) && isWordChar(text[i - 1])) i = i - 1;
+      if (!isWordChar(text[i])) return null;
+
+      let start = i;
+      let end = i + 1;
+      while (start > 0 && isWordChar(text[start - 1])) start--;
+      while (end < text.length && isWordChar(text[end])) end++;
+
+      const word = text.slice(start, end).replace(/^[-’']+|[-’']+$/g, '').trim();
+      if (!word) return null;
+      if (!/^[A-Za-z][A-Za-z’'\-]*$/.test(word)) return null;
+      return word;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  attachVerseOfDayWordTapHandlers() {
+    const el = document.getElementById('verseText');
+    if (!el || !el.addEventListener) return;
+    if (el.dataset && el.dataset.studyWordTapToday === '1') return;
+    if (el.dataset) el.dataset.studyWordTapToday = '1';
+
+    el.style.cursor = 'text';
+
+    el.addEventListener('click', async (e) => {
+      if (!this.isStudyModeEnabled()) return;
+
+      // If user is selecting text, don't hijack taps.
+      const sel = window.getSelection?.();
+      if (sel && !sel.isCollapsed && String(sel.toString() || '').trim()) return;
+
+      const word = this.getWordFromPoint(e.clientX, e.clientY);
+      if (!word) return;
+
+      await this.showDefinitionForWord(word);
+    });
   }
 
   displayTags(tagsString) {
@@ -2610,6 +3918,12 @@ class ChurchTapApp {
     } catch (e) {
       this._fundraising = null;
     }
+
+    const hasActiveGoal = !!this._fundraising && Number(this._fundraising.goal_amount_cents || 0) > 0;
+
+    // Links tab: show a small badge when fundraising is active
+    const badge = document.getElementById('linksFundraisingBadge');
+    if (badge) badge.classList.toggle('hidden', !hasActiveGoal);
 
     const card = document.getElementById('fundraisingCard');
     if (card) {
@@ -3100,6 +4414,201 @@ class ChurchTapApp {
     }
   }
 
+  // ===========================
+  // Defaults (translation/commentary/dictionary)
+  // ===========================
+  syncStudyDefaultsFromUser() {
+    if (!this.currentUser) return false;
+
+    const preferredTranslation = String(this.currentUser?.preferredTranslation || this.currentUser?.preferences?.preferredTranslation || '').trim();
+    const defaultCommentarySourceKey = String(this.currentUser?.defaultCommentarySourceKey || this.currentUser?.preferences?.defaultCommentarySourceKey || '').trim();
+    const defaultDictionarySourceKey = String(this.currentUser?.defaultDictionarySourceKey || this.currentUser?.preferences?.defaultDictionarySourceKey || '').trim();
+
+    try {
+      if (preferredTranslation) localStorage.setItem('defaultTranslation.v1', preferredTranslation.toUpperCase());
+      if (defaultCommentarySourceKey) localStorage.setItem('defaultCommentarySource.v1', defaultCommentarySourceKey);
+      if (defaultDictionarySourceKey) localStorage.setItem('defaultDictionarySource.v1', defaultDictionarySourceKey);
+    } catch (e) {}
+
+    // Keep Study tools state aligned (best effort)
+    if (this.studyState) {
+      if (preferredTranslation && !String(this.studyState.translation || '').trim()) this.studyState.translation = preferredTranslation.toUpperCase();
+      if (defaultCommentarySourceKey && !String(this.studyState.commentarySourceKey || '').trim()) this.studyState.commentarySourceKey = defaultCommentarySourceKey;
+      if (defaultDictionarySourceKey && !String(this.studyState.dictionarySourceKey || '').trim()) this.studyState.dictionarySourceKey = defaultDictionarySourceKey;
+    }
+
+    return true;
+  }
+
+  async saveUserPreferencesPatch(patch) {
+    if (!this.currentUser) return false;
+    try {
+      const res = await fetch(this.buildApiUrl('/api/auth/preferences'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(patch || {})
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) return false;
+      // Best-effort refresh so server is source of truth.
+      this.refreshCurrentUserFromServer?.().catch(() => {});
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async setDefaultTranslation(code) {
+    const t = String(code || '').trim().toUpperCase();
+    if (!t) return;
+
+    // Defaults should only be set from Menu.
+    try { localStorage.setItem('defaultTranslation.v1', t); } catch (e) {}
+    if (this.studyState && !String(this.studyState.translation || '').trim()) this.studyState.translation = t;
+
+    if (this.currentUser) {
+      this.currentUser.preferredTranslation = t;
+      if (this.currentUser.preferences && typeof this.currentUser.preferences === 'object') {
+        this.currentUser.preferences.preferredTranslation = t;
+      }
+      await this.saveUserPreferencesPatch({ preferredTranslation: t });
+    }
+  }
+
+  async setDefaultCommentarySourceKey(sourceKey) {
+    const k = String(sourceKey || '').trim();
+    // Defaults should only be set from Menu.
+    try { localStorage.setItem('defaultCommentarySource.v1', k); } catch (e) {}
+    if (this.studyState && !String(this.studyState.commentarySourceKey || '').trim()) this.studyState.commentarySourceKey = k;
+
+    if (this.currentUser) {
+      this.currentUser.defaultCommentarySourceKey = k;
+      if (this.currentUser.preferences && typeof this.currentUser.preferences === 'object') {
+        this.currentUser.preferences.defaultCommentarySourceKey = k;
+      }
+      await this.saveUserPreferencesPatch({ defaultCommentarySourceKey: k || null });
+    }
+  }
+
+  async setDefaultDictionarySourceKey(sourceKey) {
+    const k = String(sourceKey || '').trim();
+    // Defaults should only be set from Menu.
+    try { localStorage.setItem('defaultDictionarySource.v1', k); } catch (e) {}
+    if (this.studyState && !String(this.studyState.dictionarySourceKey || '').trim()) this.studyState.dictionarySourceKey = k;
+
+    if (this.currentUser) {
+      this.currentUser.defaultDictionarySourceKey = k;
+      if (this.currentUser.preferences && typeof this.currentUser.preferences === 'object') {
+        this.currentUser.preferences.defaultDictionarySourceKey = k;
+      }
+      await this.saveUserPreferencesPatch({ defaultDictionarySourceKey: k || null });
+    }
+  }
+
+  getTranslationCatalog() {
+    // Used for menu defaults and read modal.
+    return (this.translationCatalog && this.translationCatalog.length > 0)
+      ? this.translationCatalog
+      : [
+          { code: 'NASB', name: 'New American Standard Bible' },
+          { code: 'ESV', name: 'English Standard Version' },
+          { code: 'NIV', name: 'New International Version' },
+          { code: 'NLT', name: 'New Living Translation' },
+          { code: 'KJV', name: 'King James Version' },
+          { code: 'MSG', name: 'The Message' },
+          { code: 'CSB', name: 'Christian Standard Bible' },
+          { code: 'AMP', name: 'Amplified Bible' },
+          { code: 'ASV', name: 'American Standard Version' },
+          { code: 'WEB', name: 'World English Bible' }
+        ];
+  }
+
+  updateMenuDefaultPickers() {
+    const translationEl = document.getElementById('menuDefaultTranslationSelect');
+    const commentaryEl = document.getElementById('menuDefaultCommentarySelect');
+    const dictionaryEl = document.getElementById('menuDefaultDictionarySelect');
+
+    // Only runs on /menu (elements won't exist elsewhere).
+    if (!translationEl && !commentaryEl && !dictionaryEl) return;
+
+    // Translation
+    if (translationEl) {
+      const enabled = this.getEnabledTranslationCodes().map(c => String(c || '').toUpperCase());
+      const enabledSet = new Set(enabled);
+      const current = this.getDefaultTranslation();
+      const catalog = this.getTranslationCatalog()
+        .map(t => ({ code: String(t.code || '').toUpperCase(), name: t.name || String(t.code || '').toUpperCase() }));
+
+      const enabledList = enabledSet.size ? catalog.filter(t => enabledSet.has(t.code)) : [];
+      const hasCurrent = enabledSet.size ? enabledSet.has(current) : true;
+
+      const options = [
+        ...(enabledSet.size && !hasCurrent ? [{ code: current, name: current }] : []),
+        ...enabledList
+      ]
+        .map(t => `<option value="${this.escapeHtml(t.code)}" ${t.code === current ? 'selected' : ''}>${this.escapeHtml(t.code)} — ${this.escapeHtml(t.name)}</option>`)
+        .join('');
+
+      translationEl.innerHTML = options || `<option value="${this.escapeHtml(current)}" selected>${this.escapeHtml(current)}</option>`;
+      translationEl.value = current;
+    }
+
+    // Commentary
+    if (commentaryEl) {
+      const sources = Array.isArray(this._studyCommentarySources) ? this._studyCommentarySources : [];
+      const current = this.getDefaultCommentarySourceKey();
+      const hasCurrent = !!current && sources.some(s => String(s?.source_key || '') === current);
+      const opts = [
+        `<option value="" ${current ? '' : 'selected'}>Auto</option>`,
+        ...(current && !hasCurrent ? [`<option value="${this.escapeHtml(current)}" selected>${this.escapeHtml(current)}</option>`] : []),
+        ...sources.map(s => {
+          const key = String(s.source_key || '');
+          const label = String(s.title || s.abbreviation || key || 'Source');
+          return `<option value="${this.escapeHtml(key)}" ${key === current ? 'selected' : ''}>${this.escapeHtml(label)}</option>`;
+        })
+      ].join('');
+      commentaryEl.innerHTML = opts || `<option value="" selected>Auto</option>`;
+      commentaryEl.value = current;
+    }
+
+    // Dictionary
+    if (dictionaryEl) {
+      const sources = Array.isArray(this._studyDictionarySources) ? this._studyDictionarySources : [];
+      const current = this.getDefaultDictionarySourceKey();
+      const hasCurrent = !!current && sources.some(s => String(s?.source_key || '') === current);
+      const opts = [
+        `<option value="" ${current ? '' : 'selected'}>Auto</option>`,
+        ...(current && !hasCurrent ? [`<option value="${this.escapeHtml(current)}" selected>${this.escapeHtml(current)}</option>`] : []),
+        ...sources.map(s => {
+          const key = String(s.source_key || '');
+          const label = String(s.title || s.abbreviation || key || 'Source');
+          return `<option value="${this.escapeHtml(key)}" ${key === current ? 'selected' : ''}>${this.escapeHtml(label)}</option>`;
+        })
+      ].join('');
+      dictionaryEl.innerHTML = opts || `<option value="" selected>Auto</option>`;
+      dictionaryEl.value = current;
+    }
+  }
+
+  async handleMenuDefaultTranslationChange(value) {
+    await this.setDefaultTranslation(value);
+    this.updateMenuDefaultPickers();
+    this.showToast(`Default translation: ${this.getDefaultTranslation()}`);
+  }
+
+  async handleMenuDefaultCommentaryChange(value) {
+    await this.setDefaultCommentarySourceKey(value);
+    this.updateMenuDefaultPickers();
+    this.showToast('Default commentary updated');
+  }
+
+  async handleMenuDefaultDictionaryChange(value) {
+    await this.setDefaultDictionarySourceKey(value);
+    this.updateMenuDefaultPickers();
+    this.showToast('Default dictionary updated');
+  }
+
   // ---------------------------
   // Word selection definitions (Study Mode)
   // ---------------------------
@@ -3143,14 +4652,17 @@ class ChurchTapApp {
     containerEl.addEventListener('touchend', handler);
   }
 
-  async fetchDictionaryEntry(term) {
+  async fetchDictionaryEntry(term, sourceKey = '') {
     const q = String(term || '').trim();
     if (!q) return null;
 
     this._dictionaryCache = this._dictionaryCache || new Map();
-    if (this._dictionaryCache.has(q.toLowerCase())) return this._dictionaryCache.get(q.toLowerCase());
+    const source = String(sourceKey || '').trim();
+    const cacheKey = `${source || 'auto'}::${q.toLowerCase()}`;
+    if (this._dictionaryCache.has(cacheKey)) return this._dictionaryCache.get(cacheKey);
 
-    const res = await fetch(this.buildApiUrl(`/api/dictionary/lookup?term=${encodeURIComponent(q)}`), { credentials: 'include' });
+    const sourceParam = source ? `&source=${encodeURIComponent(source)}` : '';
+    const res = await fetch(this.buildApiUrl(`/api/dictionary/lookup?term=${encodeURIComponent(q)}${sourceParam}`), { credentials: 'include' });
     const data = await res.json().catch(() => null);
 
     if (!res.ok || !data?.success) {
@@ -3160,7 +4672,7 @@ class ChurchTapApp {
     }
 
     const entry = data.entry || null;
-    this._dictionaryCache.set(q.toLowerCase(), entry);
+    this._dictionaryCache.set(cacheKey, entry);
     return entry;
   }
 
@@ -3169,12 +4681,16 @@ class ChurchTapApp {
     if (!term) return;
 
     try {
-      const entry = await this.fetchDictionaryEntry(term);
+      const sourceKey = this.getDefaultDictionarySourceKey();
+      const entry = await this.fetchDictionaryEntry(term, sourceKey);
       if (!entry) {
         this.showModal('Definition', `
           <div class="text-sm text-gray-700 dark:text-gray-200">
             <div class="font-semibold">${this.escapeHtml(term)}</div>
             <div class="mt-2 text-gray-600 dark:text-gray-400">No dictionary entry found.</div>
+            <div class="mt-4 flex justify-end">
+              <button class="btn-secondary" onclick="window.churchTapApp.closeModal()">Close</button>
+            </div>
           </div>
         `);
         return;
@@ -3189,6 +4705,9 @@ class ChurchTapApp {
           <div class="font-semibold">${headword}</div>
           ${definitionHtml ? `<div class="mt-2 leading-relaxed space-y-2">${definitionHtml}</div>` : ''}
           ${source ? `<div class="mt-2 text-xs text-gray-500 dark:text-gray-400">Source: ${source}</div>` : ''}
+          <div class="mt-4 flex justify-end">
+            <button class="btn-secondary" onclick="window.churchTapApp.closeModal()">Close</button>
+          </div>
         </div>
       `);
     } catch (e) {
@@ -3201,27 +4720,19 @@ class ChurchTapApp {
   }
 
   toggleQuickMenu() {
-    const menu = document.getElementById('quickMenu');
-    menu.classList.toggle('hidden');
+    // Back-compat: menu is now a dedicated page.
+    this.navigate('/menu');
   }
 
   toggleLinksMenu() {
-    const menu = document.getElementById('quickLinksMenu');
-    const linksBtn = document.getElementById('tabLinksBtn');
-    
-    menu.classList.toggle('hidden');
-    
-    // Update aria-expanded
-    if (linksBtn) {
-      linksBtn.setAttribute('aria-expanded', !menu.classList.contains('hidden'));
-    }
+    // Back-compat: links is now a dedicated page.
+    this.navigate('/links');
   }
 
   hideLinksMenu() {
     const menu = document.getElementById('quickLinksMenu');
     const linksBtn = document.getElementById('tabLinksBtn');
-    
-    menu.classList.add('hidden');
+    if (menu) menu.classList.add('hidden');
     
     if (linksBtn) {
       linksBtn.setAttribute('aria-expanded', 'false');
@@ -3230,7 +4741,7 @@ class ChurchTapApp {
 
   hideQuickMenu() {
     const menu = document.getElementById('quickMenu');
-    menu.classList.add('hidden');
+    if (menu) menu.classList.add('hidden');
   }
 
   async toggleHeart() {
@@ -3852,7 +5363,7 @@ class ChurchTapApp {
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
     modal.innerHTML = `
-      <div class="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 relative">
+      <div class="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 relative max-h-screen overflow-y-auto">
         <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">${title}</h3>
         ${content}
       </div>
@@ -3892,8 +5403,10 @@ class ChurchTapApp {
 
   hideSplashScreen() {
     setTimeout(() => {
-      document.getElementById('splash').style.display = 'none';
-      document.getElementById('app').classList.remove('hidden');
+      const splash = document.getElementById('splash');
+      const appShell = document.getElementById('app');
+      if (splash) splash.style.display = 'none';
+      if (appShell) appShell.classList.remove('hidden');
     }, 1500);
   }
 
@@ -3986,9 +5499,19 @@ class ChurchTapApp {
     await this.refreshFavoritesFromServer().catch(() => null);
   }
 
+  getDefaultTranslation() {
+    const userT = String(this.currentUser?.preferredTranslation || this.currentUser?.preferences?.preferredTranslation || '').trim();
+    if (userT) return userT.toUpperCase();
+    try {
+      const localT = String(localStorage.getItem('defaultTranslation.v1') || '').trim();
+      if (localT) return localT.toUpperCase();
+    } catch (e) {}
+    return 'NASB';
+  }
+
   getUserPreferredTranslation() {
-    // Default to NASB if no user preference or not logged in
-    return this.currentUser?.preferredTranslation || 'NASB';
+    // Back-compat: many call sites expect this name.
+    return this.getDefaultTranslation();
   }
 
   async readFullChapter(reference) {
@@ -4408,10 +5931,15 @@ class ChurchTapApp {
     let versesHtml = '';
     if (Array.isArray(chapterData)) {
       versesHtml = chapterData.map(verse => `
-        <div class="mb-3 scroll-mt-24 rounded-lg px-2 py-1 -mx-2" data-verse="${verse.verse}">
+        <button type="button"
+                class="w-full text-left mb-3 scroll-mt-24 rounded-lg px-2 py-1 -mx-2 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+                data-verse-row="1"
+                data-book="${parsedRef?.book || ''}"
+                data-chapter="${parsedRef?.chapter || ''}"
+                data-verse="${verse.verse}">
           <span class="text-sm font-medium text-primary-600 dark:text-primary-400 mr-2">${verse.verse}</span>
           <span class="verse-text text-gray-800 dark:text-gray-200 size-${this.textSize}">${verse.text}</span>
-        </div>
+        </button>
       `).join('');
     } else {
       versesHtml = '<p class="text-gray-600 dark:text-gray-400">Chapter text not available</p>';
@@ -4449,6 +5977,33 @@ class ChurchTapApp {
     
     document.body.appendChild(modal);
 
+    // Apply any saved highlights for this chapter (best-effort)
+    if (parsedRef && Number.isFinite(parsedRef.book) && Number.isFinite(parsedRef.chapter)) {
+      this.applyScriptureHighlightsToOpenChapterModal(modal, parsedRef.book, parsedRef.chapter).catch(() => {});
+    }
+
+    // Verse click -> action sheet (highlight, note, commentary)
+    if (parsedRef && Number.isFinite(parsedRef.book) && Number.isFinite(parsedRef.chapter)) {
+      modal.addEventListener('click', (e) => {
+        const row = e.target?.closest?.('[data-verse-row="1"]');
+        if (!row) return;
+
+        // If user is selecting text, don't hijack.
+        const sel = window.getSelection?.();
+        if (sel && !sel.isCollapsed && String(sel.toString() || '').trim()) return;
+
+        const book = Number(row.getAttribute('data-book'));
+        const chapter = Number(row.getAttribute('data-chapter'));
+        const verseNum = Number(row.getAttribute('data-verse'));
+        if (!book || !chapter || !verseNum) return;
+
+        const verseTextEl = row.querySelector('.verse-text');
+        const verseText = verseTextEl ? String(verseTextEl.textContent || '').trim() : '';
+        const ref = `${this.getBookName(book)} ${chapter}:${verseNum}`;
+        this.showChapterVerseActions({ book, chapter, verse: verseNum, reference: ref, translation, rowEl: row, text: verseText });
+      });
+    }
+
     // Study Mode: allow selecting a word to define it
     if (this.isStudyModeEnabled()) {
       const scrollEl = modal.querySelector('[data-chapter-scroll]') || modal;
@@ -4469,6 +6024,424 @@ class ChurchTapApp {
         );
         target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
       });
+    }
+  }
+
+  async applyScriptureHighlightsToOpenChapterModal(modalEl, book, chapter) {
+    if (!modalEl) return;
+    if (!this.canUsePrivateVerseTools()) return;
+    if (!book || !chapter) return;
+
+    try {
+      const res = await fetch(this.buildApiUrl(`/api/scripture-highlights/${book}/${chapter}`), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) return;
+
+      const highlights = Array.isArray(data.highlights) ? data.highlights : [];
+      if (highlights.length === 0) return;
+
+      // Build quick lookup by verse number
+      const byVerse = new Map();
+      for (const h of highlights) {
+        const v = Number(h?.verse);
+        const k = String(h?.color_key || '').trim().toLowerCase();
+        if (v && k) byVerse.set(v, k);
+      }
+
+      // Apply styles to matching verse rows
+      const rows = Array.from(modalEl.querySelectorAll('[data-verse-row="1"][data-verse]'));
+      for (const row of rows) {
+        const verseNum = Number(row.getAttribute('data-verse'));
+        const key = byVerse.get(verseNum) || null;
+        if (key) this.applyChapterVerseHighlightClass(row, key);
+        else this.clearChapterVerseHighlightClass(row);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // ===========================
+  // Chapter verse actions (highlight / note / commentary)
+  // ===========================
+
+  clearChapterVerseHighlightClass(rowEl) {
+    if (!rowEl || !rowEl.classList) return;
+    rowEl.classList.remove(
+      'ct-verse-hl',
+      'ct-verse-hl-yellow',
+      'ct-verse-hl-amber',
+      'ct-verse-hl-orange',
+      'ct-verse-hl-red',
+      'ct-verse-hl-pink',
+      'ct-verse-hl-purple',
+      'ct-verse-hl-blue',
+      'ct-verse-hl-green'
+    );
+  }
+
+  applyChapterVerseHighlightClass(rowEl, colorKey) {
+    this.clearChapterVerseHighlightClass(rowEl);
+    if (!rowEl || !rowEl.classList) return;
+    const key = String(colorKey || '').trim().toLowerCase();
+    if (!key) return;
+    rowEl.classList.add('ct-verse-hl', `ct-verse-hl-${key}`);
+  }
+
+  async showChapterVerseActions(ctx) {
+    const { book, chapter, verse, reference, rowEl } = ctx || {};
+    if (!book || !chapter || !verse) return;
+
+    if (!this.canUsePrivateVerseTools()) {
+      // Still allow commentary for guests (if org feature permits), but highlights/notes are private.
+      this.showModal('Verse', `
+        <div class="space-y-3">
+          <div class="text-sm font-semibold text-gray-900 dark:text-white">${this.escapeHtml(reference || 'Verse')}</div>
+          <button class="w-full btn-primary" onclick="window.churchTapApp.openCommentaryForRef('${this.escapeHtml(reference)}')">📖 Open commentary</button>
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.closeModal()">Close</button>
+        </div>
+      `);
+      return;
+    }
+
+    // Load current highlight state for this scripture verse
+    let currentColor = null;
+    try {
+      const hlRes = await fetch(this.buildApiUrl(`/api/scripture-highlights/${book}/${chapter}/${verse}`), { credentials: 'include' });
+      const hlData = await hlRes.json().catch(() => null);
+      currentColor = hlRes.ok && hlData?.success ? (hlData.highlight?.color_key || null) : null;
+    } catch (e) {}
+
+    // Load notes count
+    let noteCount = 0;
+    try {
+      const nRes = await fetch(this.buildApiUrl(`/api/scripture-notes/${book}/${chapter}/${verse}`), { credentials: 'include' });
+      const nData = await nRes.json().catch(() => null);
+      const notes = nRes.ok && nData?.success && Array.isArray(nData.notes) ? nData.notes : [];
+      noteCount = notes.length;
+    } catch (e) {}
+
+    const colors = [
+      { key: 'yellow', label: 'Yellow', swatch: 'var(--hl-yellow-bg)' },
+      { key: 'amber', label: 'Amber', swatch: 'var(--hl-amber-bg)' },
+      { key: 'orange', label: 'Orange', swatch: 'var(--hl-orange-bg)' },
+      { key: 'red', label: 'Red', swatch: 'var(--hl-red-bg)' },
+      { key: 'pink', label: 'Pink', swatch: 'var(--hl-pink-bg)' },
+      { key: 'purple', label: 'Purple', swatch: 'var(--hl-purple-bg)' },
+      { key: 'blue', label: 'Blue', swatch: 'var(--hl-blue-bg)' },
+      { key: 'green', label: 'Green', swatch: 'var(--hl-green-bg)' }
+    ];
+
+    const colorButtons = colors.map(c => {
+      const isActive = String(currentColor || '') === c.key;
+      return `
+        <button class="flex items-center justify-between w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+                onclick="window.churchTapApp.setScriptureHighlight(${book}, ${chapter}, ${verse}, '${c.key}')">
+          <div class="flex items-center gap-3">
+            <span class="inline-block w-5 h-5 rounded-md border border-gray-300 dark:border-gray-600" style="background:${c.swatch};"></span>
+            <span class="text-sm text-gray-800 dark:text-gray-200">${c.label}</span>
+          </div>
+          ${isActive ? `<span class="text-xs font-semibold text-primary-600 dark:text-primary-400">Selected</span>` : `<span class="text-xs text-gray-400">›</span>`}
+        </button>
+      `;
+    }).join('');
+
+    const clearBtn = currentColor
+      ? `<button class="w-full px-3 py-2 rounded-lg border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                 onclick="window.churchTapApp.setScriptureHighlight(${book}, ${chapter}, ${verse}, null)">
+            Clear highlight
+         </button>`
+      : '';
+
+    // Store row element so we can update highlight UI immediately
+    this._chapterActiveRowEl = rowEl || null;
+    this._chapterActiveRef = { book, chapter, verse, reference };
+
+    this.showModal('Verse', `
+      <div class="space-y-4">
+        <div>
+          <div class="text-sm font-semibold text-gray-900 dark:text-white">${this.escapeHtml(reference || '')}</div>
+          <div class="text-xs text-gray-500 dark:text-gray-400">${noteCount} note${noteCount === 1 ? '' : 's'}</div>
+        </div>
+
+        <div class="space-y-2">
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.openScriptureNotes(${book}, ${chapter}, ${verse})">📝 Notes</button>
+          <button class="w-full btn-secondary" onclick="window.churchTapApp.openCommentaryForRef('${this.escapeHtml(reference)}')">📖 Open commentary</button>
+        </div>
+
+        <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
+          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Highlight</div>
+          <div class="space-y-2">${colorButtons}</div>
+          ${clearBtn}
+        </div>
+      </div>
+    `);
+  }
+
+  async setScriptureHighlight(book, chapter, verse, colorKey) {
+    if (!this.canUsePrivateVerseTools()) return;
+    try {
+      const res = await fetch(this.buildApiUrl(`/api/scripture-highlights/${book}/${chapter}/${verse}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ color_key: colorKey })
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        this.showToast(data?.error || 'Failed to update highlight');
+        return;
+      }
+
+      const key = data.highlight?.color_key || null;
+      if (this._chapterActiveRowEl) {
+        if (key) this.applyChapterVerseHighlightClass(this._chapterActiveRowEl, key);
+        else this.clearChapterVerseHighlightClass(this._chapterActiveRowEl);
+      }
+    } catch (e) {
+      console.error('setScriptureHighlight error:', e);
+      this.showToast('Failed to update highlight');
+    }
+  }
+
+  async openScriptureNotes(book, chapter, verse) {
+    if (!this.canUsePrivateVerseTools()) return;
+    const ref = `${this.getBookName(book)} ${chapter}:${verse}`;
+
+    this.showModal('Notes', `
+      <div class="space-y-3">
+        <div class="text-xs text-gray-500 dark:text-gray-400">Private notes for ${this.escapeHtml(ref)}</div>
+        <div class="flex items-center gap-2">
+          <button class="btn-primary text-sm" onclick="window.churchTapApp.openScriptureNoteEditor(${book}, ${chapter}, ${verse})">+ New Note</button>
+          <button class="btn-secondary text-sm" onclick="window.churchTapApp.refreshScriptureNotesList(${book}, ${chapter}, ${verse})">Refresh</button>
+        </div>
+        <div id="scriptureNotesList" class="space-y-2">
+          <div class="text-sm text-gray-600 dark:text-gray-400">Loading…</div>
+        </div>
+      </div>
+    `);
+
+    await this.refreshScriptureNotesList(book, chapter, verse);
+  }
+
+  async refreshScriptureNotesList(book, chapter, verse) {
+    const listEl = document.getElementById('scriptureNotesList');
+    if (!listEl) return;
+    try {
+      const res = await fetch(this.buildApiUrl(`/api/scripture-notes/${book}/${chapter}/${verse}`), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        listEl.innerHTML = `<div class="text-sm text-red-600">${this.escapeHtml(data?.error || 'Unable to load notes')}</div>`;
+        return;
+      }
+      const notes = Array.isArray(data.notes) ? data.notes : [];
+      if (notes.length === 0) {
+        listEl.innerHTML = `<div class="text-sm text-gray-600 dark:text-gray-400">No notes yet. Add one!</div>`;
+        return;
+      }
+      listEl.innerHTML = notes.map(n => {
+        const id = Number(n.id);
+        const title = this.escapeHtml(n.title || 'Untitled');
+        const preview = this.escapeHtml(String(n.body_markdown || '').split('\n').slice(0, 2).join(' ').slice(0, 140));
+        const created = n.created_at ? new Date(n.created_at).toLocaleString() : '';
+        return `
+          <div class="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/30">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="text-sm font-semibold text-gray-900 dark:text-white truncate">${title}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">${this.escapeHtml(created)}</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button class="btn-secondary text-xs" onclick="window.churchTapApp.openScriptureNoteEditor(${book}, ${chapter}, ${verse}, ${id})">Edit</button>
+                <button class="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 transition-colors text-xs"
+                        onclick="window.churchTapApp.deleteScriptureNote(${id}, ${book}, ${chapter}, ${verse})">Delete</button>
+              </div>
+            </div>
+            ${preview ? `<div class="mt-2 text-sm text-gray-700 dark:text-gray-200">${preview}</div>` : ''}
+            <div class="mt-2">
+              <button class="text-xs text-primary-700 dark:text-primary-300 hover:underline" onclick="window.churchTapApp.previewScriptureNote(${id}, ${book}, ${chapter}, ${verse})">Preview</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (e) {
+      console.error('refreshScriptureNotesList error:', e);
+      listEl.innerHTML = `<div class="text-sm text-red-600">Unable to load notes.</div>`;
+    }
+  }
+
+  async previewScriptureNote(noteId, book, chapter, verse) {
+    const id = Number(noteId);
+    if (!id || Number.isNaN(id)) return;
+    const res = await fetch(this.buildApiUrl(`/api/scripture-notes/${book}/${chapter}/${verse}`), { credentials: 'include' });
+    const data = await res.json().catch(() => null);
+    const notes = res.ok && data?.success && Array.isArray(data.notes) ? data.notes : [];
+    const note = notes.find(n => Number(n.id) === id);
+    if (!note) return;
+
+    const title = this.escapeHtml(note.title || 'Untitled');
+    const html = this.markdownToSafeHtml(note.body_markdown || '');
+
+    this.showModal('Note Preview', `
+      <div class="space-y-3">
+        <div class="text-sm font-semibold text-gray-900 dark:text-white">${title}</div>
+        <div class="text-sm text-gray-700 dark:text-gray-200 leading-relaxed space-y-2">${html || '<p>(empty)</p>'}</div>
+        <div class="flex justify-end gap-2">
+          <button class="btn-secondary" onclick="window.churchTapApp.closeModal()">Close</button>
+        </div>
+      </div>
+    `);
+  }
+
+  async openScriptureNoteEditor(book, chapter, verse, noteId = null) {
+    let existing = null;
+    if (noteId) {
+      const res = await fetch(this.buildApiUrl(`/api/scripture-notes/${book}/${chapter}/${verse}`), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      const notes = res.ok && data?.success && Array.isArray(data.notes) ? data.notes : [];
+      existing = notes.find(n => Number(n.id) === Number(noteId)) || null;
+    }
+
+    const initTitle = this.escapeHtml(existing?.title || '');
+    const initBody = this.escapeHtml(existing?.body_markdown || '');
+    const ref = `${this.getBookName(book)} ${chapter}:${verse}`;
+
+    this.showModal(noteId ? 'Edit Note' : 'New Note', `
+      <div class="space-y-3">
+        <div class="text-xs text-gray-500 dark:text-gray-400">Private note for ${this.escapeHtml(ref)}</div>
+        <div class="space-y-2">
+          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Title (optional)</label>
+          <input id="noteTitleInput" type="text" value="${initTitle}"
+                 class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm" />
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('**','**')"><strong>B</strong></button>
+          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('*','*')"><em>I</em></button>
+          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('\\n- ','')">• List</button>
+          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('\\n> ','')">❝ Quote</button>
+          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown(String.fromCharCode(96), String.fromCharCode(96))">{ } Code</button>
+          <button class="btn-secondary text-xs" onclick="window.churchTapApp.toggleNotePreview()">Preview</button>
+        </div>
+
+        <div id="noteEditorWrap" class="space-y-2">
+          <textarea id="noteBodyInput" rows="8"
+                    class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                    placeholder="Write your note in markdown…">${initBody}</textarea>
+          <div class="text-xs text-gray-500 dark:text-gray-400">Tip: Use **bold**, *italic*, \`code\`, lists, and blockquotes.</div>
+        </div>
+
+        <div id="notePreviewWrap" class="hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/30 p-3 text-sm text-gray-700 dark:text-gray-200 leading-relaxed"></div>
+
+        <div class="flex justify-end gap-2">
+          <button class="btn-secondary" onclick="window.churchTapApp.closeModal()">Cancel</button>
+          <button class="btn-primary" onclick="window.churchTapApp.saveScriptureNote(${book}, ${chapter}, ${verse}, ${noteId ? Number(noteId) : 'null'})">Save</button>
+        </div>
+      </div>
+    `);
+  }
+
+  async saveScriptureNote(book, chapter, verse, noteId) {
+    const title = String(document.getElementById('noteTitleInput')?.value || '').trim();
+    const body = String(document.getElementById('noteBodyInput')?.value || '').replace(/\r\n/g, '\n').trim();
+    if (!body) {
+      this.showToast('Please write something first');
+      return;
+    }
+
+    try {
+      if (noteId) {
+        const res = await fetch(this.buildApiUrl(`/api/scripture-notes/${Number(noteId)}`), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ title: title || null, body_markdown: body })
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.success) {
+          this.showToast(data?.error || 'Failed to save note');
+          return;
+        }
+      } else {
+        const res = await fetch(this.buildApiUrl(`/api/scripture-notes/${book}/${chapter}/${verse}`), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ title: title || null, body_markdown: body })
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.success) {
+          this.showToast(data?.error || 'Failed to save note');
+          return;
+        }
+      }
+
+      this.showToast('Saved');
+      await this.openScriptureNotes(book, chapter, verse);
+    } catch (e) {
+      console.error('saveScriptureNote error:', e);
+      this.showToast('Failed to save note');
+    }
+  }
+
+  async deleteScriptureNote(noteId, book, chapter, verse) {
+    const id = Number(noteId);
+    if (!id || Number.isNaN(id)) return;
+    if (!window.confirm('Delete this note?')) return;
+
+    try {
+      const res = await fetch(this.buildApiUrl(`/api/scripture-notes/${id}`), {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        this.showToast(data?.error || 'Failed to delete note');
+        return;
+      }
+      this.showToast('Deleted');
+      await this.refreshScriptureNotesList(book, chapter, verse);
+    } catch (e) {
+      console.error('deleteScriptureNote error:', e);
+      this.showToast('Failed to delete note');
+    }
+  }
+
+  async openCommentaryForRef(reference) {
+    const ref = String(reference || '').trim();
+    if (!ref) return;
+
+    try {
+      const sourceKey = String(this.getDefaultCommentarySourceKey?.() || '').trim();
+      const sourceParam = sourceKey ? `&source=${encodeURIComponent(sourceKey)}` : '';
+      const res = await fetch(this.buildApiUrl(`/api/commentary/lookup?ref=${encodeURIComponent(ref)}${sourceParam}`), { credentials: 'include' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        this.showToast(data?.error || 'Commentary unavailable');
+        return;
+      }
+      const entry = data.entry;
+      if (!entry) {
+        this.showToast('No commentary found');
+        return;
+      }
+      const title = this.escapeHtml(entry.reference || ref);
+      const bodyHtml = this.sanitizeImportedHtml(entry.content || '');
+      const source = this.escapeHtml(entry.source_name || '');
+
+      this.showModal('Commentary', `
+        <div class="space-y-3">
+          <div class="text-sm font-semibold text-gray-900 dark:text-white">${title}</div>
+          ${bodyHtml ? `<div class="text-sm text-gray-700 dark:text-gray-200 leading-relaxed space-y-2">${bodyHtml}</div>` : ''}
+          ${source ? `<div class="text-xs text-gray-500 dark:text-gray-400">Source: ${source}</div>` : ''}
+          <div class="flex justify-end">
+            <button class="btn-secondary" onclick="window.churchTapApp.closeModal()">Close</button>
+          </div>
+        </div>
+      `);
+    } catch (e) {
+      console.error('openCommentaryForRef error:', e);
+      this.showToast('Commentary unavailable');
     }
   }
 
@@ -4959,7 +6932,7 @@ class ChurchTapApp {
 
     // Very small allow-list sanitizer: keep basic formatting, remove all attributes.
     // This prevents arbitrary HTML/script execution while still rendering imported markup nicely.
-    const allowed = new Set(['P', 'BR', 'B', 'STRONG', 'I', 'EM', 'UL', 'OL', 'LI', 'SUP', 'SUB', 'BLOCKQUOTE', 'CODE']);
+    const allowed = new Set(['P', 'BR', 'B', 'STRONG', 'I', 'EM', 'UL', 'OL', 'LI', 'SUP', 'SUB', 'BLOCKQUOTE', 'CODE', 'PRE']);
 
     const tpl = document.createElement('template');
     tpl.innerHTML = raw;
@@ -5812,16 +7785,13 @@ class ChurchTapApp {
   updateTagSessionUI() {
     const tagSessionInfo = document.getElementById('tagSessionInfo');
     const tagSessionId = document.getElementById('tagSessionId');
+    // Menu is now a dedicated page; these elements won't exist on most routes.
+    if (!tagSessionInfo || !tagSessionId) return;
     
     if (this.currentTagId) {
-      const session = this.getTagSession();
       tagSessionInfo.classList.remove('hidden');
-      
-      if (session && session.pageViews) {
-        tagSessionId.textContent = `${this.currentTagId} • ${session.pageViews} views`;
-      } else {
-        tagSessionId.textContent = this.currentTagId;
-      }
+      // Keep NFC details hidden from end users; UI just indicates connection.
+      tagSessionId.textContent = 'NFC Connected';
     } else {
       tagSessionInfo.classList.add('hidden');
     }
@@ -5869,10 +7839,10 @@ class ChurchTapApp {
       `;
       installBtn.className = 'w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-green-600 dark:text-green-400';
       
-      // Add to menu
-      const settingsSection = document.querySelector('#quickMenu .border-t');
-      if (settingsSection) {
-        settingsSection.parentNode.insertBefore(installBtn, settingsSection);
+      // Add to menu page (preferred). Fallback: legacy quick menu popover if present.
+      const mount = document.getElementById('menuInstallInsertPoint') || document.querySelector('#quickMenu .border-t');
+      if (mount && mount.parentNode) {
+        mount.parentNode.insertBefore(installBtn, mount);
       }
       
       installBtn.addEventListener('click', () => {
@@ -5988,6 +7958,7 @@ class ChurchTapApp {
   updateCommunityHeader(date) {
     const today = new Date().toISOString().split('T')[0];
     const header = document.getElementById('communityDateHeader');
+    if (!header) return;
     
     if (date === today) {
       header.textContent = "Today's Community";
@@ -6011,40 +7982,42 @@ class ChurchTapApp {
     const praise_reports = praiseEnabled ? community.praise_reports : [];
     const verse_insights = insightsEnabled ? community.verse_insights : [];
     
-    document.getElementById('loadingCommunity').classList.add('hidden');
-    document.getElementById('communitySection').classList.remove('hidden');
+    const loading = document.getElementById('loadingCommunity');
+    const section = document.getElementById('communitySection');
+    if (loading) loading.classList.add('hidden');
+    if (section) section.classList.remove('hidden');
     
     // Display prayer requests
     if (prayerEnabled && prayer_requests && prayer_requests.length > 0) {
       this.displayPrayerRequests(prayer_requests);
-      document.getElementById('prayerRequestsSection').classList.remove('hidden');
+      document.getElementById('prayerRequestsSection')?.classList.remove('hidden');
     } else {
-      document.getElementById('prayerRequestsSection').classList.add('hidden');
+      document.getElementById('prayerRequestsSection')?.classList.add('hidden');
     }
     
     // Display verse insights
     if (insightsEnabled && verse_insights && verse_insights.length > 0) {
       this.displayVerseInsights(verse_insights);
-      document.getElementById('verseInsightsSection').classList.remove('hidden');
+      document.getElementById('verseInsightsSection')?.classList.remove('hidden');
     } else {
-      document.getElementById('verseInsightsSection').classList.add('hidden');
+      document.getElementById('verseInsightsSection')?.classList.add('hidden');
     }
     
     // Display praise reports
     if (praiseEnabled && praise_reports && praise_reports.length > 0) {
       this.displayPraiseReports(praise_reports);
-      document.getElementById('praiseReportsSection').classList.remove('hidden');
+      document.getElementById('praiseReportsSection')?.classList.remove('hidden');
     } else {
-      document.getElementById('praiseReportsSection').classList.add('hidden');
+      document.getElementById('praiseReportsSection')?.classList.add('hidden');
     }
     
     // Show empty state if no content
     if ((!prayer_requests || prayer_requests.length === 0) && 
         (!praise_reports || praise_reports.length === 0) && 
         (!verse_insights || verse_insights.length === 0)) {
-      document.getElementById('emptyCommunity').classList.remove('hidden');
+      document.getElementById('emptyCommunity')?.classList.remove('hidden');
     } else {
-      document.getElementById('emptyCommunity').classList.add('hidden');
+      document.getElementById('emptyCommunity')?.classList.add('hidden');
     }
   }
 
@@ -6139,11 +8112,16 @@ class ChurchTapApp {
   }
 
   showEmptyCommunity() {
-    document.getElementById('loadingCommunity').classList.add('hidden');
-    document.getElementById('communitySection').classList.remove('hidden');
-    document.getElementById('prayerRequestsSection').classList.add('hidden');
-    document.getElementById('praiseReportsSection').classList.add('hidden');
-    document.getElementById('emptyCommunity').classList.remove('hidden');
+    const loading = document.getElementById('loadingCommunity');
+    const section = document.getElementById('communitySection');
+    const prayers = document.getElementById('prayerRequestsSection');
+    const praise = document.getElementById('praiseReportsSection');
+    const empty = document.getElementById('emptyCommunity');
+    if (loading) loading.classList.add('hidden');
+    if (section) section.classList.remove('hidden');
+    if (prayers) prayers.classList.add('hidden');
+    if (praise) praise.classList.add('hidden');
+    if (empty) empty.classList.remove('hidden');
   }
 
   showPrayerRequestModal() {
@@ -6538,6 +8516,8 @@ class ChurchTapApp {
       lifeStage: user.lifeStage ?? prefs.lifeStage ?? null,
       prayerFrequency: user.prayerFrequency ?? prefs.prayerFrequency ?? null,
       preferredTranslation: user.preferredTranslation ?? prefs.preferredTranslation ?? null,
+      defaultCommentarySourceKey: user.defaultCommentarySourceKey ?? prefs.defaultCommentarySourceKey ?? null,
+      defaultDictionarySourceKey: user.defaultDictionarySourceKey ?? prefs.defaultDictionarySourceKey ?? null,
       studyModeEnabled: user.studyModeEnabled ?? prefs.studyModeEnabled,
       interests,
       struggles
@@ -6551,6 +8531,7 @@ class ChurchTapApp {
     if (!data?.success) return false;
     this.currentUser = this.normalizeUser(data.user);
     this.syncStudyModeFromUser?.();
+    this.syncStudyDefaultsFromUser?.();
     this.updateTranslationButtons();
     return true;
   }
@@ -6566,11 +8547,13 @@ class ChurchTapApp {
         if (data.success) {
           this.currentUser = this.normalizeUser(data.user);
           this.syncStudyModeFromUser?.();
+          this.syncStudyDefaultsFromUser?.();
           this.updateUIForLoggedInUser();
           // Load memberships + active group for group switcher/community gating UI
           this.membershipContext = await this.fetchMembershipContext();
           this.adminOrganizations = await this.fetchAdminOrganizations();
           this.updateGroupDisplay();
+          this.updateVersePrivateToolsVisibility();
           // Sync favorites for the active group
           this.refreshFavoritesFromServer().catch(() => {});
         } else {
@@ -6621,6 +8604,7 @@ class ChurchTapApp {
     if (guestMenuItems) guestMenuItems.classList.remove('hidden');
     
     this.currentUser = null;
+    this.updateVersePrivateToolsVisibility();
   }
 
   getUserInitials(user) {
@@ -7366,17 +9350,25 @@ class ChurchTapApp {
   }
 
   displayOrganizationLinks(links) {
-    const linksContainer = document.getElementById('quickLinksList');
+    const isLinksPage = String(window.location.pathname || '') === '/links';
+    const pageContainer = document.getElementById('linksPageList');
+    const linksContainer = (isLinksPage && pageContainer) ? pageContainer : document.getElementById('quickLinksList');
     const linksButton = document.getElementById('tabLinksBtn');
     
-    console.log('DisplayOrganizationLinks called with:', links);
-    console.log('Links container found:', !!linksContainer);
-    console.log('Links button found:', !!linksButton);
-    
-    if (!linksContainer || !Array.isArray(links) || links.length === 0) {
-      console.log('Hiding links button - no links or container missing');
-      if (linksButton) {
-        linksButton.style.display = 'none';
+    const hasLinks = Array.isArray(links) && links.length > 0;
+
+    // Show/hide the Links tab button regardless of which route we're on.
+    const shouldShowLinksTab = hasLinks || !!this._fundraising;
+    if (linksButton) linksButton.style.display = shouldShowLinksTab ? 'flex' : 'none';
+
+    // If we're not on the Links page (or container isn't present), nothing else to render.
+    if (!linksContainer) return;
+
+    if (!hasLinks) {
+      if (isLinksPage) {
+        linksContainer.innerHTML = `<div class="text-sm text-gray-600 dark:text-gray-400 py-2">No links available for this group.</div>`;
+      } else {
+        // Legacy popover no longer exists; nothing to render here.
       }
       return;
     }
@@ -7431,10 +9423,7 @@ class ChurchTapApp {
 
     linksContainer.appendChild(frag);
     
-    // Show the links button
-    if (linksButton) {
-      linksButton.style.display = 'flex';
-    }
+    // Button already set above.
   }
 
   // ===== Calendar & CTA additions =====
@@ -7767,7 +9756,7 @@ class ChurchTapApp {
       return;
     }
 
-    inner.style.backgroundColor = cta.bg_color || '#0ea5e9';
+    inner.style.backgroundColor = cta.bg_color || '#055089';
     inner.style.color = cta.text_color || '#ffffff';
     iconEl.textContent = cta.icon || '📣';
     textEl.textContent = cta.text || '';
@@ -7816,11 +9805,11 @@ class ChurchTapApp {
     inner.appendChild(rightArrow);
     
     inner.addEventListener('mouseenter', () => {
-      inner.style.backgroundColor = `color-mix(in srgb, ${cta.bg_color || '#0ea5e9'} 90%, white 10%)`;
+      inner.style.backgroundColor = `color-mix(in srgb, ${cta.bg_color || '#055089'} 90%, white 10%)`;
       rightArrow.style.transform = 'translateY(-50%) translateX(2px)';
     });
     inner.addEventListener('mouseleave', () => {
-      inner.style.backgroundColor = cta.bg_color || '#0ea5e9';
+      inner.style.backgroundColor = cta.bg_color || '#055089';
       rightArrow.style.transform = 'translateY(-50%) translateX(0px)';
     });
     
@@ -7831,7 +9820,7 @@ class ChurchTapApp {
     parent.style.overflow = 'hidden';
     
     // Edge fades for marquee
-    const bg = cta.bg_color || '#0ea5e9';
+    const bg = cta.bg_color || '#055089';
     const leftFade = document.createElement('div');
     leftFade.style.position = 'absolute';
     leftFade.style.left = '0';
@@ -7953,6 +9942,12 @@ class ChurchTapApp {
         'xl': 'Extra Large'
       };
       textSizeIndicator.textContent = sizeNames[this.textSize] || 'Medium';
+    }
+
+    // Update study mode toggle
+    const studyToggle = document.getElementById('studyModeMenuToggle');
+    if (studyToggle) {
+      studyToggle.checked = !!this.isStudyModeEnabled();
     }
 
     // Update group display
@@ -8089,6 +10084,7 @@ class ChurchTapApp {
 
     // Refresh memberships when opening switcher so it’s always current
     this.membershipContext = await this.fetchMembershipContext();
+    this.updateVersePrivateToolsVisibility();
     const memberships = this.membershipContext?.memberships || [];
     const activeOrgId = this.membershipContext?.active_organization_id;
 
@@ -8151,6 +10147,7 @@ class ChurchTapApp {
       if (!data.success) throw new Error(data.error || 'Failed to switch group');
 
       this.membershipContext = await this.fetchMembershipContext();
+      this.updateVersePrivateToolsVisibility();
       this.closeModal();
       await this.refreshForActiveGroupChange();
       this.showToast('Group switched');
@@ -8174,6 +10171,7 @@ class ChurchTapApp {
       if (!data.success) throw new Error(data.error || 'Failed to leave group');
 
       this.membershipContext = await this.fetchMembershipContext();
+      this.updateVersePrivateToolsVisibility();
       this.closeModal();
       await this.refreshForActiveGroupChange();
       this.showToast('Left group');

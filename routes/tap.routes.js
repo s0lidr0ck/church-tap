@@ -186,6 +186,7 @@ router.get('/api/organizations/search', async (req, res) => {
     
     let sql = `
       SELECT id, name, subdomain, org_type, city, state, latitude, longitude, join_type,
+             COALESCE(review_status, 'approved') AS review_status,
              CASE 
                WHEN latitude IS NOT NULL AND longitude IS NOT NULL AND $1::decimal IS NOT NULL AND $2::decimal IS NOT NULL
                THEN (
@@ -254,6 +255,7 @@ router.get('/api/organizations/search', async (req, res) => {
         type: org.org_type,
         location: org.city && org.state ? `${org.city}, ${org.state}` : null,
         joinType: org.join_type,
+        reviewStatus: org.review_status,
         distance: org.distance_miles ? Math.round(org.distance_miles * 10) / 10 : null
       }));
       
