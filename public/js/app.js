@@ -478,8 +478,8 @@ class ChurchTapApp {
 
       listEl.innerHTML = notes.map(n => {
         const id = Number(n.id);
-        const title = this.escapeHtml(n.title || 'Untitled');
-        const preview = this.escapeHtml(String(n.body_markdown || '').split('\n').slice(0, 2).join(' ').slice(0, 140));
+        const title = n.created_at ? this.escapeHtml(new Date(n.created_at).toLocaleString()) : 'Note';
+        const preview = String(n.body_markdown || '').split('\n').slice(0, 2).join(' ').slice(0, 140);
         const created = n.created_at ? new Date(n.created_at).toLocaleString() : '';
         return `
           <div class="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/30">
@@ -494,10 +494,7 @@ class ChurchTapApp {
                         onclick="window.churchTapApp.deleteNote(${id}, ${Number(verseId)})">Delete</button>
               </div>
             </div>
-            ${preview ? `<div class="mt-2 text-sm text-gray-700 dark:text-gray-200">${preview}</div>` : ''}
-            <div class="mt-2">
-              <button class="text-xs text-primary-700 dark:text-primary-300 hover:underline" onclick="window.churchTapApp.previewNote(${id})">Preview</button>
-            </div>
+            ${preview ? `<div class="mt-2 text-sm text-gray-700 dark:text-gray-200">${this.renderInlineMarkdown(preview)}</div>` : ''}
           </div>
         `;
       }).join('');
@@ -521,7 +518,7 @@ class ChurchTapApp {
     const note = notes.find(n => Number(n.id) === id);
     if (!note) return;
 
-    const title = this.escapeHtml(note.title || 'Untitled');
+    const title = note.created_at ? this.escapeHtml(new Date(note.created_at).toLocaleString()) : 'Note';
     const html = this.markdownToSafeHtml(note.body_markdown || '');
 
     this.showModal('Note Preview', `
@@ -548,34 +545,29 @@ class ChurchTapApp {
       existing = notes.find(n => Number(n.id) === Number(noteId)) || null;
     }
 
-    const initTitle = this.escapeHtml(existing?.title || '');
-    const initBody = this.escapeHtml(existing?.body_markdown || '');
+    const initMarkdown = String(existing?.body_markdown || '');
+    const createdLabel = existing?.created_at ? this.escapeHtml(new Date(existing.created_at).toLocaleString()) : '';
 
     this.showModal(noteId ? 'Edit Note' : 'New Note', `
       <div class="space-y-3">
-        <div class="space-y-2">
-          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Title (optional)</label>
-          <input id="noteTitleInput" type="text" value="${initTitle}"
-                 class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm" />
-        </div>
+        ${createdLabel ? `<div class="text-xs text-gray-500 dark:text-gray-400">Created ${createdLabel}</div>` : ''}
 
         <div class="flex flex-wrap items-center gap-2">
-          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('**','**')"><strong>B</strong></button>
-          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('*','*')"><em>I</em></button>
-          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('\\n- ','')">• List</button>
-          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('\\n> ','')">❝ Quote</button>
-          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown(String.fromCharCode(96), String.fromCharCode(96))">{ } Code</button>
-          <button class="btn-secondary text-xs" onclick="window.churchTapApp.toggleNotePreview()">Preview</button>
+          <button class="btn-secondary text-xs" data-note-format="bold" onmousedown="event.preventDefault()" onclick="window.churchTapApp.noteExec('bold')"><strong>B</strong></button>
+          <button class="btn-secondary text-xs" data-note-format="italic" onmousedown="event.preventDefault()" onclick="window.churchTapApp.noteExec('italic')"><em>I</em></button>
+          <button class="btn-secondary text-xs" onmousedown="event.preventDefault()" onclick="window.churchTapApp.noteExec('ul')">• List</button>
+          <button class="btn-secondary text-xs" onmousedown="event.preventDefault()" onclick="window.churchTapApp.noteExec('quote')">❝ Quote</button>
+          <button class="btn-secondary text-xs" data-note-format="code" onmousedown="event.preventDefault()" onclick="window.churchTapApp.noteExec('code')">{ } Code</button>
         </div>
 
         <div id="noteEditorWrap" class="space-y-2">
-          <textarea id="noteBodyInput" rows="8"
-                    class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
-                    placeholder="Write your note in markdown…">${initBody}</textarea>
-          <div class="text-xs text-gray-500 dark:text-gray-400">Tip: Use **bold**, *italic*, \`code\`, lists, and blockquotes.</div>
+          <div id="noteBodyInput"
+               contenteditable="true"
+               role="textbox"
+               aria-label="Note editor"
+               class="w-full min-h-[12.5rem] px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm leading-relaxed overflow-y-auto"></div>
+          <div class="text-xs text-gray-500 dark:text-gray-400">Tip: Use the toolbar to format as you type.</div>
         </div>
-
-        <div id="notePreviewWrap" class="hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/30 p-3 text-sm text-gray-700 dark:text-gray-200 leading-relaxed"></div>
 
         <div class="flex justify-end gap-2">
           <button class="btn-secondary" onclick="window.churchTapApp.closeModal()">Cancel</button>
@@ -583,20 +575,264 @@ class ChurchTapApp {
         </div>
       </div>
     `);
+
+    this.setNoteEditorMarkdown(initMarkdown);
+    this.attachNoteEditorHandlers();
   }
 
-  insertMarkdown(prefix, suffix) {
-    const ta = document.getElementById('noteBodyInput');
-    if (!ta) return;
-    const start = ta.selectionStart || 0;
-    const end = ta.selectionEnd || 0;
-    const val = String(ta.value || '');
-    const selected = val.slice(start, end);
-    const next = val.slice(0, start) + prefix + selected + suffix + val.slice(end);
-    ta.value = next;
-    const cursor = start + prefix.length + selected.length + suffix.length;
-    ta.focus();
-    ta.setSelectionRange(cursor, cursor);
+  getNoteEditorEl() {
+    const el = document.getElementById('noteBodyInput');
+    return el && el.isContentEditable ? el : null;
+  }
+
+  setNoteEditorMarkdown(markdown) {
+    const editor = this.getNoteEditorEl();
+    if (!editor) return;
+    const html = this.markdownToSafeHtml(String(markdown || ''));
+    editor.innerHTML = html || '';
+    editor.focus();
+    this.syncNoteFormatButtonsFromSelection();
+  }
+
+  // Very small sanitizer for contenteditable HTML (no attributes allowed).
+  sanitizeNoteEditorHtml(html) {
+    const raw = String(html || '');
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${raw}</div>`, 'text/html');
+    const root = doc.body.firstElementChild;
+    if (!root) return '';
+
+    const allowed = new Set(['B', 'STRONG', 'I', 'EM', 'CODE', 'P', 'BR', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'DIV']);
+
+    const walk = (node) => {
+      if (!node) return;
+      const children = Array.from(node.childNodes || []);
+      for (const ch of children) walk(ch);
+
+      if (node.nodeType === 1) {
+        const tag = node.tagName;
+        if (!allowed.has(tag)) {
+          // Replace unknown elements with their text content.
+          const txt = doc.createTextNode(node.textContent || '');
+          node.replaceWith(txt);
+          return;
+        }
+        // Strip all attributes
+        const attrs = Array.from(node.attributes || []);
+        for (const a of attrs) node.removeAttribute(a.name);
+      }
+    };
+    walk(root);
+
+    return root.innerHTML;
+  }
+
+  // Convert sanitized HTML (limited tags) back to markdown for storage.
+  noteEditorHtmlToMarkdown(html) {
+    const safeHtml = this.sanitizeNoteEditorHtml(html);
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${safeHtml}</div>`, 'text/html');
+    const root = doc.body.firstElementChild;
+    if (!root) return '';
+
+    const textMd = (s) => String(s || '').replace(/\r\n/g, '\n');
+
+    const childrenToMd = (node) => Array.from(node.childNodes || []).map(nodeToMd).join('');
+
+    const nodeToMd = (node) => {
+      if (!node) return '';
+      if (node.nodeType === 3) return textMd(node.nodeValue);
+      if (node.nodeType !== 1) return '';
+
+      const tag = node.tagName;
+      if (tag === 'BR') return '\n';
+      if (tag === 'STRONG' || tag === 'B') return `**${childrenToMd(node)}**`;
+      if (tag === 'EM' || tag === 'I') return `*${childrenToMd(node)}*`;
+      if (tag === 'CODE') {
+        const t = textMd(node.textContent || '').replace(/`/g, '\\`');
+        return `\`${t}\``;
+      }
+      if (tag === 'LI') return childrenToMd(node).trim();
+      if (tag === 'UL') {
+        const lis = Array.from(node.querySelectorAll(':scope > li'));
+        const lines = lis.map(li => `- ${nodeToMd(li)}`).join('\n');
+        return `${lines}\n\n`;
+      }
+      if (tag === 'OL') {
+        const lis = Array.from(node.querySelectorAll(':scope > li'));
+        const lines = lis.map((li, idx) => `${idx + 1}. ${nodeToMd(li)}`).join('\n');
+        return `${lines}\n\n`;
+      }
+      if (tag === 'BLOCKQUOTE') {
+        const inner = childrenToMd(node).trim().split('\n').map(l => (l ? `> ${l}` : '>')).join('\n');
+        return `${inner}\n\n`;
+      }
+      if (tag === 'P' || tag === 'DIV') {
+        const inner = childrenToMd(node).trim();
+        return inner ? `${inner}\n\n` : '';
+      }
+
+      // Fallback
+      return childrenToMd(node);
+    };
+
+    let md = childrenToMd(root);
+    md = md.replace(/[ \t]+\n/g, '\n');
+    md = md.replace(/\n{3,}/g, '\n\n');
+    md = md.trim();
+    return md;
+  }
+
+  syncNoteFormatButtonsFromSelection() {
+    const activeClass = 'bg-primary-600 text-white';
+    const kinds = ['bold', 'italic', 'code'];
+    const editor = this.getNoteEditorEl();
+    const sel = window.getSelection?.();
+
+    // Determine states
+    let boldOn = false;
+    let italicOn = false;
+    try { boldOn = !!document.queryCommandState?.('bold'); } catch (e) {}
+    try { italicOn = !!document.queryCommandState?.('italic'); } catch (e) {}
+
+    let codeOn = false;
+    try {
+      const anchor = sel?.anchorNode;
+      const el = anchor && anchor.nodeType === 3 ? anchor.parentElement : anchor;
+      codeOn = !!(el && el.closest && el.closest('code'));
+    } catch (e) {}
+
+    const state = { bold: boldOn, italic: italicOn, code: codeOn };
+
+    for (const k of kinds) {
+      const btns = Array.from(document.querySelectorAll(`[data-note-format="${k}"]`));
+      for (const btn of btns) {
+        const isOn = state[k] === true && !!editor && !!sel;
+        if (!btn.classList.contains('btn-secondary')) btn.classList.add('btn-secondary');
+        if (isOn) btn.classList.add(...activeClass.split(' '));
+        else btn.classList.remove(...activeClass.split(' '));
+      }
+    }
+  }
+
+  // Inline code toggle for contenteditable (wrap selection in <code>).
+  toggleInlineCode() {
+    const editor = this.getNoteEditorEl();
+    if (!editor) return;
+    editor.focus();
+
+    const sel = window.getSelection?.();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+
+    // If selection/caret is inside an existing code tag, unwrap it.
+    const anchor = sel.anchorNode && sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode;
+    const codeEl = anchor && anchor.closest ? anchor.closest('code') : null;
+    if (codeEl && editor.contains(codeEl)) {
+      const parent = codeEl.parentNode;
+      while (codeEl.firstChild) parent.insertBefore(codeEl.firstChild, codeEl);
+      parent.removeChild(codeEl);
+      return;
+    }
+
+    if (range.collapsed) {
+      const code = document.createElement('code');
+      const zwsp = document.createTextNode('\u200B');
+      code.appendChild(zwsp);
+      range.insertNode(code);
+      // Place cursor inside the code node, after the zwsp
+      const r = document.createRange();
+      r.setStart(zwsp, 1);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      return;
+    }
+
+    const code = document.createElement('code');
+    try {
+      code.appendChild(range.extractContents());
+      range.insertNode(code);
+      sel.removeAllRanges();
+      const r = document.createRange();
+      r.selectNodeContents(code);
+      r.collapse(false);
+      sel.addRange(r);
+    } catch (e) {}
+  }
+
+  saveNoteEditorSelection() {
+    const editor = this.getNoteEditorEl();
+    if (!editor) return;
+    const sel = window.getSelection?.();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    // Only save if selection is inside the editor
+    const anchor = sel.anchorNode && sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode;
+    if (!anchor || !editor.contains(anchor)) return;
+    // Clone so it survives DOM operations
+    this._noteEditorSavedRange = range.cloneRange();
+  }
+
+  restoreNoteEditorSelection() {
+    const editor = this.getNoteEditorEl();
+    const r = this._noteEditorSavedRange;
+    if (!editor || !r) return;
+    try {
+      const sel = window.getSelection?.();
+      if (!sel) return;
+      editor.focus();
+      sel.removeAllRanges();
+      sel.addRange(r);
+    } catch (e) {}
+  }
+
+  noteExec(cmd) {
+    const editor = this.getNoteEditorEl();
+    if (!editor) return;
+    // Button click can steal focus/selection; restore last known caret first.
+    this.restoreNoteEditorSelection();
+
+    const c = String(cmd || '').trim().toLowerCase();
+    try {
+      if (c === 'bold') document.execCommand('bold');
+      else if (c === 'italic') document.execCommand('italic');
+      else if (c === 'ul') document.execCommand('insertUnorderedList');
+      else if (c === 'quote') document.execCommand('formatBlock', false, 'blockquote');
+      else if (c === 'code') this.toggleInlineCode();
+    } catch (e) {}
+
+    this.syncNoteFormatButtonsFromSelection();
+    this.saveNoteEditorSelection();
+  }
+
+  attachNoteEditorHandlers() {
+    const editor = this.getNoteEditorEl();
+    if (!editor) return;
+
+    // Keep toolbar state synced as user moves caret/selects.
+    const sync = () => {
+      this.saveNoteEditorSelection();
+      this.syncNoteFormatButtonsFromSelection();
+    };
+    editor.addEventListener('keyup', sync);
+    editor.addEventListener('mouseup', sync);
+    editor.addEventListener('input', sync);
+    // Also catch selection changes triggered by touch selection handles.
+    if (!this._noteEditorSelectionChangeBound) {
+      this._noteEditorSelectionChangeBound = true;
+      document.addEventListener('selectionchange', () => {
+        // Only save/sync if the active selection is inside the editor.
+        const ed = this.getNoteEditorEl();
+        if (!ed) return;
+        const sel = window.getSelection?.();
+        const anchor = sel?.anchorNode && sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel?.anchorNode;
+        if (!anchor || !ed.contains(anchor)) return;
+        this.saveNoteEditorSelection();
+        this.syncNoteFormatButtonsFromSelection();
+      });
+    }
+    sync();
   }
 
   toggleNotePreview() {
@@ -623,8 +859,8 @@ class ChurchTapApp {
     const vid = Number(verseId);
     if (!vid || Number.isNaN(vid)) return;
 
-    const title = String(document.getElementById('noteTitleInput')?.value || '').trim();
-    const body = String(document.getElementById('noteBodyInput')?.value || '').replace(/\r\n/g, '\n').trim();
+    const editor = this.getNoteEditorEl();
+    const body = this.noteEditorHtmlToMarkdown(editor?.innerHTML || '');
     if (!body) {
       this.showToast('Please write something first');
       return;
@@ -636,7 +872,7 @@ class ChurchTapApp {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ title: title || null, body_markdown: body })
+          body: JSON.stringify({ title: null, body_markdown: body })
         });
         const data = await res.json().catch(() => null);
         if (!res.ok || !data?.success) {
@@ -648,7 +884,7 @@ class ChurchTapApp {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ title: title || null, body_markdown: body })
+          body: JSON.stringify({ title: null, body_markdown: body })
         });
         const data = await res.json().catch(() => null);
         if (!res.ok || !data?.success) {
@@ -1469,9 +1705,6 @@ class ChurchTapApp {
         </div>
 
         <div class="space-y-3">
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/saved')">
-            🔖 Saved
-          </button>
           <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/favorites')">
             ❤️ Favorites
           </button>
@@ -1810,10 +2043,9 @@ class ChurchTapApp {
 
     const filtered = q
       ? notes.filter(n => {
-          const title = String(n.title || '').toLowerCase();
           const body = String(n.body_markdown || '').toLowerCase();
           const ref = String(this.formatNoteReference(n) || '').toLowerCase();
-          return title.includes(q) || body.includes(q) || ref.includes(q);
+          return body.includes(q) || ref.includes(q);
         })
       : notes;
 
@@ -1824,10 +2056,11 @@ class ChurchTapApp {
 
     el.innerHTML = filtered.map(n => {
       const ref = this.escapeHtml(this.formatNoteReference(n) || 'Verse');
-      const title = this.escapeHtml(n.title || '');
-      const snippet = this.escapeHtml(String(n.body_markdown || '').replace(/\s+/g, ' ').trim().slice(0, 160));
-      const when = n.updated_at || n.created_at;
-      const whenText = when ? this.escapeHtml(new Date(when).toLocaleString()) : '';
+      const snippetRaw = String(n.body_markdown || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+      const snippet = snippetRaw ? this.renderInlineMarkdown(snippetRaw) : '';
+      const created = n.created_at || n.createdAt;
+      const title = created ? this.escapeHtml(new Date(created).toLocaleString()) : '';
+      const whenText = title;
 
       const actionBtn = n.kind === 'daily'
         ? `<button class="btn-secondary text-xs" onclick="window.churchTapApp.openNoteEditor(${Number(n.verse_id)}, ${Number(n.id)})">Edit</button>`
@@ -1967,8 +2200,7 @@ class ChurchTapApp {
     const filtered = q
       ? items.filter(h => {
           const ref = String(this.formatHighlightReference(h) || '').toLowerCase();
-          const color = String(h.color_key || '').toLowerCase();
-          return ref.includes(q) || color.includes(q);
+          return ref.includes(q);
         })
       : items;
 
@@ -1979,7 +2211,6 @@ class ChurchTapApp {
 
     el.innerHTML = filtered.map(h => {
       const ref = this.escapeHtml(this.formatHighlightReference(h) || 'Verse');
-      const colorKey = this.escapeHtml(String(h.color_key || ''));
       const when = h.updated_at || h.created_at;
       const whenText = when ? this.escapeHtml(new Date(when).toLocaleString()) : '';
 
@@ -1997,7 +2228,6 @@ class ChurchTapApp {
                 <span class="inline-block w-4 h-4 rounded border border-gray-300 dark:border-gray-600" style="background:${swatchVar};"></span>
                 <div class="text-xs text-gray-500 dark:text-gray-400">${ref}</div>
               </div>
-              <div class="text-sm font-semibold text-gray-900 dark:text-white mt-1 capitalize">${colorKey}</div>
               ${whenText ? `<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">${whenText}</div>` : ''}
             </div>
             <div class="flex flex-col gap-2">
@@ -3099,35 +3329,7 @@ class ChurchTapApp {
 
     // Note: Menu + Links are full pages now (no popover close-on-outside-click needed).
 
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      if (e.target.type === 'text' || e.target.type === 'textarea') return;
-      
-      switch(e.key) {
-        case 'ArrowLeft':
-          this.navigateDay(-1);
-          break;
-        case 'ArrowRight':
-          this.navigateDay(1);
-          break;
-        case ' ':
-          e.preventDefault();
-          this.showRandomVerse();
-          break;
-        case 'h':
-          this.toggleHeart();
-          break;
-        case 'f':
-          this.toggleFavorite();
-          break;
-        case 't':
-          this.goToToday();
-          break;
-        case 'd':
-          this.toggleTheme();
-          break;
-      }
-    });
+    // Keyboard shortcuts removed (typing should never trigger app actions).
 
     // Double tap to favorite
     let lastTap = 0;
@@ -5354,7 +5556,7 @@ class ChurchTapApp {
     });
   }
 
-  showModal(title, content) {
+  showModal(title, content, opts = {}) {
     // Close any existing modal first
     if (this.currentModal) {
       this.closeModal();
@@ -5362,6 +5564,9 @@ class ChurchTapApp {
     
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    if (opts && opts.zIndex) {
+      modal.style.zIndex = String(opts.zIndex);
+    }
     modal.innerHTML = `
       <div class="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 relative max-h-screen overflow-y-auto">
         <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">${title}</h3>
@@ -6000,7 +6205,7 @@ class ChurchTapApp {
         const verseTextEl = row.querySelector('.verse-text');
         const verseText = verseTextEl ? String(verseTextEl.textContent || '').trim() : '';
         const ref = `${this.getBookName(book)} ${chapter}:${verseNum}`;
-        this.showChapterVerseActions({ book, chapter, verse: verseNum, reference: ref, translation, rowEl: row, text: verseText });
+        this.showChapterVerseActionSheet({ book, chapter, verse: verseNum, reference: ref, translation, rowEl: row, text: verseText });
       });
     }
 
@@ -6086,6 +6291,213 @@ class ChurchTapApp {
     const key = String(colorKey || '').trim().toLowerCase();
     if (!key) return;
     rowEl.classList.add('ct-verse-hl', `ct-verse-hl-${key}`);
+  }
+
+  // Dedicated bottom sheet (for chapter verse taps)
+  closeBottomSheet() {
+    try {
+      if (this._bottomSheetKeyHandler) {
+        document.removeEventListener('keydown', this._bottomSheetKeyHandler, true);
+      }
+    } catch (e) {}
+    this._bottomSheetKeyHandler = null;
+
+    const root = this._bottomSheetRoot;
+    const panel = this._bottomSheetPanel;
+    this._bottomSheetRoot = null;
+    this._bottomSheetPanel = null;
+
+    if (!root || !document.body.contains(root)) return;
+
+    try {
+      if (panel) panel.style.transform = 'translateY(100%)';
+      setTimeout(() => {
+        try {
+          if (document.body.contains(root)) document.body.removeChild(root);
+        } catch (e) {}
+      }, 180);
+    } catch (e) {
+      try { document.body.removeChild(root); } catch (e2) {}
+    }
+  }
+
+  showBottomSheet(renderHtml, opts = {}) {
+    this.closeBottomSheet();
+
+    const zIndex = String(opts?.zIndex || 10000);
+    const title = String(opts?.title || '').trim();
+
+    const root = document.createElement('div');
+    root.className = 'fixed inset-0 bg-black/40 flex items-end justify-center';
+    root.style.zIndex = zIndex;
+
+    const panel = document.createElement('div');
+    panel.className = 'w-full max-w-lg bg-white dark:bg-gray-800 rounded-t-2xl shadow-2xl';
+    panel.style.transform = 'translateY(100%)';
+    panel.style.transition = 'transform 160ms ease-out';
+
+    panel.innerHTML = `
+      <div class="px-4 pt-3 pb-6" style="padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));">
+        <div class="mx-auto w-10 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600 mb-3"></div>
+        ${title ? `<div class="text-sm font-semibold text-gray-900 dark:text-white mb-2">${this.escapeHtml(title)}</div>` : ''}
+        <div data-sheet-body>
+          ${typeof renderHtml === 'function' ? renderHtml() : String(renderHtml || '')}
+        </div>
+      </div>
+    `;
+
+    root.appendChild(panel);
+    document.body.appendChild(root);
+
+    requestAnimationFrame(() => {
+      panel.style.transform = 'translateY(0)';
+    });
+
+    root.addEventListener('click', (e) => {
+      if (e.target === root) this.closeBottomSheet();
+    });
+
+    const keyHandler = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.closeBottomSheet();
+      }
+    };
+    document.addEventListener('keydown', keyHandler, true);
+
+    this._bottomSheetRoot = root;
+    this._bottomSheetPanel = panel;
+    this._bottomSheetKeyHandler = keyHandler;
+
+    return { root, panel };
+  }
+
+  async showChapterVerseActionSheet(ctx) {
+    const { book, chapter, verse, reference, rowEl } = ctx || {};
+    if (!book || !chapter || !verse) return;
+
+    // If user is selecting text, don't hijack.
+    const sel = window.getSelection?.();
+    if (sel && !sel.isCollapsed && String(sel.toString() || '').trim()) return;
+
+    // Store row element so highlight UI updates immediately
+    this._chapterActiveRowEl = rowEl || null;
+    this._chapterActiveRef = { book, chapter, verse, reference };
+
+    const canUsePrivate = this.canUsePrivateVerseTools();
+
+    // Best-effort load current highlight state
+    let currentColor = null;
+    if (canUsePrivate) {
+      try {
+        const hlRes = await fetch(this.buildApiUrl(`/api/scripture-highlights/${book}/${chapter}/${verse}`), { credentials: 'include' });
+        const hlData = await hlRes.json().catch(() => null);
+        currentColor = hlRes.ok && hlData?.success ? (hlData.highlight?.color_key || null) : null;
+      } catch (e) {}
+    }
+
+    const colors = [
+      { key: 'yellow', label: 'Yellow', swatch: 'var(--hl-yellow-bg)' },
+      { key: 'amber', label: 'Amber', swatch: 'var(--hl-amber-bg)' },
+      { key: 'orange', label: 'Orange', swatch: 'var(--hl-orange-bg)' },
+      { key: 'red', label: 'Red', swatch: 'var(--hl-red-bg)' },
+      { key: 'pink', label: 'Pink', swatch: 'var(--hl-pink-bg)' },
+      { key: 'purple', label: 'Purple', swatch: 'var(--hl-purple-bg)' },
+      { key: 'blue', label: 'Blue', swatch: 'var(--hl-blue-bg)' },
+      { key: 'green', label: 'Green', swatch: 'var(--hl-green-bg)' }
+    ];
+
+    const safeRef = this.escapeHtml(String(reference || ''));
+
+    const render = () => {
+      const swatches = colors.map(c => {
+        const active = String(currentColor || '') === c.key;
+        return `
+          <button type="button"
+                  class="w-9 h-9 rounded-lg border ${active ? 'border-primary-500' : 'border-gray-200 dark:border-gray-700'} bg-white dark:bg-gray-900/30 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors flex items-center justify-center flex-none"
+                  data-sheet-action="color"
+                  data-color="${this.escapeHtml(c.key)}"
+                  aria-label="Highlight color">
+            <span class="inline-block w-6 h-6 rounded-md border border-gray-300 dark:border-gray-600" style="background:${c.swatch};"></span>
+          </button>
+        `;
+      }).join('');
+
+      const disabledHint = !canUsePrivate
+        ? `<div class="text-xs text-gray-500 dark:text-gray-400">Login and select an active group to add private notes/highlights.</div>`
+        : '';
+
+      const clearBtn = (canUsePrivate && currentColor)
+        ? `<button type="button"
+                   class="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 transition-colors text-xs"
+                   data-sheet-action="clear">
+              Clear
+            </button>`
+        : '';
+
+      return `
+        <div class="space-y-3">
+          <div class="text-xs text-gray-500 dark:text-gray-400">${safeRef}</div>
+          ${disabledHint}
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button"
+                    class="w-full px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 transition-colors text-left disabled:opacity-50"
+                    data-sheet-action="note"
+                    ${canUsePrivate ? '' : 'disabled'}>
+              Note
+            </button>
+            <button type="button"
+                    class="w-full px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 transition-colors text-left"
+                    data-sheet-action="commentary">
+              Commentary
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 overflow-x-auto whitespace-nowrap py-1"
+                 style="-ms-overflow-style:none; scrollbar-width:none;">
+              ${swatches}
+            </div>
+            ${clearBtn}
+          </div>
+        </div>
+      `;
+    };
+
+    const { panel } = this.showBottomSheet(render, { title: 'Verse', zIndex: 10000 });
+    const bodyEl = panel.querySelector('[data-sheet-body]');
+    if (!bodyEl) return;
+
+    bodyEl.addEventListener('click', (e) => {
+      const btn = e.target?.closest?.('[data-sheet-action]');
+      if (!btn) return;
+      const action = String(btn.getAttribute('data-sheet-action') || '');
+
+      if (action === 'color') {
+        const colorKey = String(btn.getAttribute('data-color') || '').trim().toLowerCase();
+        if (!colorKey) return;
+        currentColor = colorKey;
+        this.setScriptureHighlight(book, chapter, verse, colorKey).catch(() => {});
+        this.closeBottomSheet();
+        return;
+      }
+      if (action === 'clear') {
+        currentColor = null;
+        this.setScriptureHighlight(book, chapter, verse, null).catch(() => {});
+        this.closeBottomSheet();
+        return;
+      }
+      if (action === 'note') {
+        this.closeBottomSheet();
+        this.openScriptureNotes(book, chapter, verse, { zIndex: 10000 }).catch(() => {});
+        return;
+      }
+      if (action === 'commentary') {
+        this.closeBottomSheet();
+        this.openCommentaryForRef(String(reference || ''), { zIndex: 10000 }).catch(() => {});
+        return;
+      }
+    });
   }
 
   async showChapterVerseActions(ctx) {
@@ -6204,22 +6616,27 @@ class ChurchTapApp {
     }
   }
 
-  async openScriptureNotes(book, chapter, verse) {
+  async openScriptureNotes(book, chapter, verse, opts = {}) {
     if (!this.canUsePrivateVerseTools()) return;
     const ref = `${this.getBookName(book)} ${chapter}:${verse}`;
+
+    // Remember opts so refresh/edit/preview stay above chapter modal if needed
+    this._scriptureNotesModalOpts = opts && typeof opts === 'object' ? opts : {};
+    const z = Number(this._scriptureNotesModalOpts?.zIndex) || null;
+    const zObj = z ? `{ zIndex: ${z} }` : '{}';
 
     this.showModal('Notes', `
       <div class="space-y-3">
         <div class="text-xs text-gray-500 dark:text-gray-400">Private notes for ${this.escapeHtml(ref)}</div>
         <div class="flex items-center gap-2">
-          <button class="btn-primary text-sm" onclick="window.churchTapApp.openScriptureNoteEditor(${book}, ${chapter}, ${verse})">+ New Note</button>
+          <button class="btn-primary text-sm" onclick="window.churchTapApp.openScriptureNoteEditor(${book}, ${chapter}, ${verse}, null, ${zObj})">+ New Note</button>
           <button class="btn-secondary text-sm" onclick="window.churchTapApp.refreshScriptureNotesList(${book}, ${chapter}, ${verse})">Refresh</button>
         </div>
         <div id="scriptureNotesList" class="space-y-2">
           <div class="text-sm text-gray-600 dark:text-gray-400">Loading…</div>
         </div>
       </div>
-    `);
+    `, this._scriptureNotesModalOpts);
 
     await this.refreshScriptureNotesList(book, chapter, verse);
   }
@@ -6228,6 +6645,9 @@ class ChurchTapApp {
     const listEl = document.getElementById('scriptureNotesList');
     if (!listEl) return;
     try {
+      const z = Number(this._scriptureNotesModalOpts?.zIndex) || null;
+      const zObj = z ? `{ zIndex: ${z} }` : '{}';
+
       const res = await fetch(this.buildApiUrl(`/api/scripture-notes/${book}/${chapter}/${verse}`), { credentials: 'include' });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
@@ -6241,8 +6661,8 @@ class ChurchTapApp {
       }
       listEl.innerHTML = notes.map(n => {
         const id = Number(n.id);
-        const title = this.escapeHtml(n.title || 'Untitled');
-        const preview = this.escapeHtml(String(n.body_markdown || '').split('\n').slice(0, 2).join(' ').slice(0, 140));
+        const title = n.created_at ? this.escapeHtml(new Date(n.created_at).toLocaleString()) : 'Note';
+        const preview = String(n.body_markdown || '').split('\n').slice(0, 2).join(' ').slice(0, 140);
         const created = n.created_at ? new Date(n.created_at).toLocaleString() : '';
         return `
           <div class="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/30">
@@ -6252,15 +6672,12 @@ class ChurchTapApp {
                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">${this.escapeHtml(created)}</div>
               </div>
               <div class="flex items-center gap-2">
-                <button class="btn-secondary text-xs" onclick="window.churchTapApp.openScriptureNoteEditor(${book}, ${chapter}, ${verse}, ${id})">Edit</button>
+                <button class="btn-secondary text-xs" onclick="window.churchTapApp.openScriptureNoteEditor(${book}, ${chapter}, ${verse}, ${id}, ${zObj})">Edit</button>
                 <button class="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 transition-colors text-xs"
                         onclick="window.churchTapApp.deleteScriptureNote(${id}, ${book}, ${chapter}, ${verse})">Delete</button>
               </div>
             </div>
-            ${preview ? `<div class="mt-2 text-sm text-gray-700 dark:text-gray-200">${preview}</div>` : ''}
-            <div class="mt-2">
-              <button class="text-xs text-primary-700 dark:text-primary-300 hover:underline" onclick="window.churchTapApp.previewScriptureNote(${id}, ${book}, ${chapter}, ${verse})">Preview</button>
-            </div>
+            ${preview ? `<div class="mt-2 text-sm text-gray-700 dark:text-gray-200">${this.renderInlineMarkdown(preview)}</div>` : ''}
           </div>
         `;
       }).join('');
@@ -6270,7 +6687,7 @@ class ChurchTapApp {
     }
   }
 
-  async previewScriptureNote(noteId, book, chapter, verse) {
+  async previewScriptureNote(noteId, book, chapter, verse, opts = {}) {
     const id = Number(noteId);
     if (!id || Number.isNaN(id)) return;
     const res = await fetch(this.buildApiUrl(`/api/scripture-notes/${book}/${chapter}/${verse}`), { credentials: 'include' });
@@ -6279,8 +6696,12 @@ class ChurchTapApp {
     const note = notes.find(n => Number(n.id) === id);
     if (!note) return;
 
-    const title = this.escapeHtml(note.title || 'Untitled');
+    const title = note.created_at ? this.escapeHtml(new Date(note.created_at).toLocaleString()) : 'Note';
     const html = this.markdownToSafeHtml(note.body_markdown || '');
+
+    const useOpts = (opts && typeof opts === 'object' && Object.keys(opts).length)
+      ? opts
+      : (this._scriptureNotesModalOpts || {});
 
     this.showModal('Note Preview', `
       <div class="space-y-3">
@@ -6290,10 +6711,10 @@ class ChurchTapApp {
           <button class="btn-secondary" onclick="window.churchTapApp.closeModal()">Close</button>
         </div>
       </div>
-    `);
+    `, useOpts);
   }
 
-  async openScriptureNoteEditor(book, chapter, verse, noteId = null) {
+  async openScriptureNoteEditor(book, chapter, verse, noteId = null, opts = {}) {
     let existing = null;
     if (noteId) {
       const res = await fetch(this.buildApiUrl(`/api/scripture-notes/${book}/${chapter}/${verse}`), { credentials: 'include' });
@@ -6302,48 +6723,50 @@ class ChurchTapApp {
       existing = notes.find(n => Number(n.id) === Number(noteId)) || null;
     }
 
-    const initTitle = this.escapeHtml(existing?.title || '');
-    const initBody = this.escapeHtml(existing?.body_markdown || '');
+    const initMarkdown = String(existing?.body_markdown || '');
     const ref = `${this.getBookName(book)} ${chapter}:${verse}`;
+    const createdLabel = existing?.created_at ? this.escapeHtml(new Date(existing.created_at).toLocaleString()) : '';
+
+    const useOpts = (opts && typeof opts === 'object' && Object.keys(opts).length)
+      ? opts
+      : (this._scriptureNotesModalOpts || {});
 
     this.showModal(noteId ? 'Edit Note' : 'New Note', `
       <div class="space-y-3">
         <div class="text-xs text-gray-500 dark:text-gray-400">Private note for ${this.escapeHtml(ref)}</div>
-        <div class="space-y-2">
-          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Title (optional)</label>
-          <input id="noteTitleInput" type="text" value="${initTitle}"
-                 class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm" />
-        </div>
+        ${createdLabel ? `<div class="text-xs text-gray-500 dark:text-gray-400">Created ${createdLabel}</div>` : ''}
 
         <div class="flex flex-wrap items-center gap-2">
-          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('**','**')"><strong>B</strong></button>
-          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('*','*')"><em>I</em></button>
-          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('\\n- ','')">• List</button>
-          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown('\\n> ','')">❝ Quote</button>
-          <button class="btn-secondary text-xs" onclick="window.churchTapApp.insertMarkdown(String.fromCharCode(96), String.fromCharCode(96))">{ } Code</button>
-          <button class="btn-secondary text-xs" onclick="window.churchTapApp.toggleNotePreview()">Preview</button>
+          <button class="btn-secondary text-xs" data-note-format="bold" onmousedown="event.preventDefault()" onclick="window.churchTapApp.noteExec('bold')"><strong>B</strong></button>
+          <button class="btn-secondary text-xs" data-note-format="italic" onmousedown="event.preventDefault()" onclick="window.churchTapApp.noteExec('italic')"><em>I</em></button>
+          <button class="btn-secondary text-xs" onmousedown="event.preventDefault()" onclick="window.churchTapApp.noteExec('ul')">• List</button>
+          <button class="btn-secondary text-xs" onmousedown="event.preventDefault()" onclick="window.churchTapApp.noteExec('quote')">❝ Quote</button>
+          <button class="btn-secondary text-xs" data-note-format="code" onmousedown="event.preventDefault()" onclick="window.churchTapApp.noteExec('code')">{ } Code</button>
         </div>
 
         <div id="noteEditorWrap" class="space-y-2">
-          <textarea id="noteBodyInput" rows="8"
-                    class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
-                    placeholder="Write your note in markdown…">${initBody}</textarea>
-          <div class="text-xs text-gray-500 dark:text-gray-400">Tip: Use **bold**, *italic*, \`code\`, lists, and blockquotes.</div>
+          <div id="noteBodyInput"
+               contenteditable="true"
+               role="textbox"
+               aria-label="Note editor"
+               class="w-full min-h-[12.5rem] px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm leading-relaxed overflow-y-auto"></div>
+          <div class="text-xs text-gray-500 dark:text-gray-400">Tip: Use the toolbar to format as you type.</div>
         </div>
-
-        <div id="notePreviewWrap" class="hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/30 p-3 text-sm text-gray-700 dark:text-gray-200 leading-relaxed"></div>
 
         <div class="flex justify-end gap-2">
           <button class="btn-secondary" onclick="window.churchTapApp.closeModal()">Cancel</button>
           <button class="btn-primary" onclick="window.churchTapApp.saveScriptureNote(${book}, ${chapter}, ${verse}, ${noteId ? Number(noteId) : 'null'})">Save</button>
         </div>
       </div>
-    `);
+    `, useOpts);
+
+    this.setNoteEditorMarkdown(initMarkdown);
+    this.attachNoteEditorHandlers();
   }
 
   async saveScriptureNote(book, chapter, verse, noteId) {
-    const title = String(document.getElementById('noteTitleInput')?.value || '').trim();
-    const body = String(document.getElementById('noteBodyInput')?.value || '').replace(/\r\n/g, '\n').trim();
+    const editor = this.getNoteEditorEl();
+    const body = this.noteEditorHtmlToMarkdown(editor?.innerHTML || '');
     if (!body) {
       this.showToast('Please write something first');
       return;
@@ -6355,7 +6778,7 @@ class ChurchTapApp {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ title: title || null, body_markdown: body })
+          body: JSON.stringify({ title: null, body_markdown: body })
         });
         const data = await res.json().catch(() => null);
         if (!res.ok || !data?.success) {
@@ -6367,7 +6790,7 @@ class ChurchTapApp {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ title: title || null, body_markdown: body })
+          body: JSON.stringify({ title: null, body_markdown: body })
         });
         const data = await res.json().catch(() => null);
         if (!res.ok || !data?.success) {
@@ -6377,7 +6800,7 @@ class ChurchTapApp {
       }
 
       this.showToast('Saved');
-      await this.openScriptureNotes(book, chapter, verse);
+      await this.openScriptureNotes(book, chapter, verse, this._scriptureNotesModalOpts || {});
     } catch (e) {
       console.error('saveScriptureNote error:', e);
       this.showToast('Failed to save note');
@@ -6407,7 +6830,7 @@ class ChurchTapApp {
     }
   }
 
-  async openCommentaryForRef(reference) {
+  async openCommentaryForRef(reference, opts = {}) {
     const ref = String(reference || '').trim();
     if (!ref) return;
 
@@ -6438,7 +6861,7 @@ class ChurchTapApp {
             <button class="btn-secondary" onclick="window.churchTapApp.closeModal()">Close</button>
           </div>
         </div>
-      `);
+      `, opts);
     } catch (e) {
       console.error('openCommentaryForRef error:', e);
       this.showToast('Commentary unavailable');

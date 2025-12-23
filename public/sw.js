@@ -1,7 +1,7 @@
 // NOTE:
 // If you make a breaking change to the caching strategy, bump CACHE_VERSION.
 // This ensures clients drop old caches quickly.
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const APP_SHELL_CACHE = `churchtap-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `churchtap-runtime-${CACHE_VERSION}`;
 

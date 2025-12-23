@@ -119,6 +119,16 @@ router.get('/my-prayers', (req, res) => {
   res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
 
+router.get('/my-notes', (req, res) => {
+  setNoStore(res);
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
+router.get('/my-highlights', (req, res) => {
+  setNoStore(res);
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
 router.get('/admin', (req, res) => {
   setNoStore(res);
   res.sendFile(path.join(__dirname, '../public', 'admin.html'));
