@@ -2495,8 +2495,29 @@ class ChurchTapApp {
       if (!response.ok) throw new Error(`Bible fetch failed: ${response.status}`);
       const data = await response.json();
 
-      const text = this.escapeHtml(String(data.text || data.verse_text || data.content || '')).replace(/\n/g, '<br>');
+      const rawText = String(data.text || data.verse_text || data.content || '');
       const safeRef = this.escapeHtml(ref);
+
+      let text = this.escapeHtml(rawText).replace(/\n/g, '<br>');
+      if (translation === 'KJV') {
+        // Render Strong's numbers as clickable chips while keeping the rest HTML-escaped.
+        const tokens = [];
+        const tokenized = rawText.replace(/<s>([hg]?\d+)<\/s>/gi, (m, n) => {
+          const idx = tokens.length;
+          tokens.push(String(n || '').trim());
+          return `@@STRONGS_${idx}@@`;
+        });
+
+        let escaped = this.escapeHtml(tokenized).replace(/\n/g, '<br>');
+        escaped = escaped.replace(/@@STRONGS_(\d+)@@/g, (m, i) => {
+          const idx = Number(i);
+          const num = String(tokens[idx] || '').toUpperCase().replace(/[^HG0-9]/g, '');
+          // processStrongsNumbers will convert these tags into clickable chips.
+          return `<S>${num}</S>`;
+        });
+
+        text = this.processStrongsNumbers(escaped, ref);
+      }
 
       this.setStudyContent(`
         <div class="space-y-3">
@@ -6082,7 +6103,10 @@ class ChurchTapApp {
     
     // Handle bolls.life API response format
     const reference = verseData.reference || verseData.citation || 'Bible Verse';
-    const text = verseData.text || verseData.verse_text || verseData.content || 'Verse text not available';
+    const rawText = verseData.text || verseData.verse_text || verseData.content || 'Verse text not available';
+    const text = String(translation || '').toUpperCase() === 'KJV'
+      ? this.processStrongsNumbers(rawText, reference)
+      : rawText;
     const translationName = verseData.translation_name || translation;
     
     modal.innerHTML = `
@@ -7878,21 +7902,33 @@ class ChurchTapApp {
       return;
     }
 
-    const resultItems = results.results.map(verse => `
+    const resultItems = results.results.map(verse => {
+      const ref = `${this.getBookName(verse.book)} ${verse.chapter}:${verse.verse}`;
+      const safeRef = this.escapeHtml(ref);
+      const rawText = String(verse.text || '');
+
+      const bodyHtml = String(translation || '').toUpperCase() === 'KJV'
+        ? this.processStrongsNumbers(rawText, ref)
+        : this.escapeHtml(rawText.replace(/<[^>]*>/g, '')).substring(0, 120) + '...';
+
+      const body = String(translation || '').toUpperCase() === 'KJV'
+        ? `<div class="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">${bodyHtml}</div>`
+        : `<div class="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">${bodyHtml}</div>`;
+
+      return `
       <div class="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
         <button onclick="app.viewSearchResult(${verse.book}, ${verse.chapter}, ${verse.verse}, '${translation}'); this.closest('.fixed').remove();" 
                 class="w-full text-left p-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
           <div class="mb-1">
             <div class="text-sm font-medium text-primary-600 dark:text-primary-400">
-              ${this.getBookName(verse.book)} ${verse.chapter}:${verse.verse}
+              ${safeRef}
             </div>
           </div>
-          <div class="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">
-            ${verse.text.replace(/<[^>]*>/g, '').substring(0, 120)}...
-          </div>
+          ${body}
         </button>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     const hasMorePages = results.total > (currentPage * 20);
     const paginationControls = `
@@ -9622,7 +9658,12 @@ class ChurchTapApp {
     if (!reference) return false;
     
     // Extract book name from reference (e.g., "Matthew 5:1" -> "Matthew")
-    const bookName = reference.split(' ')[0].toLowerCase();
+    const parts = String(reference || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+    let bookName = parts[0] || '';
+    // Handle "1 Corinthians", "2 Timothy", etc.
+    if ((bookName === '1' || bookName === '2' || bookName === '3') && parts[1]) {
+      bookName = `${bookName}${parts[1]}`;
+    }
     
     // New Testament books
     const newTestamentBooks = [
@@ -9648,12 +9689,13 @@ class ChurchTapApp {
     const prefix = isNewTestament ? 'G' : 'H';
     
     // Replace Strong's number tags with clickable elements
-    return text.replace(/<S>(\d+)<\/S>/g, (match, number) => {
+    return String(text).replace(/<s>([hg]?\d+)<\/s>/gi, (match, raw) => {
+      const number = String(raw || '').trim().toUpperCase();
       const strongsNumber = number.startsWith('H') || number.startsWith('G') ? number : `${prefix}${number}`;
       return `<span class="strongs-number" 
                     style="display: inline-block; background: #fef3c7; color: #92400e; padding: 2px 4px; border-radius: 4px; font-size: 11px; font-family: monospace; cursor: pointer; margin-left: 2px; border: 1px solid #d97706;" 
-                    onclick="app.showStrongsDefinition('${strongsNumber}')" 
-                    title="Click to see Strong's #${strongsNumber} definition"
+                    onclick="(window.churchTapApp||window.app).showStrongsDefinition('${strongsNumber}')" 
+                    title="Click to look up Strong's #${strongsNumber}"
                     onmouseover="this.style.background='#fde68a'" 
                     onmouseout="this.style.background='#fef3c7'">
                 ${strongsNumber}
@@ -9661,19 +9703,117 @@ class ChurchTapApp {
     });
   }
   
+  getStrongsDictionarySourceKey() {
+    const sources = Array.isArray(this._studyDictionarySources) ? this._studyDictionarySources : [];
+    if (sources.length === 0) return '';
+    const def = String(this.getDefaultDictionarySourceKey?.() || '').trim();
+    if (def) {
+      const match = sources.find(s => String(s?.source_key || '') === def && s?.is_strongs === true);
+      if (match) return String(match.source_key || '').trim();
+    }
+    const first = sources.find(s => s?.is_strongs === true);
+    return first ? String(first.source_key || '').trim() : '';
+  }
+
+  getStrongsLookupTerms(strongsNumber) {
+    const raw = String(strongsNumber || '').trim().toUpperCase();
+    const cleaned = raw.replace(/[^HG0-9]/g, '');
+    if (!cleaned) return [];
+
+    const hasPrefix = cleaned.startsWith('H') || cleaned.startsWith('G');
+    const digits = cleaned.replace(/^[HG]/, '');
+    const terms = [];
+
+    if (hasPrefix) terms.push(cleaned);
+    // Many datasets store the numeric part only
+    if (digits) terms.push(digits);
+    // Also try prefixed form if user passed just digits
+    if (!hasPrefix && digits) {
+      terms.push(`G${digits}`);
+      terms.push(`H${digits}`);
+    }
+
+    // Deduplicate while preserving order
+    const seen = new Set();
+    return terms.filter(t => {
+      const k = String(t).toUpperCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }
+
   async showStrongsDefinition(strongsNumber) {
     try {
-      const response = await fetch(`/api/strongs/definition/${strongsNumber}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        this.displayStrongsDefinition(data.definition);
-      } else {
-        this.showToast('Definition not available');
+      // Prefer our own Strong's concordance loaded into Dictionary sources/entries.
+      await this.ensureStudySourcesLoaded?.().catch(() => {});
+      const sourceKey = this.getStrongsDictionarySourceKey();
+
+      const terms = this.getStrongsLookupTerms(strongsNumber);
+      if (terms.length === 0) {
+        this.showToast('Definition unavailable');
+        return;
       }
+
+      let entry = null;
+      for (const t of terms) {
+        try {
+          entry = await this.fetchDictionaryEntry(t, sourceKey);
+          if (entry) break;
+        } catch (e) {
+          if (e && e.status === 403) {
+            this.showToast('Study tools are disabled for this group');
+            return;
+          }
+          // continue trying other variants
+        }
+      }
+
+      // If no strongs-specific source key exists, allow auto lookup as a fallback.
+      if (!entry && !sourceKey) {
+        for (const t of terms) {
+          try {
+            entry = await this.fetchDictionaryEntry(t, '');
+            if (entry) break;
+          } catch (e) {
+            if (e && e.status === 403) {
+              this.showToast('Study tools are disabled for this group');
+              return;
+            }
+          }
+        }
+      }
+
+      const label = terms[0];
+      if (!entry) {
+        this.showModal('Strong’s', `
+          <div class="text-sm text-gray-700 dark:text-gray-200">
+            <div class="font-semibold">Strong’s ${this.escapeHtml(label)}</div>
+            <div class="mt-2 text-gray-600 dark:text-gray-400">No concordance entry found.</div>
+            <div class="mt-4 flex justify-end">
+              <button class="btn-secondary" onclick="window.churchTapApp.closeModal()">Close</button>
+            </div>
+          </div>
+        `);
+        return;
+      }
+
+      const headword = this.escapeHtml(entry.headword || label);
+      const definitionHtml = this.sanitizeImportedHtml(entry.definition || '');
+      const source = this.escapeHtml(entry.source_name || '');
+      this.showModal('Strong’s', `
+        <div class="text-sm text-gray-700 dark:text-gray-200">
+          <div class="font-semibold">${headword}</div>
+          ${definitionHtml ? `<div class="mt-2 leading-relaxed space-y-2">${definitionHtml}</div>` : ''}
+          ${source ? `<div class="mt-2 text-xs text-gray-500 dark:text-gray-400">Source: ${source}</div>` : ''}
+          <div class="mt-4 flex justify-end">
+            <button class="btn-secondary" onclick="window.churchTapApp.closeModal()">Close</button>
+          </div>
+        </div>
+      `);
     } catch (error) {
-      console.error('Error fetching Strong\'s definition:', error);
-      this.showToast('Network error');
+      console.error('Error fetching Strong’s concordance entry:', error);
+      this.showToast('Definition unavailable');
     }
   }
   
