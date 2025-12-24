@@ -5194,33 +5194,89 @@ html.dark #verseTags > span {
   border-color: color-mix(in srgb, var(--brand-secondary) 70%, black) !important;
 }
 
+#exploreSearchTile {
+  background-color: var(--brand-primary) !important; /* #055089 */
+  border-color: color-mix(in srgb, var(--brand-primary) 70%, black) !important;
+}
+
 #exploreStudyTile {
   background-color: var(--brand-accent) !important; /* #EB5E28 */
   border-color: color-mix(in srgb, var(--brand-accent) 70%, black) !important;
+}
+
+#exploreHistoryTile {
+  background-color: color-mix(in srgb, var(--brand-primary) 60%, var(--brand-secondary)) !important;
+  border-color: color-mix(in srgb, var(--brand-primary) 72%, black) !important;
+}
+
+#exploreCalendarTile {
+  background-color: color-mix(in srgb, var(--brand-primary) 60%, var(--brand-accent)) !important;
+  border-color: color-mix(in srgb, var(--brand-primary) 72%, black) !important;
+}
+
+#exploreRandomTile {
+  background-color: color-mix(in srgb, var(--brand-secondary) 55%, var(--brand-accent)) !important;
+  border-color: color-mix(in srgb, var(--brand-accent) 72%, black) !important;
 }
 
 #exploreReadTile:hover {
   background-color: var(--ui-secondary-hover) !important;
 }
 
+#exploreSearchTile:hover {
+  background-color: var(--ui-primary-hover) !important;
+}
+
 #exploreStudyTile:hover {
   background-color: var(--ui-accent-hover) !important;
 }
 
+#exploreHistoryTile:hover {
+  background-color: color-mix(in srgb, var(--brand-primary) 70%, var(--brand-secondary)) !important;
+}
+
+#exploreCalendarTile:hover {
+  background-color: color-mix(in srgb, var(--brand-primary) 70%, var(--brand-accent)) !important;
+}
+
+#exploreRandomTile:hover {
+  background-color: color-mix(in srgb, var(--brand-secondary) 60%, var(--brand-accent)) !important;
+}
+
 /* Ensure Explore tile text reads on colored backgrounds */
 #exploreReadTile,
-#exploreStudyTile {
+#exploreSearchTile,
+#exploreStudyTile,
+#exploreHistoryTile,
+#exploreCalendarTile,
+#exploreRandomTile {
   color: var(--brand-bg) !important; /* #FDFEF9 */
 }
 
 #exploreReadTile .text-gray-900,
 #exploreReadTile .text-gray-600,
+#exploreSearchTile .text-gray-900,
+#exploreSearchTile .text-gray-600,
 #exploreStudyTile .text-gray-900,
 #exploreStudyTile .text-gray-600,
+#exploreHistoryTile .text-gray-900,
+#exploreHistoryTile .text-gray-600,
+#exploreCalendarTile .text-gray-900,
+#exploreCalendarTile .text-gray-600,
+#exploreRandomTile .text-gray-900,
+#exploreRandomTile .text-gray-600,
 #exploreReadTile .dark\:text-white:is(.dark *),
 #exploreReadTile .dark\:text-gray-400:is(.dark *),
+#exploreSearchTile .dark\:text-white:is(.dark *),
+#exploreSearchTile .dark\:text-gray-400:is(.dark *),
 #exploreStudyTile .dark\:text-white:is(.dark *),
-#exploreStudyTile .dark\:text-gray-400:is(.dark *) {
+#exploreStudyTile .dark\:text-gray-400:is(.dark *),
+#exploreHistoryTile .dark\:text-white:is(.dark *),
+#exploreHistoryTile .dark\:text-gray-400:is(.dark *),
+#exploreCalendarTile .dark\:text-white:is(.dark *),
+#exploreCalendarTile .dark\:text-gray-400:is(.dark *),
+#exploreRandomTile .dark\:text-white:is(.dark *),
+#exploreRandomTile .dark\:text-gray-400:is(.dark *) {
   color: var(--brand-bg) !important;
   opacity: 0.92;
 }
