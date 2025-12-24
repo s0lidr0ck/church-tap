@@ -1565,7 +1565,7 @@ class ChurchTapApp {
     const studyEnabled = this.isStudyModeEnabled();
     const studyTile = studyEnabled
       ? `
-          <button id="exploreStudyTile" class="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-gray-200 dark:border-gray-700 text-left hover:bg-purple-100 dark:hover:bg-purple-800 transition-colors"
+          <button id="exploreStudyTile" class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   onclick="window.churchTapApp.navigate('/study')">
             <div class="text-lg">📚</div>
             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Study</div>
@@ -1600,7 +1600,7 @@ class ChurchTapApp {
             <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Book • Chapter • Verse</div>
           </button>
 
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          <button id="exploreSearchTile" class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   onclick="window.churchTapApp.showVerseSearchModal()">
             <div class="text-lg">🔍</div>
             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Search</div>
@@ -1609,21 +1609,21 @@ class ChurchTapApp {
 
           ${studyTile}
 
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          <button id="exploreHistoryTile" class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   onclick="window.churchTapApp.showHistory()">
             <div class="text-lg">🕐</div>
             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">History</div>
             <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Last 60 days</div>
           </button>
 
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          <button id="exploreCalendarTile" class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   onclick="window.churchTapApp.openCalendarModal()">
             <div class="text-lg">📅</div>
             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Calendar</div>
             <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Pick a date</div>
           </button>
 
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          <button id="exploreRandomTile" class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   onclick="window.churchTapApp.showRandomVerse()">
             <div class="text-lg">🎲</div>
             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Random</div>
