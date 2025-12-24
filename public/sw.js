@@ -1,17 +1,18 @@
 // NOTE:
 // If you make a breaking change to the caching strategy, bump CACHE_VERSION.
 // This ensures clients drop old caches quickly.
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const APP_SHELL_CACHE = `churchtap-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `churchtap-runtime-${CACHE_VERSION}`;
 
 const APP_SHELL_URLS = [
   '/verse',
-  '/css/style.css',
-  '/js/app.js',
+  '/css/style.css?v=4',
+  '/js/app.js?v=4',
   '/manifest.json',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
+  '/icons/churchtap-full.svg',
 ];
 
 function isHtmlNavigationRequest(request) {
@@ -144,6 +145,12 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (isHtmlNavigationRequest(event.request)) {
+    event.respondWith(networkFirst(event));
+    return;
+  }
+
+  // These files are NOT fingerprinted; prefer getting the latest on every load.
+  if (url.pathname === '/css/style.css' || url.pathname === '/js/app.js') {
     event.respondWith(networkFirst(event));
     return;
   }
