@@ -13,6 +13,7 @@ const APP_SHELL_URLS = [
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
   '/icons/churchtap-full.svg',
+  '/icons/churchtap-glyph.svg',
 ];
 
 function isHtmlNavigationRequest(request) {
