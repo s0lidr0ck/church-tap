@@ -8,29 +8,93 @@
   }
   
   body {
-    @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100;
+    background-color: var(--ct-app-bg);
+    color: var(--ui-text);
     transition: background-color 0.3s ease, color 0.3s ease;
-    color: var(--brand-black);
   }
 
   :root {
     /* Palette tokens */
-    --saffron: #EAC435;       /* saffron */
-    --yinmn-blue: #345995;    /* primary blue */
-    --magnolia: #FCF7FF;      /* soft background */
-    --french-gray: #C4CAD0;   /* muted gray */
-    --viridian: #53917E;      /* success teal */
-    --eerie-black: #101916;   /* deep black */
+    --dusk-blue: #055089;         /* primary */
+    --porcelain: #FDFEF9;         /* background */
+    --light-sea-green: #04b7b1;   /* secondary */
+    --coffee-bean: #14080e;       /* dark surface / text */
+    --spicy-paprika: #eb5e28;     /* accent / attention */
+    --french-gray: #C4CAD0;       /* muted gray */
 
     /* Brand tokens (used throughout UI) */
-    --brand-primary: var(--yinmn-blue);
-    --brand-accent: var(--saffron);
-    --brand-bg: var(--magnolia);
+    --brand-primary: var(--dusk-blue);
+    --brand-secondary: var(--light-sea-green);
+    --brand-accent: var(--spicy-paprika);
+    --brand-bg: var(--porcelain);
     --brand-muted: var(--french-gray);
-    --brand-success: var(--viridian);
-    --brand-black: var(--eerie-black);
+    --brand-success: var(--light-sea-green);
+    --brand-black: var(--coffee-bean);
     /* Sidebar menu text color: defaults to background for high contrast on dark menu */
     --menu-text: var(--brand-bg);
+
+    /* Logo tokens */
+    --ct-logo-church: #055089; /* Light: Church */
+    --ct-logo-tap: #04b7b1;    /* Both: Tap */
+
+    /* App background tokens */
+    --ct-app-bg: var(--brand-bg);
+
+    /* UI semantic tokens (light) */
+    --ui-text: var(--brand-black);
+    --ui-text-muted: color-mix(in srgb, var(--brand-black) 65%, var(--brand-muted));
+    --ui-border: color-mix(in srgb, var(--brand-muted) 70%, var(--brand-bg));
+    --ui-surface: #ffffff;
+    --ui-surface-2: color-mix(in srgb, #ffffff 70%, var(--brand-bg));
+
+    /* Primary action */
+    --ui-primary: var(--brand-primary);
+    --ui-primary-hover: color-mix(in srgb, var(--brand-primary) 85%, black);
+    --ui-on-primary: var(--brand-bg);
+
+    /* Accent */
+    --ui-accent: var(--brand-accent);
+    --ui-accent-hover: color-mix(in srgb, var(--brand-accent) 85%, black);
+
+    /* Secondary */
+    --ui-secondary: var(--brand-secondary);
+    --ui-secondary-hover: color-mix(in srgb, var(--brand-secondary) 85%, black);
+  }
+
+  html.dark {
+    --ct-logo-church: #FDFEF9; /* Dark: Church */
+    --ct-app-bg: var(--brand-black);
+
+    /* UI semantic tokens (dark) */
+    --ui-text: var(--brand-bg);
+    --ui-text-muted: color-mix(in srgb, var(--brand-bg) 75%, var(--brand-black));
+    --ui-border: color-mix(in srgb, var(--brand-bg) 14%, var(--brand-black));
+
+    /* Surfaces: much darker (10% Dusk Blue / 90% Coffee Bean) */
+    --ui-surface: color-mix(in srgb, var(--brand-primary) 10%, var(--brand-black));
+    --ui-surface-2: color-mix(in srgb, var(--brand-primary) 7%, var(--brand-black));
+
+    /* Primary action on Coffee Bean background */
+    --ui-primary: var(--brand-primary);
+    --ui-primary-hover: color-mix(in srgb, var(--brand-primary) 85%, white);
+    --ui-on-primary: var(--brand-bg);
+
+    /* Accent/secondary on dark */
+    --ui-accent: var(--brand-accent);
+    --ui-accent-hover: color-mix(in srgb, var(--brand-accent) 85%, white);
+    --ui-secondary: var(--brand-secondary);
+    --ui-secondary-hover: color-mix(in srgb, var(--brand-secondary) 85%, white);
+  }
+
+  html.dark body {
+    background-color: var(--ct-app-bg);
+    color: var(--ui-text);
+  }
+
+  /* Ensure the app shell uses our brand background colors (override Tailwind gradient classes) */
+  #app {
+    background-color: var(--ct-app-bg) !important;
+    background-image: none !important;
   }
 }
 
@@ -216,11 +280,310 @@
 
   .glass-effect {
     backdrop-filter: blur(10px);
-    @apply bg-white/80 dark:bg-gray-800/80;
+    /* Light theme: slightly darker + glassy over Porcelain background */
+    background-color: color-mix(in srgb, var(--brand-bg) 88%, var(--brand-primary) 12%);
+    border: 1px solid color-mix(in srgb, var(--brand-primary) 14%, transparent);
+    box-shadow: 0 10px 25px -18px color-mix(in srgb, var(--brand-black) 35%, transparent);
+  }
+
+  /* Harmonize glass effect overlays against brand-primary background */
+  .glass-effect:is(.dark *) {
+    background-color: color-mix(in srgb, var(--ui-surface) 65%, transparent);
   }
   
   .touch-manipulation {
     touch-action: manipulation;
+  }
+
+  /* Logo helpers (inline SVG theming via CSS variables) */
+  .ct-logo svg { display: block; width: auto; }
+  .ct-logo--header svg { height: 18px; }
+  .ct-logo--splash svg { height: 40px; margin: 0 auto; }
+  .ct-logo--marketing svg { height: 20px; }
+  .ct-logo--marketing-footer svg { height: 18px; }
+
+  .ct-logo .logo-church path,
+  .ct-logo #logo-church path { fill: var(--ct-logo-church); }
+
+  .ct-logo .logo-tap path,
+  .ct-logo #logo-tap path { fill: var(--ct-logo-tap); }
+
+  .ct-logo--splash {
+    /* Splash is always on primary-blue background, so keep the mark readable
+       even before the theme toggle has applied. */
+    --ct-logo-church: #FDFEF9;
+    --ct-logo-tap: #04b7b1;
+  }
+
+  /* Splash logo animation (swaps between wordmark + glyph) */
+  .ct-splash-anim {
+    display: grid;
+    place-items: center;
+    width: max-content;
+    margin: 0 auto;
+    position: relative;
+    overflow: visible;
+  }
+
+  .ct-splash-anim .ct-splash-logo {
+    grid-area: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    will-change: opacity, transform, filter;
+    transform-origin: 50% 60%;
+  }
+
+  .ct-splash-anim .ct-splash-logo--full {
+    animation: ctSplashFullBold 3600ms cubic-bezier(0.2, 0.9, 0.2, 1) infinite;
+  }
+
+  .ct-splash-anim .ct-splash-logo--glyph {
+    animation: ctSplashGlyphBold 3600ms cubic-bezier(0.2, 0.9, 0.2, 1) infinite;
+  }
+
+  @keyframes ctSplashSwoosh {
+    0%, 18% { opacity: 0; transform: translateX(-130%) skewX(-16deg); }
+    28% { opacity: 0.95; }
+    46% { opacity: 0.0; transform: translateX(130%) skewX(-16deg); }
+    100% { opacity: 0; transform: translateX(130%) skewX(-16deg); }
+  }
+
+  @keyframes ctSplashFullBold {
+    0% { opacity: 0; transform: translateY(6px) rotate(-6deg) scale(0.96); filter: blur(1.5px); }
+    8% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); filter: blur(0px); }
+    28% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); filter: blur(0px); }
+    40% { opacity: 0; transform: translateY(6px) rotate(-18deg) scale(0.92); filter: blur(2.5px); }
+    100% { opacity: 0; transform: translateY(6px) rotate(-18deg) scale(0.92); filter: blur(2.5px); }
+  }
+
+  @keyframes ctSplashGlyphBold {
+    0%, 28% { opacity: 0; transform: translateY(6px) rotate(22deg) scale(0.90); filter: blur(2.5px); }
+    46% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1.08); filter: blur(0px); }
+    70% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); filter: blur(0px); }
+    86% { opacity: 0; transform: translateY(6px) rotate(-18deg) scale(0.92); filter: blur(2.5px); }
+    100% { opacity: 0; transform: translateY(6px) rotate(-18deg) scale(0.92); filter: blur(2.5px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .splash-screen::after,
+    .splash-screen::before { animation: none; display: none; }
+
+    .ct-splash-anim .ct-splash-logo--full,
+    .ct-splash-anim .ct-splash-logo--glyph { animation: none; filter: none; transform: none; }
+
+    .ct-splash-anim .ct-splash-logo--full { opacity: 1; }
+    .ct-splash-anim .ct-splash-logo--glyph { opacity: 0; }
+  }
+
+  /* Splash sizing: make the glyph much larger than the wordmark */
+  .ct-logo--splash .ct-splash-logo--full svg { height: 40px; }
+  .ct-logo--splash .ct-splash-logo--glyph svg { height: 160px; /* ~4x the wordmark */ }
+
+  /* =========================================================
+     Brand Overrides (map Tailwind utility colors to UI tokens)
+     ========================================================= */
+
+  /* Primary backgrounds (common in HTML + JS templates) */
+  .bg-primary-500 { background-color: var(--ui-primary) !important; }
+  .bg-primary-600 { background-color: var(--ui-primary) !important; }
+  .bg-primary-700 { background-color: var(--ui-primary-hover) !important; }
+  .hover\:bg-primary-700:hover { background-color: var(--ui-primary-hover) !important; }
+
+  .bg-blue-500 { background-color: var(--ui-primary) !important; }
+  .bg-blue-600 { background-color: var(--ui-primary) !important; }
+  .hover\:bg-blue-600:hover { background-color: var(--ui-primary-hover) !important; }
+  .hover\:bg-blue-700:hover { background-color: var(--ui-primary-hover) !important; }
+
+  /* “Soft” primary tints */
+  .bg-primary-50 { background-color: color-mix(in srgb, var(--ui-primary) 7%, var(--ct-app-bg)) !important; }
+  .bg-primary-100 { background-color: color-mix(in srgb, var(--ui-primary) 14%, var(--ct-app-bg)) !important; }
+  .hover\:bg-primary-200:hover { background-color: color-mix(in srgb, var(--ui-primary) 20%, var(--ct-app-bg)) !important; }
+
+  .bg-blue-50 { background-color: color-mix(in srgb, var(--ui-primary) 10%, var(--ct-app-bg)) !important; }
+  .bg-blue-100 { background-color: color-mix(in srgb, var(--ui-primary) 16%, var(--ct-app-bg)) !important; }
+  .hover\:bg-blue-200:hover { background-color: color-mix(in srgb, var(--ui-primary) 24%, var(--ct-app-bg)) !important; }
+
+  /* Text */
+  .text-primary-600 { color: var(--ui-primary) !important; }
+  .text-primary-700 { color: var(--ui-primary) !important; }
+  .text-blue-600 { color: var(--ui-primary) !important; }
+  .text-blue-700 { color: var(--ui-primary) !important; }
+  .text-blue-800 { color: var(--ui-primary) !important; }
+
+  /* Borders */
+  .border-primary-100 { border-color: var(--ui-border) !important; }
+  .border-primary-500 { border-color: var(--ui-primary) !important; }
+  .border-primary-600 { border-color: var(--ui-primary) !important; }
+  .border-primary-700 { border-color: var(--ui-primary-hover) !important; }
+
+  .border-blue-200 { border-color: var(--ui-border) !important; }
+  .border-blue-300 { border-color: var(--ui-border) !important; }
+  .border-blue-700 { border-color: var(--ui-primary-hover) !important; }
+
+  /* Rings / focus */
+  .ring-primary-300 { --tw-ring-color: color-mix(in srgb, var(--ui-primary) 45%, transparent) !important; }
+  .ring-primary-500 { --tw-ring-color: color-mix(in srgb, var(--ui-primary) 60%, transparent) !important; }
+  .outline-primary-400 { outline-color: color-mix(in srgb, var(--ui-primary) 70%, white) !important; }
+
+  /* Dark-mode variants that appear frequently in markup */
+  .dark\:text-primary-400:is(.dark *) { color: color-mix(in srgb, var(--ui-on-primary) 88%, var(--ui-accent)) !important; }
+  .dark\:text-primary-300:is(.dark *) { color: color-mix(in srgb, var(--ui-on-primary) 80%, var(--ui-accent)) !important; }
+  .dark\:text-blue-400:is(.dark *) { color: color-mix(in srgb, var(--ui-on-primary) 85%, var(--ui-primary)) !important; }
+  .dark\:text-blue-300:is(.dark *) { color: color-mix(in srgb, var(--ui-on-primary) 75%, var(--ui-primary)) !important; }
+  .dark\:text-blue-200:is(.dark *) { color: color-mix(in srgb, var(--ui-on-primary) 90%, var(--ui-primary)) !important; }
+
+  .dark\:bg-blue-900:is(.dark *) { background-color: var(--ui-surface) !important; }
+  .dark\:bg-blue-900\/20:is(.dark *) { background-color: color-mix(in srgb, var(--ui-on-primary) 18%, transparent) !important; }
+  .dark\:hover\:bg-blue-800:hover:is(.dark *) { background-color: var(--ui-surface-2) !important; }
+
+  .dark\:bg-primary-900:is(.dark *) { background-color: var(--ui-surface-2) !important; }
+  .dark\:bg-primary-900\/20:is(.dark *) { background-color: color-mix(in srgb, var(--ui-on-primary) 16%, transparent) !important; }
+  .dark\:bg-primary-800:is(.dark *) { background-color: var(--ui-surface) !important; }
+  .dark\:hover\:bg-primary-800:hover:is(.dark *) { background-color: var(--ui-surface-2) !important; }
+
+  .dark\:border-primary-800:is(.dark *) { border-color: var(--ui-border) !important; }
+  .dark\:border-blue-700:is(.dark *) { border-color: var(--ui-border) !important; }
+
+  /* Make sure “primary buttons” read well everywhere */
+  .text-white { color: var(--ui-on-primary) !important; }
+
+  /* =========================================================
+     Dark surfaces + contrast (map gray utilities to UI tokens)
+     ========================================================= */
+
+  .dark\:bg-gray-900:is(.dark *) { background-color: var(--ct-app-bg) !important; }
+  .dark\:bg-gray-900\/40:is(.dark *) { background-color: color-mix(in srgb, var(--ui-on-primary) 14%, transparent) !important; }
+  .dark\:bg-gray-900\/20:is(.dark *) { background-color: color-mix(in srgb, var(--ui-on-primary) 10%, transparent) !important; }
+  .dark\:bg-gray-800:is(.dark *) { background-color: var(--ui-surface) !important; }
+  .dark\:bg-gray-700:is(.dark *) { background-color: var(--ui-surface-2) !important; }
+  .dark\:hover\:bg-gray-700:hover:is(.dark *) { background-color: color-mix(in srgb, var(--ui-surface-2) 85%, white) !important; }
+  .dark\:hover\:bg-gray-700\/40:hover:is(.dark *) { background-color: color-mix(in srgb, var(--ui-surface-2) 55%, transparent) !important; }
+  .dark\:hover\:bg-gray-600:hover:is(.dark *) { background-color: color-mix(in srgb, var(--ui-surface-2) 70%, white) !important; }
+
+  .dark\:border-gray-700:is(.dark *) { border-color: var(--ui-border) !important; }
+  .dark\:border-gray-600:is(.dark *) { border-color: var(--ui-border) !important; }
+
+  .dark\:text-gray-100:is(.dark *) { color: var(--ui-text) !important; }
+  .dark\:text-gray-200:is(.dark *) { color: var(--ui-text) !important; }
+  .dark\:text-gray-300:is(.dark *) { color: color-mix(in srgb, var(--ui-text) 92%, var(--ui-text-muted)) !important; }
+  .dark\:text-gray-400:is(.dark *) { color: var(--ui-text-muted) !important; }
+  .dark\:text-gray-500:is(.dark *) { color: color-mix(in srgb, var(--ui-text-muted) 85%, transparent) !important; }
+
+  .dark\:placeholder-gray-400:is(.dark *)::placeholder { color: var(--ui-text-muted) !important; }
+  .dark\:placeholder-gray-400:is(.dark *)::-moz-placeholder { color: var(--ui-text-muted) !important; }
+
+  /* Verse card surface on dark mode */
+  .verse-container:is(.dark *) {
+    background-color: var(--ui-surface);
+    box-shadow: 0 10px 25px -10px color-mix(in srgb, var(--brand-bg) 18%, transparent);
+  }
+
+  /* =========================================================
+     Community CTAs (brand-derived trio; keep other yellow/purple uses intact)
+     ========================================================= */
+
+  /* Prayer: outlined */
+  #submitPrayerBtn {
+    background-color: transparent !important;
+    border: 2px solid var(--ui-primary) !important;
+    color: var(--ui-on-primary) !important; /* dark mode default */
+  }
+  html:not(.dark) #submitPrayerBtn { color: var(--ui-primary) !important; /* light mode */ }
+  #submitPrayerBtn:hover { background-color: color-mix(in srgb, var(--ui-primary) 14%, transparent) !important; }
+
+  /* Praise: secondary (teal) */
+  #submitPraiseBtn.bg-yellow-500 { background-color: var(--ui-secondary) !important; }
+  #submitPraiseBtn.hover\:bg-yellow-600:hover { background-color: var(--ui-secondary-hover) !important; }
+
+  /* Insight: accent (paprika) */
+  #submitInsightBtn.bg-purple-500 { background-color: var(--ui-accent) !important; }
+  #submitInsightBtn.hover\:bg-purple-600:hover { background-color: var(--ui-accent-hover) !important; }
+
+  /* Verse action buttons: make Chapter the primary action, Translation the secondary */
+  #textChapterBtn,
+  #textChapterBtnDesktop,
+  #imageChapterBtn,
+  #imageChapterBtnDesktop {
+    background-color: var(--ui-primary) !important;
+    color: var(--ui-on-primary) !important;
+    border: 1px solid color-mix(in srgb, var(--ui-primary) 70%, white) !important;
+  }
+
+  #textChapterBtn:hover,
+  #textChapterBtnDesktop:hover,
+  #imageChapterBtn:hover,
+  #imageChapterBtnDesktop:hover {
+    background-color: var(--ui-primary-hover) !important;
+  }
+
+  #textTranslationBtn,
+  #textTranslationBtnDesktop,
+  #imageTranslationBtn,
+  #imageTranslationBtnDesktop {
+    background-color: color-mix(in srgb, var(--ui-secondary) 22%, var(--ui-surface)) !important;
+    color: var(--ui-text) !important;
+    border: 1px solid color-mix(in srgb, var(--ui-secondary) 55%, var(--ui-border)) !important;
+  }
+
+  #textTranslationBtn:hover,
+  #textTranslationBtnDesktop:hover,
+  #imageTranslationBtn:hover,
+  #imageTranslationBtnDesktop:hover {
+    background-color: color-mix(in srgb, var(--ui-secondary) 30%, var(--ui-surface)) !important;
+  }
+
+  html.dark #textTranslationBtn,
+  html.dark #textTranslationBtnDesktop,
+  html.dark #imageTranslationBtn,
+  html.dark #imageTranslationBtnDesktop {
+    /* ensure contrast against blue-forward surfaces in dark mode */
+    color: var(--brand-bg) !important;
+  }
+
+  /* Verse tags: shift from “button-like” to “chip-like” */
+  #verseTags > span {
+    background-color: color-mix(in srgb, var(--ui-secondary) 14%, var(--ui-surface-2)) !important;
+    color: color-mix(in srgb, var(--ui-text) 92%, var(--ui-text-muted)) !important;
+    border: 1px solid var(--ui-border) !important;
+  }
+
+  html.dark #verseTags > span {
+    background-color: color-mix(in srgb, var(--ui-secondary) 10%, var(--ui-surface-2)) !important;
+    color: var(--ui-text) !important;
+  }
+
+  /* =========================================================
+     Explore tiles: brand colors
+     ========================================================= */
+
+  #exploreReadTile {
+    background-color: var(--brand-secondary) !important; /* #04B7B1 */
+    border-color: color-mix(in srgb, var(--brand-secondary) 70%, black) !important;
+  }
+
+  #exploreStudyTile {
+    background-color: var(--brand-accent) !important; /* #EB5E28 */
+    border-color: color-mix(in srgb, var(--brand-accent) 70%, black) !important;
+  }
+
+  #exploreReadTile:hover { background-color: var(--ui-secondary-hover) !important; }
+  #exploreStudyTile:hover { background-color: var(--ui-accent-hover) !important; }
+
+  /* Ensure Explore tile text reads on colored backgrounds */
+  #exploreReadTile,
+  #exploreStudyTile { color: var(--brand-bg) !important; /* #FDFEF9 */ }
+
+  #exploreReadTile .text-gray-900,
+  #exploreReadTile .text-gray-600,
+  #exploreStudyTile .text-gray-900,
+  #exploreStudyTile .text-gray-600,
+  #exploreReadTile .dark\:text-white:is(.dark *),
+  #exploreReadTile .dark\:text-gray-400:is(.dark *),
+  #exploreStudyTile .dark\:text-white:is(.dark *),
+  #exploreStudyTile .dark\:text-gray-400:is(.dark *) {
+    color: var(--brand-bg) !important;
+    opacity: 0.92;
   }
 }
 
@@ -243,11 +606,62 @@
 
 /* PWA splash screen styles */
 .splash-screen {
-  @apply fixed inset-0 bg-primary-600 flex items-center justify-center z-50;
+  @apply fixed inset-0 flex items-center justify-center z-50;
+  background-color: var(--brand-primary);
+  overflow: hidden;
 }
 
+.splash-screen::after {
+  content: "";
+  position: absolute;
+  inset: -35% -60%;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(253, 254, 249, 0.00) 35%,
+    rgba(253, 254, 249, 0.60) 50%,
+    rgba(253, 254, 249, 0.00) 65%,
+    transparent 100%
+  );
+  transform: translateX(-130%) skewX(-16deg);
+  mix-blend-mode: soft-light;
+  filter: blur(0.6px);
+  animation: ctSplashSwoosh 3600ms ease-in-out infinite;
+  z-index: 0;
+}
+
+.splash-screen::before {
+  content: "";
+  position: absolute;
+  inset: -35% -60%;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(253, 254, 249, 0.00) 35%,
+    rgba(4, 183, 177, 0.55) 50%,
+    rgba(253, 254, 249, 0.00) 65%,
+    transparent 100%
+  );
+  transform: translateX(-130%) skewX(-16deg);
+  mix-blend-mode: soft-light;
+  filter: blur(0.8px);
+  animation: ctSplashSwoosh 3600ms ease-in-out infinite;
+  animation-delay: 160ms;
+  z-index: 0;
+}
+
+.splash-screen > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Back-compat for any older splash text usage */
 .splash-logo {
-  @apply text-white text-4xl font-bold animate-pulse;
+  @apply text-white text-4xl font-bold;
 }
 
 /* Verse image styles */

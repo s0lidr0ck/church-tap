@@ -4,10 +4,11 @@
 const CACHE_VERSION = 'v3';
 const APP_SHELL_CACHE = `churchtap-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `churchtap-runtime-${CACHE_VERSION}`;
+const CSS_URL = `/css/style.css?v=${CACHE_VERSION}`;
 
 const APP_SHELL_URLS = [
   '/verse',
-  '/css/style.css',
+  CSS_URL,
   '/js/app.js',
   '/manifest.json',
   '/icons/icon-192x192.png',
