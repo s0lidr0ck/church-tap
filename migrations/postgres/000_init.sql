@@ -296,6 +296,92 @@ CREATE INDEX IF NOT EXISTS idx_ct_verse_import_settings_org_id ON CT_verse_impor
 
 -- Note: Trigger for updated_at will be added later
 
+-- Add missing columns to CT_organizations for NFC/bracelet flow
+ALTER TABLE CT_organizations ADD COLUMN IF NOT EXISTS org_type TEXT DEFAULT 'church';
+ALTER TABLE CT_organizations ADD COLUMN IF NOT EXISTS join_type TEXT DEFAULT 'open';
+ALTER TABLE CT_organizations ADD COLUMN IF NOT EXISTS city TEXT;
+ALTER TABLE CT_organizations ADD COLUMN IF NOT EXISTS state TEXT;
+ALTER TABLE CT_organizations ADD COLUMN IF NOT EXISTS latitude DECIMAL;
+ALTER TABLE CT_organizations ADD COLUMN IF NOT EXISTS longitude DECIMAL;
+
+-- NFC Tags table
+CREATE TABLE IF NOT EXISTS ct_nfc_tags (
+  id SERIAL PRIMARY KEY,
+  custom_id TEXT UNIQUE NOT NULL,
+  organization_id INTEGER REFERENCES CT_organizations(id) ON DELETE SET NULL,
+  status TEXT DEFAULT 'available',
+  batch_name TEXT,
+  notes TEXT,
+  assigned_by INTEGER REFERENCES CT_admin_users(id) ON DELETE SET NULL,
+  assigned_at TIMESTAMP,
+  scan_count INTEGER DEFAULT 0,
+  last_scanned_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ct_nfc_tags_custom_id ON ct_nfc_tags(custom_id);
+CREATE INDEX IF NOT EXISTS idx_ct_nfc_tags_org_id ON ct_nfc_tags(organization_id);
+CREATE INDEX IF NOT EXISTS idx_ct_nfc_tags_status ON ct_nfc_tags(status);
+CREATE INDEX IF NOT EXISTS idx_ct_nfc_tags_batch ON ct_nfc_tags(batch_name);
+
+-- Bracelet Memberships table
+CREATE TABLE IF NOT EXISTS ct_bracelet_memberships (
+  id SERIAL PRIMARY KEY,
+  bracelet_uid TEXT NOT NULL,
+  organization_id INTEGER NOT NULL REFERENCES CT_organizations(id) ON DELETE CASCADE,
+  status TEXT DEFAULT 'pending',
+  requested_at TIMESTAMP DEFAULT NOW(),
+  approved_at TIMESTAMP,
+  approved_by INTEGER REFERENCES CT_admin_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ct_bracelet_memberships_uid ON ct_bracelet_memberships(bracelet_uid);
+CREATE INDEX IF NOT EXISTS idx_ct_bracelet_memberships_org ON ct_bracelet_memberships(organization_id);
+CREATE INDEX IF NOT EXISTS idx_ct_bracelet_memberships_status ON ct_bracelet_memberships(status);
+
+-- Organization Requests table
+CREATE TABLE IF NOT EXISTS ct_organization_requests (
+  id SERIAL PRIMARY KEY,
+  org_name TEXT NOT NULL,
+  org_type TEXT NOT NULL,
+  description TEXT,
+  address TEXT,
+  street_address TEXT,
+  city TEXT,
+  state TEXT,
+  zip_code TEXT,
+  country TEXT DEFAULT 'United States',
+  contact_name TEXT NOT NULL,
+  first_name TEXT,
+  last_name TEXT,
+  contact_email TEXT NOT NULL,
+  contact_phone TEXT,
+  contact_title TEXT,
+  website TEXT,
+  requested_subdomain TEXT NOT NULL,
+  status TEXT DEFAULT 'pending',
+  submitted_at TIMESTAMP DEFAULT NOW(),
+  reviewed_at TIMESTAMP,
+  reviewed_by INTEGER,
+  review_notes TEXT,
+  approval_email_sent BOOLEAN DEFAULT FALSE,
+  admin_account_created BOOLEAN DEFAULT FALSE,
+  organization_id INTEGER REFERENCES CT_organizations(id) ON DELETE SET NULL,
+  setup_token TEXT,
+  setup_token_expires_at TIMESTAMP,
+  bracelet_uid TEXT,
+  source_ip TEXT,
+  user_agent TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ct_org_requests_status ON ct_organization_requests(status);
+CREATE INDEX IF NOT EXISTS idx_ct_org_requests_submitted_at ON ct_organization_requests(submitted_at);
+CREATE INDEX IF NOT EXISTS idx_ct_org_requests_subdomain ON ct_organization_requests(requested_subdomain);
+
 -- Seed default organization (id = 1) if none exists
 INSERT INTO CT_organizations (id, name, subdomain, settings, plan_type, features, is_active)
 SELECT 1, 'Default Organization', 'default', '{}'::jsonb, 'enterprise', '["verses","community","analytics","users","api"]'::jsonb, TRUE
