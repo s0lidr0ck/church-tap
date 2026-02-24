@@ -47,8 +47,13 @@ This starts `nodemon server.js` on port 3000. Requires `DATABASE_URL` in the env
 
 There is no formal test framework (no jest/mocha). The project has ad-hoc test scripts in `scripts/` (e.g., `test-endpoints.js`, `test-s3.js`). Verify behavior via API calls or browser interaction.
 
+### NFC bracelet scanning
+
+Test the bracelet flow by visiting `/t/<any-uid>` (e.g. `/t/TEST123`). New UIDs should redirect to `/choose-organization`; claimed UIDs serve the verse page directly.
+
 ### Gotchas
 
 - `npm install` may skip devDependencies if `NODE_ENV=production`. Use `npm install --include=dev` to ensure `tailwindcss` and `nodemon` are available.
 - The app crashes immediately if PostgreSQL is not running or `DATABASE_URL` is not set.
 - S3/AWS features gracefully degrade when credentials are missing (local file upload fallback).
+- The `init-postgres.js` script splits SQL on `;\n` — do not use `DO $$...$$` blocks in `000_init.sql` as they contain internal semicolons that break the splitter. Use plain `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` instead.
