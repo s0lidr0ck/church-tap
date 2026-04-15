@@ -1623,7 +1623,7 @@ html.dark #textTranslationBtn,
 /* ─── Admin UI (preserve) ─────────────────────── */
 
 .modern-card {
-  background-image: linear-gradient(180deg, var(--brand-bg), #ffffff);
+  background-image: linear-gradient(180deg, var(--brand-bg), var(--ui-surface));
   border-radius: 0.75rem;
   border-width: 1px;
   --tw-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
@@ -1640,7 +1640,7 @@ html.dark #textTranslationBtn,
 }
 
 .modern-card {
-  border-color: var(--brand-muted);
+  border-color: var(--ui-border);
 }
 
 .btn-primary-modern {
@@ -1713,6 +1713,11 @@ html:not(.dark):not(.sepia):not(.night) #personalizationBadge .btn-secondary-mod
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
 }
 
+#adminDashboard .btn-secondary-modern {
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+}
+
 .btn-secondary-modern:hover {
   --tw-gradient-from: #f9fafb var(--tw-gradient-from-position);
   --tw-gradient-to: rgb(249 250 251 / 0) var(--tw-gradient-to-position);
@@ -1753,11 +1758,13 @@ html:not(.dark):not(.sepia):not(.night) #personalizationBadge .btn-secondary-mod
   --tw-ring-color: rgb(75 85 99 / var(--tw-ring-opacity, 1));
 }
 
-.admin-table thead {
-  background-image: linear-gradient(90deg, color-mix(in srgb, var(--brand-muted) 20%, white), var(--brand-bg));
+.admin-table thead,
+  .admin-table-head {
+  background-image: linear-gradient(90deg, color-mix(in srgb, var(--brand-muted) 20%, var(--ui-surface)), var(--brand-bg));
 }
 
-.admin-table thead th {
+.admin-table thead th,
+  .admin-table-head th {
   padding-left: 1.5rem;
   padding-right: 1.5rem;
   padding-top: 0.75rem;
@@ -1772,19 +1779,11 @@ html:not(.dark):not(.sepia):not(.night) #personalizationBadge .btn-secondary-mod
 }
 
 .admin-table tbody tr:nth-child(even) {
-  background-color: rgb(238 242 255 / 0.2);
-}
-
-.admin-table tbody tr:nth-child(even):is(.dark *) {
-  background-color: rgb(31 41 55 / 0.3);
+  background: color-mix(in srgb, var(--brand-primary) 4%, var(--ui-surface));
 }
 
 .admin-table tbody tr:hover {
-  background-color: rgb(238 242 255 / 0.4);
-}
-
-.admin-table tbody tr:hover:is(.dark *) {
-  background-color: rgb(31 41 55 / 0.8);
+  background: color-mix(in srgb, var(--brand-primary) 7%, var(--ui-surface));
 }
 
 html:not(.dark):not(.sepia):not(.night) #personalizationBadge .status-badge {
@@ -2871,6 +2870,10 @@ html:not(.dark):not(.sepia):not(.night) #personalizationBadge .inline-flex {
 
 .gap-4 {
   gap: 1rem;
+}
+
+.gap-5 {
+  gap: 1.25rem;
 }
 
 .gap-6 {
@@ -5336,7 +5339,7 @@ html.dark {
   bottom: 62px;
   left: 0;
   right: 0;
-  background: white;
+  background: var(--ui-surface);
   border-radius: 18px 18px 0 0;
   z-index: 46;
   padding: 16px 16px 8px;
@@ -5353,7 +5356,7 @@ html.dark {
 .admin-more-drawer-handle {
   width: 36px;
   height: 4px;
-  background: #d1d5db;
+  background: var(--ui-border);
   border-radius: 2px;
   margin: 0 auto 14px;
 }
@@ -5364,7 +5367,7 @@ html.dark {
   gap: 14px;
   padding: 13px 12px;
   border-radius: 12px;
-  color: #1f2937;
+  color: var(--ui-text);
   font-size: 15px;
   font-weight: 500;
   cursor: pointer;
@@ -5377,7 +5380,7 @@ html.dark {
 }
 
 .admin-more-item:active, .admin-more-item:hover {
-  background: #f3f4f6;
+  background: var(--ui-surface-2);
 }
 
 .admin-more-item svg {
@@ -5407,7 +5410,7 @@ html.dark {
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #9ca3af;
+  color: var(--ui-text-muted);
   padding: 4px 12px 8px;
 }
 
@@ -5423,8 +5426,8 @@ html.dark {
   --tw-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
-  background: white;
-  border-color: color-mix(in srgb, var(--brand-muted) 60%, white);
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
 }
 
 .admin-stat-icon {
@@ -5440,14 +5443,14 @@ html.dark {
 
 .admin-stat-label {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--ui-text-muted);
   font-weight: 500;
 }
 
 .admin-stat-value {
   font-size: 22px;
   font-weight: 700;
-  color: #111827;
+  color: var(--ui-text);
   line-height: 1.1;
 }
 
@@ -5465,13 +5468,13 @@ html.dark {
 .admin-page-title {
   font-size: 22px;
   font-weight: 700;
-  color: #111827;
+  color: var(--ui-text);
   line-height: 1.2;
 }
 
 .admin-page-subtitle {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--ui-text-muted);
   margin-top: 2px;
 }
 
@@ -5492,8 +5495,8 @@ html.dark {
   --tw-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
-  background: white;
-  border-color: color-mix(in srgb, var(--brand-muted) 60%, white);
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
 }
 
 .admin-section-card-header {
@@ -5502,27 +5505,27 @@ html.dark {
   padding-right: 1.25rem;
   padding-top: 1rem;
   padding-bottom: 1rem;
-  border-color: color-mix(in srgb, var(--brand-muted) 40%, white);
+  border-color: var(--ui-border);
 }
 
 .admin-section-card-title {
   font-size: 16px;
   font-weight: 600;
-  color: #111827;
+  color: var(--ui-text);
 }
 
 .admin-section-card-subtitle {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--ui-text-muted);
   margin-top: 2px;
 }
 
 /* Modal backgrounds — clean white */
 
 .admin-modal-inner {
-  background: white;
+  background: var(--ui-surface);
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--ui-border);
   box-shadow: 0 20px 60px rgba(0,0,0,0.15);
 }
 
@@ -5582,6 +5585,69 @@ html.dark {
   );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+/* ── Admin: override generic Tailwind grays with brand tokens ────────── */
+
+#adminDashboard .text-gray-900,
+#adminDashboard .text-gray-800 {
+  color: var(--ui-text);
+}
+
+#adminDashboard .text-gray-700 {
+  color: var(--ui-text);
+}
+
+#adminDashboard .text-gray-500,
+#adminDashboard .text-gray-600 {
+  color: var(--ui-text-muted);
+}
+
+#adminDashboard .text-gray-400 {
+  color: var(--ui-text-muted);
+  opacity: 0.7;
+}
+
+#adminDashboard table .bg-white,
+#adminDashboard .bg-white:not(.admin-bottom-nav *):not(.admin-more-drawer *) {
+  background-color: var(--ui-surface) !important;
+}
+
+#adminDashboard .bg-gray-50 {
+  background-color: var(--ui-surface-2) !important;
+}
+
+#adminDashboard .bg-gray-100 {
+  background-color: var(--ui-surface-2) !important;
+}
+
+#adminDashboard .divide-gray-200 > * + * {
+  border-color: var(--ui-border);
+}
+
+#adminDashboard .border-gray-200 {
+  border-color: var(--ui-border) !important;
+}
+
+#adminDashboard .border-gray-300 {
+  border-color: var(--ui-border) !important;
+}
+
+#adminDashboard .placeholder-gray-400::-moz-placeholder {
+  color: var(--ui-text-muted);
+  opacity: 0.6;
+}
+
+#adminDashboard .placeholder-gray-400::placeholder {
+  color: var(--ui-text-muted);
+  opacity: 0.6;
+}
+
+/* Admin: modern card uses brand-bg gradient */
+
+#adminDashboard .modern-card {
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
 }
 
 #exploreReadTile .hover\:text-gray-900:hover,
