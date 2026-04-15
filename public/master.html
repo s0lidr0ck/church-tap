@@ -15,14 +15,52 @@
     gtag('js', new Date());
     gtag('config', 'G-Q0RCM76BL8');
   </script>
+
+  <style>
+    .brand-text-gradient {
+      background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    /* Master portal theming overrides */
+    #masterDashboard .text-gray-900,
+    #masterDashboard .text-gray-800 { color: var(--ui-text) !important; }
+    #masterDashboard .text-gray-700,
+    #masterDashboard .text-gray-600,
+    #masterDashboard .text-gray-500 { color: var(--ui-text-muted) !important; }
+    #masterDashboard .bg-white { background: var(--ui-surface) !important; }
+    #masterDashboard .bg-gray-50 { background: color-mix(in srgb, var(--ui-surface) 90%, var(--ui-border)) !important; }
+    #masterDashboard .border-gray-200,
+    #masterDashboard .divide-gray-200 { border-color: var(--ui-border) !important; }
+    #masterDashboard input,
+    #masterDashboard select {
+      background: var(--ui-surface) !important;
+      color: var(--ui-text) !important;
+      border-color: var(--ui-border) !important;
+    }
+    #masterDashboard .border-t { border-color: var(--ui-border) !important; }
+    /* Stat card icon overrides - brand tints */
+    #masterDashboard .from-blue-500.to-indigo-600 { background: linear-gradient(135deg, var(--brand-primary), color-mix(in srgb, var(--brand-primary) 70%, var(--brand-secondary))) !important; }
+    #masterDashboard .from-green-500.to-emerald-600 { background: linear-gradient(135deg, var(--brand-secondary), color-mix(in srgb, var(--brand-secondary) 70%, var(--brand-primary))) !important; }
+    #masterDashboard .from-purple-500.to-pink-600 { background: linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 80%, var(--brand-secondary)), var(--brand-secondary)) !important; }
+    #masterDashboard .from-yellow-500.to-orange-600 { background: linear-gradient(135deg, var(--brand-accent), color-mix(in srgb, var(--brand-accent) 80%, var(--brand-primary))) !important; }
+    /* Loading/spinner colors */
+    #masterDashboard .border-blue-600 { border-color: var(--brand-primary) !important; }
+    /* Pagination */
+    #masterDashboard .text-gray-700 button,
+    #masterDashboard .text-gray-700 { color: var(--ui-text) !important; }
+    /* Map placeholder */
+    #worldMap { background: color-mix(in srgb, var(--ui-surface) 95%, var(--ui-border)) !important; }
+  </style>
 </head>
 <body class="h-full overflow-x-hidden">
   
   <!-- Master Login Screen -->
-  <div id="masterLoginScreen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900">
+  <div id="masterLoginScreen" class="min-h-screen flex items-center justify-center" style="background: linear-gradient(135deg, var(--brand-primary) 0%, color-mix(in srgb, var(--brand-primary) 60%, var(--brand-secondary)) 50%, var(--brand-secondary) 100%)">
     <div class="max-w-md w-full space-y-8 px-4">
       <div class="text-center">
-        <div class="mx-auto h-16 w-16 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-2xl shadow-lg">
+        <div class="mx-auto h-16 w-16 flex items-center justify-center rounded-full text-white text-2xl shadow-lg" style="background: linear-gradient(135deg, var(--brand-secondary), var(--brand-primary))">
           🚀
         </div>
         <h2 class="mt-6 text-center text-3xl font-extrabold text-white">Master Portal</h2>
@@ -349,7 +387,7 @@
             <!-- Organizations Tab -->
             <div id="organizationsMasterContent" class="tab-content hidden">
               <div class="mb-6 flex justify-between items-center">
-                <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">🏢 Organizations</h1>
+                <h1 class="text-3xl font-bold brand-text-gradient">🏢 Organizations</h1>
                 <button id="addOrganizationBtn" class="btn-primary-modern">✨ Add New Organization</button>
               </div>
 
@@ -388,7 +426,7 @@
                         <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
-                    <tbody id="organizationsTable" class="bg-white divide-y divide-gray-200">
+                    <tbody id="organizationsTable" style="background: var(--ui-surface)" class="divide-y" style="border-color: var(--ui-border)">
                       <!-- Organizations will be loaded here -->
                     </tbody>
                   </table>
@@ -399,7 +437,7 @@
             <!-- Organization Requests Tab -->
             <div id="orgRequestsMasterContent" class="tab-content hidden">
               <div class="mb-6 flex justify-between items-center">
-                <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">📋 Organization Requests</h1>
+                <h1 class="text-3xl font-bold brand-text-gradient">📋 Organization Requests</h1>
                 <div class="flex items-center space-x-4">
                   <select id="requestsStatusFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     <option value="">All Statuses</option>
@@ -418,18 +456,18 @@
 
                 <div class="overflow-x-auto">
                   <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                    <thead style="background: var(--ui-surface-2, color-mix(in srgb, var(--ui-surface) 95%, var(--ui-border)))">
                       <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact Info</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Organization</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Contact Info</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Plan</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Submitted</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Actions</th>
                       </tr>
                     </thead>
-                    <tbody id="orgRequestsTableBody" class="bg-white divide-y divide-gray-200">
+                    <tbody id="orgRequestsTableBody" style="background: var(--ui-surface)" class="divide-y" style="border-color: var(--ui-border)">
                       <!-- Organization requests will be loaded here -->
                     </tbody>
                   </table>
@@ -438,7 +476,7 @@
             </div>
 
             <div id="billingMasterContent" class="tab-content hidden">
-              <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-8">💳 Billing & Plans</h1>
+              <h1 class="text-3xl font-bold brand-text-gradient mb-8">💳 Billing & Plans</h1>
               <div class="modern-card p-6">
                 <p class="text-gray-600">Billing management coming soon...</p>
               </div>
@@ -446,7 +484,7 @@
 
             <div id="analyticsMasterContent" class="tab-content hidden">
               <div class="mb-6 flex justify-between items-center">
-                <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">📈 Global Analytics</h1>
+                <h1 class="text-3xl font-bold brand-text-gradient">📈 Global Analytics</h1>
                 <div class="flex items-center space-x-4">
                   <select id="analyticsTimeframe" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     <option value="24h">Last 24 Hours</option>
@@ -550,17 +588,17 @@
                 
                 <div class="overflow-x-auto">
                   <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                    <thead style="background: var(--ui-surface-2, color-mix(in srgb, var(--ui-surface) 95%, var(--ui-border)))">
                       <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Session</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tags Scanned</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activities</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Session</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Location</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Tags Scanned</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Activities</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Time</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Actions</th>
                       </tr>
                     </thead>
-                    <tbody id="sessionsTable" class="bg-white divide-y divide-gray-200">
+                    <tbody id="sessionsTable" style="background: var(--ui-surface)" class="divide-y" style="border-color: var(--ui-border)">
                       <!-- Sessions will be loaded here -->
                     </tbody>
                   </table>
@@ -571,7 +609,7 @@
             <!-- Tag Activities Tab -->
             <div id="tagActivitiesMasterContent" class="tab-content hidden">
               <div class="mb-6 flex justify-between items-center">
-                <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">🎯 Tag Activities</h1>
+                <h1 class="text-3xl font-bold brand-text-gradient">🎯 Tag Activities</h1>
                 <div class="flex items-center space-x-4">
                   <select id="tagActivitiesTimeframe" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     <option value="24h">Last 24 Hours</option>
@@ -678,19 +716,19 @@
                 <!-- Table container -->
                 <div id="tagActivitiesTableContainer" class="overflow-x-auto">
                   <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                    <thead style="background: var(--ui-surface-2, color-mix(in srgb, var(--ui-surface) 95%, var(--ui-border)))">
                       <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tag ID</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Session</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activities</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Time</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Tag ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Session</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Location</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Organization</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Activities</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider" style="color: var(--ui-text-muted)">Actions</th>
                       </tr>
                     </thead>
-                    <tbody id="tagActivitiesTable" class="bg-white divide-y divide-gray-200">
+                    <tbody id="tagActivitiesTable" style="background: var(--ui-surface)" class="divide-y" style="border-color: var(--ui-border)">
                       <!-- Tag activities will be loaded here -->
                     </tbody>
                   </table>
@@ -724,14 +762,14 @@
             </div>
 
             <div id="supportMasterContent" class="tab-content hidden">
-              <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-8">🎧 Support</h1>
+              <h1 class="text-3xl font-bold brand-text-gradient mb-8">🎧 Support</h1>
               <div class="modern-card p-6">
                 <p class="text-gray-600">Support management coming soon...</p>
               </div>
             </div>
 
             <div id="systemMasterContent" class="tab-content hidden">
-              <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-8">⚙️ System Settings</h1>
+              <h1 class="text-3xl font-bold brand-text-gradient mb-8">⚙️ System Settings</h1>
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="modern-card p-6">
                   <h3 class="text-lg font-medium text-gray-900 mb-2">Default Topics (Emergency Scripture)</h3>
@@ -765,7 +803,7 @@
                             <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider">Actions</th>
                           </tr>
                         </thead>
-                        <tbody id="masterTopicsTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+                        <tbody id="masterTopicsTableBody" style="background: var(--ui-surface)" class="divide-y" style="border-color: var(--ui-border)"></tbody>
                       </table>
                     </div>
                   </div>
@@ -818,7 +856,7 @@
                           <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
-                      <tbody id="masterTopicVersesTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+                      <tbody id="masterTopicVersesTableBody" style="background: var(--ui-surface)" class="divide-y" style="border-color: var(--ui-border)"></tbody>
                     </table>
                   </div>
                 </div>
@@ -833,9 +871,9 @@
 
   <!-- Add Organization Modal -->
   <div id="organizationModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-xl bg-white">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-xl" style="background: var(--ui-surface)">
       <div class="mt-3">
-        <h3 id="organizationModalTitle" class="text-lg font-medium text-gray-900 mb-4">✨ Add New Organization</h3>
+        <h3 id="organizationModalTitle" class="text-lg font-medium mb-4" style="color: var(--ui-text)">✨ Add New Organization</h3>
         
         <form id="organizationForm" class="space-y-4">
           <input type="hidden" id="organizationId">
