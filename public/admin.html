@@ -69,38 +69,39 @@
     }
   </script>
 </head>
-<body class="h-full bg-gray-50">
+<body class="h-full" style="background: linear-gradient(160deg, #055089 0%, #033460 50%, #04b7b1 100%)">
   <!-- Login Screen -->
-  <div id="loginScreen" class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8">
-      <div>
-        <div class="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-primary-600 text-white text-xl">✞</div>
-        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Admin Dashboard</h2>
-        <p class="mt-2 text-center text-sm text-gray-600">Sign in to manage Church Tap</p>
+  <div id="loginScreen" class="min-h-screen flex items-center justify-center py-12 px-5">
+    <div class="w-full max-w-sm">
+      <!-- Logo / Branding -->
+      <div class="text-center mb-8">
+        <div class="mx-auto h-16 w-16 flex items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm text-white text-3xl mb-4 shadow-lg border border-white/20">✞</div>
+        <h2 class="text-2xl font-bold text-white">Church Tap Admin</h2>
+        <p class="mt-1 text-sm text-white/70">Sign in to manage your organization</p>
       </div>
-      <form id="loginForm" class="mt-8 space-y-6">
-        <div class="rounded-md shadow-sm -space-y-px">
+      <!-- Login Card -->
+      <div class="bg-white rounded-2xl shadow-2xl p-8">
+        <form id="loginForm" class="space-y-5">
           <div>
-            <label for="username" class="sr-only">Username</label>
-            <input id="username" name="username" type="text" required 
-                   class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm" 
-                   placeholder="Username">
+            <label for="username" class="block text-sm font-semibold text-gray-700 mb-1.5">Username</label>
+            <input id="username" name="username" type="text" required autocomplete="username"
+                   class="block w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent text-sm transition-colors"
+                   style="--tw-ring-color: color-mix(in srgb, var(--brand-primary, #055089) 40%, transparent)"
+                   placeholder="Enter your username">
           </div>
           <div>
-            <label for="password" class="sr-only">Password</label>
-            <input id="password" name="password" type="password" required 
-                   class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm" 
-                   placeholder="Password">
+            <label for="password" class="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
+            <input id="password" name="password" type="password" required autocomplete="current-password"
+                   class="block w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent text-sm transition-colors"
+                   style="--tw-ring-color: color-mix(in srgb, var(--brand-primary, #055089) 40%, transparent)"
+                   placeholder="Enter your password">
           </div>
-        </div>
-        <div>
-          <button type="submit" 
-                  class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+          <div id="loginError" class="hidden bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3"></div>
+          <button type="submit" class="btn-primary-modern w-full justify-center py-3 text-base font-semibold rounded-xl">
             Sign in
           </button>
-        </div>
-        <div id="loginError" class="hidden text-red-600 text-sm text-center"></div>
-      </form>
+        </form>
+      </div>
     </div>
   </div>
 
@@ -375,32 +376,37 @@
       <div class="flex-1 flex flex-col overflow-hidden">
         <!-- Top Navigation (Mobile + Desktop Header) -->
         <header class="w-full">
-          <div class="relative z-10 flex-shrink-0 h-16 admin-header flex">
-            <!-- Mobile menu button -->
-            <button class="lg:hidden px-4 border-r border-gray-200 text-gray-400 focus:outline-none focus:text-gray-600" id="mobileMenuBtn">
-              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-              </svg>
-            </button>
-            
-            <!-- Desktop header content -->
-            <div class="flex-1 flex justify-between px-4 sm:px-6 lg:px-8">
-              <div class="flex-1 flex items-center">
-                <div>
-                  <h1 class="text-xl font-semibold text-white" id="pageTitle">Dashboard</h1>
-                  <div class="text-sm text-white/80" id="organizationContext"></div>
-                </div>
+          <div class="relative z-10 flex-shrink-0 h-14 admin-header flex items-center">
+            <!-- Mobile: ✞ logo + title (hamburger removed — bottom nav handles nav) -->
+            <div class="lg:hidden flex items-center px-4 gap-3 flex-1">
+              <span class="text-xl">✞</span>
+              <div>
+                <h1 class="text-base font-semibold text-white leading-tight" id="pageTitle">Dashboard</h1>
+                <div class="text-xs text-white/70 leading-tight" id="organizationContext"></div>
               </div>
-              <div class="flex items-center space-x-4">
-                <button id="menuThemeToggle" class="hidden lg:inline-flex px-3 py-1 rounded-md text-sm bg-white/10 hover:bg-white/20 text-white">Toggle Menu Text</button>
+            </div>
+            <!-- Desktop: hamburger was never here; just show title -->
+            <div class="hidden lg:flex flex-1 items-center px-8 gap-3">
+              <div>
+                <h1 class="text-xl font-semibold text-white" id="pageTitleDesktop">Dashboard</h1>
+                <div class="text-sm text-white/80" id="organizationContextDesktop"></div>
               </div>
+            </div>
+            <!-- Right: logout + theme toggle on desktop -->
+            <div class="flex items-center gap-2 px-4">
+              <button id="menuThemeToggle" class="hidden lg:inline-flex px-3 py-1 rounded-md text-sm bg-white/10 hover:bg-white/20 text-white">Toggle Menu Text</button>
+              <button id="mobileMenuBtn" class="lg:hidden p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors" title="All sections">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                </svg>
+              </button>
             </div>
           </div>
         </header>
 
         <!-- Main Content -->
         <main class="flex-1 relative overflow-y-auto focus:outline-none">
-          <div class="py-6 px-4 sm:px-6 lg:px-8">
+          <div id="adminMainContent" class="py-6 px-4 sm:px-6 lg:px-8">
       
       <!-- Dashboard Tab -->
       <div id="dashboardContent" class="tab-content hidden">
@@ -549,101 +555,53 @@
         
         <!-- NFC & Tag Stats Cards -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div class="bg-white overflow-hidden shadow rounded-lg">
-            <div class="p-5">
-              <div class="flex items-center">
-                <div class="flex-shrink-0">
-                  <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                    </svg>
-                  </div>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt class="text-sm font-medium text-gray-500 truncate">Total NFC Scans</dt>
-                    <dd id="totalScans" class="text-lg font-medium text-gray-900">--</dd>
-                  </dl>
-                </div>
-              </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,#3b82f6 15%,white)">📱</div>
+            <div>
+              <div class="admin-stat-label">Total NFC Scans</div>
+              <div id="totalScans" class="admin-stat-value">--</div>
             </div>
           </div>
 
-          <div class="bg-white overflow-hidden shadow rounded-lg">
-            <div class="p-5">
-              <div class="flex items-center">
-                <div class="flex-shrink-0">
-                  <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
-                  </div>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt class="text-sm font-medium text-gray-500 truncate">Unique Sessions</dt>
-                    <dd id="uniqueSessions" class="text-lg font-medium text-gray-900">--</dd>
-                  </dl>
-                </div>
-              </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,#22c55e 15%,white)">👥</div>
+            <div>
+              <div class="admin-stat-label">Unique Sessions</div>
+              <div id="uniqueSessions" class="admin-stat-value">--</div>
             </div>
           </div>
 
-          <div class="bg-white overflow-hidden shadow rounded-lg">
-            <div class="p-5">
-              <div class="flex items-center">
-                <div class="flex-shrink-0">
-                  <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-                    </svg>
-                  </div>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt class="text-sm font-medium text-gray-500 truncate">Active Tags</dt>
-                    <dd id="activeTags" class="text-lg font-medium text-gray-900">--</dd>
-                  </dl>
-                </div>
-              </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,#a855f7 15%,white)">🏷️</div>
+            <div>
+              <div class="admin-stat-label">Active Tags</div>
+              <div id="activeTags" class="admin-stat-value">--</div>
             </div>
           </div>
 
-          <div class="bg-white overflow-hidden shadow rounded-lg">
-            <div class="p-5">
-              <div class="flex items-center">
-                <div class="flex-shrink-0">
-                  <div class="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                    </svg>
-                  </div>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt class="text-sm font-medium text-gray-500 truncate">Avg Engagement</dt>
-                    <dd id="avgEngagement" class="text-lg font-medium text-gray-900">--</dd>
-                  </dl>
-                </div>
-              </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,#f59e0b 15%,white)">❤️</div>
+            <div>
+              <div class="admin-stat-label">Avg Engagement</div>
+              <div id="avgEngagement" class="admin-stat-value">--</div>
             </div>
           </div>
         </div>
 
         <!-- Analytics Grid - Row 1 -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <div class="bg-white shadow overflow-hidden sm:rounded-md">
-            <div class="px-4 py-5 sm:px-6">
-              <h3 class="text-lg leading-6 font-medium text-gray-900">Top Performing Tags (Last 7 Days)</h3>
+          <div class="admin-section-card">
+            <div class="admin-section-card-header">
+              <div class="admin-section-card-title">Top Performing Tags (Last 7 Days)</div>
             </div>
             <ul id="topTagsList" class="divide-y divide-gray-200">
               <!-- Top tags will be loaded here -->
             </ul>
           </div>
 
-          <div class="bg-white shadow overflow-hidden sm:rounded-md">
-            <div class="px-4 py-5 sm:px-6">
-              <h3 class="text-lg leading-6 font-medium text-gray-900">Geographic Distribution</h3>
+          <div class="admin-section-card">
+            <div class="admin-section-card-header">
+              <div class="admin-section-card-title">Geographic Distribution</div>
             </div>
             <div class="px-4 py-5" id="geoMap">
               <!-- Geographic map will be loaded here -->
@@ -653,18 +611,18 @@
 
         <!-- Analytics Grid - Row 2 -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <div class="bg-white shadow overflow-hidden sm:rounded-md">
-            <div class="px-4 py-5 sm:px-6">
-              <h3 class="text-lg leading-6 font-medium text-gray-900">Daily Scan Activity</h3>
+          <div class="admin-section-card">
+            <div class="admin-section-card-header">
+              <div class="admin-section-card-title">Daily Scan Activity</div>
             </div>
             <div class="px-4 py-5" id="dailyScanChart">
               <!-- Daily scan chart will be loaded here -->
             </div>
           </div>
 
-          <div class="bg-white shadow overflow-hidden sm:rounded-md">
-            <div class="px-4 py-5 sm:px-6">
-              <h3 class="text-lg leading-6 font-medium text-gray-900">Hourly Activity Pattern</h3>
+          <div class="admin-section-card">
+            <div class="admin-section-card-header">
+              <div class="admin-section-card-title">Hourly Activity Pattern</div>
             </div>
             <div class="px-4 py-5" id="hourlyChart">
               <!-- Hourly activity chart will be loaded here -->
@@ -674,18 +632,18 @@
 
         <!-- Analytics Grid - Row 3 -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <div class="bg-white shadow overflow-hidden sm:rounded-md">
-            <div class="px-4 py-5 sm:px-6">
-              <h3 class="text-lg leading-6 font-medium text-gray-900">Engagement Funnel</h3>
+          <div class="admin-section-card">
+            <div class="admin-section-card-header">
+              <div class="admin-section-card-title">Engagement Funnel</div>
             </div>
             <div class="px-4 py-5" id="engagementFunnel">
               <!-- Engagement funnel will be loaded here -->
             </div>
           </div>
 
-          <div class="bg-white shadow overflow-hidden sm:rounded-md">
-            <div class="px-4 py-5 sm:px-6">
-              <h3 class="text-lg leading-6 font-medium text-gray-900">Visitor Retention</h3>
+          <div class="admin-section-card">
+            <div class="admin-section-card-header">
+              <div class="admin-section-card-title">Visitor Retention</div>
             </div>
             <div class="px-4 py-5" id="visitorRetention">
               <!-- Visitor retention metrics will be loaded here -->
@@ -694,9 +652,9 @@
         </div>
 
         <!-- Top Verses -->
-        <div class="bg-white shadow overflow-hidden sm:rounded-md">
-          <div class="px-4 py-5 sm:px-6">
-            <h3 class="text-lg leading-6 font-medium text-gray-900">Most Viewed Verses (Last 7 Days)</h3>
+        <div class="admin-section-card">
+          <div class="admin-section-card-header">
+            <div class="admin-section-card-title">Most Viewed Verses (Last 7 Days)</div>
           </div>
           <ul id="topVersesList" class="divide-y divide-gray-200">
             <!-- Top verses will be loaded here -->
@@ -709,7 +667,7 @@
         <h1 class="sr-only">Community Management</h1>
         
         <!-- Filter Controls -->
-        <div class="mb-6 bg-white shadow sm:rounded-lg p-4">
+        <div class="mb-6 modern-card p-4">
           <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
             <div class="w-full sm:w-auto">
               <label for="communityDaysFilter" class="block text-sm font-medium text-gray-700 mb-1 sm:sr-only">Time Range</label>
@@ -725,60 +683,36 @@
 
         <!-- Community Stats -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div class="bg-white overflow-hidden shadow rounded-lg">
-            <div class="p-5">
-              <div class="flex items-center">
-                <div class="flex-shrink-0">
-                  <span class="text-2xl">🙏</span>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt class="text-sm font-medium text-gray-500 truncate">Prayer Requests</dt>
-                    <dd id="totalPrayerRequests" class="text-lg font-medium text-gray-900">--</dd>
-                  </dl>
-                </div>
-              </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,var(--brand-primary) 12%,white)">🙏</div>
+            <div>
+              <div class="admin-stat-label">Prayer Requests</div>
+              <div id="totalPrayerRequests" class="admin-stat-value">--</div>
             </div>
           </div>
 
-          <div class="bg-white overflow-hidden shadow rounded-lg">
-            <div class="p-5">
-              <div class="flex items-center">
-                <div class="flex-shrink-0">
-                  <span class="text-2xl">🎉</span>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt class="text-sm font-medium text-gray-500 truncate">Praise Reports</dt>
-                    <dd id="totalPraiseReports" class="text-lg font-medium text-gray-900">--</dd>
-                  </dl>
-                </div>
-              </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,#f59e0b 12%,white)">🎉</div>
+            <div>
+              <div class="admin-stat-label">Praise Reports</div>
+              <div id="totalPraiseReports" class="admin-stat-value">--</div>
             </div>
           </div>
 
-          <div class="bg-white overflow-hidden shadow rounded-lg">
-            <div class="p-5">
-              <div class="flex items-center">
-                <div class="flex-shrink-0">
-                  <span class="text-2xl">💭</span>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt class="text-sm font-medium text-gray-500 truncate">Verse Insights</dt>
-                    <dd id="totalVerseInsights" class="text-lg font-medium text-gray-900">--</dd>
-                  </dl>
-                </div>
-              </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,#8b5cf6 12%,white)">💭</div>
+            <div>
+              <div class="admin-stat-label">Verse Insights</div>
+              <div id="totalVerseInsights" class="admin-stat-value">--</div>
             </div>
           </div>
         </div>
 
         <!-- Prayer Requests Management -->
-        <div class="bg-white shadow overflow-hidden sm:rounded-md mb-8">
-          <div class="px-4 py-5 sm:px-6">
-            <h3 class="text-lg leading-6 font-medium text-gray-900">Prayer Requests</h3>
-            <p class="mt-1 max-w-2xl text-sm text-gray-500">Manage and moderate prayer requests</p>
+        <div class="admin-section-card mb-6">
+          <div class="admin-section-card-header">
+            <div class="admin-section-card-title">🙏 Prayer Requests</div>
+            <div class="admin-section-card-subtitle">Manage and moderate prayer requests</div>
           </div>
           <div id="prayerRequestsAdminList" class="divide-y divide-gray-200">
             <!-- Prayer requests will be loaded here -->
@@ -786,10 +720,10 @@
         </div>
 
         <!-- Praise Reports Management -->
-        <div class="bg-white shadow overflow-hidden sm:rounded-md mb-8">
-          <div class="px-4 py-5 sm:px-6">
-            <h3 class="text-lg leading-6 font-medium text-gray-900">Praise Reports</h3>
-            <p class="mt-1 max-w-2xl text-sm text-gray-500">Manage and moderate praise reports</p>
+        <div class="admin-section-card mb-6">
+          <div class="admin-section-card-header">
+            <div class="admin-section-card-title">🎉 Praise Reports</div>
+            <div class="admin-section-card-subtitle">Manage and moderate praise reports</div>
           </div>
           <div id="praiseReportsAdminList" class="divide-y divide-gray-200">
             <!-- Praise reports will be loaded here -->
@@ -797,10 +731,10 @@
         </div>
 
         <!-- Verse Insights Management -->
-        <div class="bg-white shadow overflow-hidden sm:rounded-md">
-          <div class="px-4 py-5 sm:px-6">
-            <h3 class="text-lg leading-6 font-medium text-gray-900">Verse Insights</h3>
-            <p class="mt-1 max-w-2xl text-sm text-gray-500">Manage and moderate verse insights</p>
+        <div class="admin-section-card">
+          <div class="admin-section-card-header">
+            <div class="admin-section-card-title">💭 Verse Insights</div>
+            <div class="admin-section-card-subtitle">Manage and moderate verse insights</div>
           </div>
           <div id="verseInsightsAdminList" class="divide-y divide-gray-200">
             <!-- Verse insights will be loaded here -->
@@ -814,69 +748,33 @@
 
         <!-- User Statistics -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div class="bg-white overflow-hidden shadow rounded-lg">
-            <div class="p-5">
-              <div class="flex items-center">
-                <div class="flex-shrink-0">
-                  <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-                    </svg>
-                  </div>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt class="text-sm font-medium text-gray-500 truncate">Total Tags</dt>
-                    <dd id="totalTags" class="text-lg font-medium text-gray-900">--</dd>
-                  </dl>
-                </div>
-              </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,#3b82f6 15%,white)">🏷️</div>
+            <div>
+              <div class="admin-stat-label">Total Tags</div>
+              <div id="totalTags" class="admin-stat-value">--</div>
             </div>
           </div>
 
-          <div class="bg-white overflow-hidden shadow rounded-lg">
-            <div class="p-5">
-              <div class="flex items-center">
-                <div class="flex-shrink-0">
-                  <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                    </svg>
-                  </div>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt class="text-sm font-medium text-gray-500 truncate">Active Tags</dt>
-                    <dd id="activeTags" class="text-lg font-medium text-gray-900">--</dd>
-                  </dl>
-                </div>
-              </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,#22c55e 15%,white)">⚡</div>
+            <div>
+              <div class="admin-stat-label">Active Tags</div>
+              <div id="activeTags" class="admin-stat-value">--</div>
             </div>
           </div>
 
-          <div class="bg-white overflow-hidden shadow rounded-lg">
-            <div class="p-5">
-              <div class="flex items-center">
-                <div class="flex-shrink-0">
-                  <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
-                  </div>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt class="text-sm font-medium text-gray-500 truncate">Community Contributors</dt>
-                    <dd id="communityContributors" class="text-lg font-medium text-gray-900">--</dd>
-                  </dl>
-                </div>
-              </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,#a855f7 15%,white)">🤝</div>
+            <div>
+              <div class="admin-stat-label">Community Contributors</div>
+              <div id="communityContributors" class="admin-stat-value">--</div>
             </div>
           </div>
         </div>
 
         <!-- Filter and Search -->
-        <div class="mb-6 bg-white shadow sm:rounded-lg p-4">
+        <div class="mb-6 modern-card p-4">
           <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
             <div class="w-full sm:w-auto">
               <input id="userTagSearch" type="text" placeholder="Search tag ID..."
@@ -1556,7 +1454,7 @@
 
   <!-- Add/Edit Verse Modal -->
   <div id="verseModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-8 mb-20 border border-gray-200 w-11/12 md:w-3/4 lg:w-1/2 shadow-2xl rounded-lg" style="background-color: #C1C5C9;">
+    <div class="relative top-20 mx-auto mb-20 w-11/12 md:w-3/4 lg:w-1/2 admin-modal-inner p-8">
       <div>
         <h3 id="modalTitle" class="text-2xl font-semibold text-gray-900 mb-8">Add New Verse</h3>
         
@@ -1642,7 +1540,7 @@
 
   <!-- Add/Edit Link Modal -->
   <div id="linkModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-8 mb-20 border border-gray-200 w-11/12 md:w-3/4 lg:w-1/2 shadow-2xl rounded-lg" style="background-color: #C1C5C9;">
+    <div class="relative top-20 mx-auto mb-20 w-11/12 md:w-3/4 lg:w-1/2 admin-modal-inner p-8">
       <div>
         <h3 id="linkModalTitle" class="text-2xl font-semibold text-gray-900 mb-8">Add New Link</h3>
 
@@ -1766,6 +1664,80 @@
         </div>
       </div>
     </div>
+  </div>
+
+
+  <!-- Mobile Bottom Navigation (hidden on desktop) -->
+  <nav class="admin-bottom-nav lg:hidden" id="adminBottomNav">
+    <button class="admin-bottom-tab active" data-tab="dashboard" onclick="adminDashboard.showTab('dashboard')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      <span class="admin-bottom-tab-label">Dashboard</span>
+    </button>
+    <button class="admin-bottom-tab" data-tab="verses" onclick="adminDashboard.showTab('verses')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+      <span class="admin-bottom-tab-label">Verses</span>
+    </button>
+    <button class="admin-bottom-tab" data-tab="community" onclick="adminDashboard.showTab('community')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+      <span class="admin-bottom-tab-label">Community</span>
+    </button>
+    <button class="admin-bottom-tab" data-tab="analytics" onclick="adminDashboard.showTab('analytics')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      <span class="admin-bottom-tab-label">Analytics</span>
+    </button>
+    <button class="admin-bottom-tab" id="adminMoreBtn" onclick="adminDashboard.openMoreDrawer()">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      <span class="admin-bottom-tab-label">More</span>
+    </button>
+  </nav>
+
+  <!-- More Drawer Overlay -->
+  <div class="admin-more-overlay lg:hidden" id="adminMoreOverlay" onclick="adminDashboard.closeMoreDrawer()"></div>
+
+  <!-- More Drawer -->
+  <div class="admin-more-drawer lg:hidden" id="adminMoreDrawer">
+    <div class="admin-more-drawer-handle"></div>
+    <div class="admin-more-section-label">Management</div>
+    <button class="admin-more-item" onclick="adminDashboard.showTab('users'); adminDashboard.closeMoreDrawer()">
+      <div class="admin-more-item-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m3 5.197a4 4 0 11-6.708-3.23"/></svg></div>
+      <span>Users</span>
+    </button>
+    <button class="admin-more-item" onclick="adminDashboard.showTab('braceletRequests'); adminDashboard.closeMoreDrawer()">
+      <div class="admin-more-item-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg></div>
+      <span>Bracelet Requests <span id="moreDrawerBraceletBadge" class="ml-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full hidden"></span></span>
+    </button>
+    <div class="admin-more-section-label">Content</div>
+    <button class="admin-more-item" onclick="adminDashboard.showTab('links'); adminDashboard.closeMoreDrawer()">
+      <div class="admin-more-item-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg></div>
+      <span>Links</span>
+    </button>
+    <button class="admin-more-item" onclick="adminDashboard.showTab('topics'); adminDashboard.closeMoreDrawer()">
+      <div class="admin-more-item-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/></svg></div>
+      <span>Topics</span>
+    </button>
+    <button class="admin-more-item" onclick="adminDashboard.showTab('events'); adminDashboard.closeMoreDrawer()">
+      <div class="admin-more-item-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+      <span>Events</span>
+    </button>
+    <button class="admin-more-item" onclick="adminDashboard.showTab('cta'); adminDashboard.closeMoreDrawer()">
+      <div class="admin-more-item-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg></div>
+      <span>CTA Banner</span>
+    </button>
+    <div class="admin-more-section-label">Giving & Media</div>
+    <button class="admin-more-item" onclick="adminDashboard.showTab('fundraising'); adminDashboard.closeMoreDrawer()">
+      <div class="admin-more-item-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg></div>
+      <span>Fundraising</span>
+    </button>
+    <button class="admin-more-item" onclick="adminDashboard.showTab('playlist'); adminDashboard.closeMoreDrawer()">
+      <div class="admin-more-item-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z"/></svg></div>
+      <span>Worship Playlist</span>
+    </button>
+    <div class="admin-more-section-label">Admin</div>
+    <button class="admin-more-item" onclick="adminDashboard.showTab('settings'); adminDashboard.closeMoreDrawer()">
+      <div class="admin-more-item-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
+      <span>Settings</span>
+    </button>
+    <div class="pb-2"></div>
   </div>
 
   <script src="/js/admin.js"></script>
