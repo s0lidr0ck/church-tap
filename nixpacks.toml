@@ -1,6 +1,9 @@
-# CSS is pre-compiled and committed — skip the Tailwind rebuild during deploy
+# CSS is pre-compiled and committed directly — no Tailwind rebuild needed on server
+[phases.install]
+cmds = ["npm install"]
+
 [phases.build]
-cmds = []
+cmds = ["echo 'CSS pre-compiled, skipping Tailwind rebuild'"]
 
 [start]
 cmd = "node server.js"
