@@ -61,8 +61,9 @@
 
     /* ─── Verse card ────────────────────────────── */
     --verse-card-bg: #ffffff;
-    --verse-card-shadow: 0 4px 32px -8px rgba(5, 80, 137, 0.13), 0 1px 4px rgba(5, 80, 137, 0.06);
-    --verse-text-color: var(--coffee-bean);
+    --verse-card-gradient: linear-gradient(155deg, #1278c8 0%, #055089 42%, #033460 100%);
+    --verse-card-shadow: 0 12px 48px -8px rgba(3, 52, 96, 0.55), 0 4px 16px rgba(3, 52, 96, 0.25);
+    --verse-text-color: var(--porcelain);
 
     /* ─── Bottom nav ────────────────────────────── */
     --nav-bg: rgba(253, 254, 249, 0.94);
@@ -100,6 +101,7 @@
 
     /* Verse card in dark mode */
     --verse-card-bg: var(--ui-surface);
+    --verse-card-gradient: var(--ui-surface);
     --verse-card-shadow: 0 4px 32px -8px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3);
     --verse-text-color: var(--brand-bg);
 
@@ -140,6 +142,7 @@
     --ui-secondary-hover: #547057;
 
     --verse-card-bg: #faf5eb;
+    --verse-card-gradient: linear-gradient(155deg, #fdf8ee 0%, #faf5eb 60%, #f5edd8 100%);
     --verse-card-shadow: 0 4px 32px -8px rgba(107,62,30,0.18), 0 1px 4px rgba(107,62,30,0.08);
     --verse-text-color: #2e1c0a;
 
@@ -157,6 +160,9 @@
   html.sepia body {
     background-color: var(--ct-app-bg);
     color: var(--ui-text);
+  }
+  html.sepia #app {
+    background-image: radial-gradient(ellipse 100% 45% at 50% 0%, rgba(139, 94, 46, 0.12) 0%, transparent 70%) !important;
   }
 
   /* ─── Night Theme ─────────────────────────────── */
@@ -181,6 +187,7 @@
     --ui-secondary-hover: #40a890;
 
     --verse-card-bg: #0d1a2e;
+    --verse-card-gradient: linear-gradient(155deg, #0f2240 0%, #0d1a2e 60%, #080f1c 100%);
     --verse-card-shadow: 0 4px 32px -8px rgba(0,0,0,0.6), 0 1px 4px rgba(0,0,0,0.5);
     --verse-text-color: #c8dcf0;
 
@@ -201,11 +208,12 @@
   }
   html.night #app {
     background-color: var(--ct-app-bg) !important;
+    background-image: radial-gradient(ellipse 100% 45% at 50% 0%, rgba(30, 60, 100, 0.25) 0%, transparent 70%) !important;
   }
 
   #app {
     background-color: var(--ct-app-bg) !important;
-    background-image: none !important;
+    background-image: radial-gradient(ellipse 100% 45% at 50% 0%, color-mix(in srgb, var(--brand-primary) 10%, transparent) 0%, transparent 75%) !important;
   }
 }
 
@@ -216,37 +224,64 @@
 
   /* ─── Verse Card ──────────────────────────────── */
   .verse-card {
-    background-color: var(--verse-card-bg);
+    background: var(--verse-card-gradient, var(--verse-card-bg));
     box-shadow: var(--verse-card-shadow);
-    border-radius: 1.25rem;
+    border-radius: 1.5rem;
     transition: box-shadow 0.3s ease;
-    border: 1px solid var(--ui-border);
+    border: none;
+    position: relative;
+    overflow: hidden;
   }
 
   /* Legacy alias (used in JS templates) */
   .verse-container {
-    background-color: var(--verse-card-bg);
+    background: var(--verse-card-gradient, var(--verse-card-bg));
     box-shadow: var(--verse-card-shadow);
-    border-radius: 1.25rem;
-    border: 1px solid var(--ui-border);
+    border-radius: 1.5rem;
+    border: none;
+    position: relative;
+    overflow: hidden;
     @apply p-6 mx-4 my-6;
-    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    transition: box-shadow 0.3s ease;
+  }
+
+  /* Decorative watermark cross inside the verse card */
+  .verse-container::before {
+    content: "✝";
+    position: absolute;
+    right: -0.5rem;
+    top: -1.5rem;
+    font-size: 11rem;
+    line-height: 1;
+    pointer-events: none;
+    z-index: 0;
+    color: rgba(255, 255, 255, 0.045);
+    font-family: Georgia, serif;
+    font-style: normal;
+    user-select: none;
+  }
+
+  /* Ensure verse content renders above the watermark */
+  .verse-container > * {
+    position: relative;
+    z-index: 1;
   }
 
   /* ─── Verse Typography ────────────────────────── */
   .verse-text {
     font-family: 'Georgia', 'Times New Roman', serif;
     color: var(--verse-text-color);
-    line-height: 1.75;
-    @apply text-xl text-center;
-    letter-spacing: -0.01em;
+    line-height: 1.9;
+    @apply text-center;
+    font-size: 1.2rem;
+    letter-spacing: 0.005em;
     font-style: italic;
     transition: font-size 0.2s ease;
   }
 
-  .verse-text.size-small { @apply text-base; }
-  .verse-text.size-medium { @apply text-xl; }
-  .verse-text.size-large { @apply text-2xl; }
+  .verse-text.size-small { font-size: 0.95rem; }
+  .verse-text.size-medium { font-size: 1.2rem; }
+  .verse-text.size-large { font-size: 1.45rem; }
 
   .verse-reference {
     font-family: 'Inter', system-ui, sans-serif;
@@ -371,42 +406,46 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    padding: 12px 8px;
-    border-radius: 14px;
-    font-weight: 600;
-    font-size: 0.75rem;
-    letter-spacing: 0.02em;
+    gap: 6px;
+    padding: 16px 8px;
+    border-radius: 18px;
+    font-weight: 700;
+    font-size: 0.78rem;
+    letter-spacing: 0.01em;
     transition: all 0.18s ease;
     touch-action: manipulation;
     border: none;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    color: white;
   }
+  .submit-btn .text-2xl,
+  .submit-btn span[style*="font-size: 1.25rem"],
+  .submit-btn span:first-child { font-size: 1.6rem !important; line-height: 1; }
   .submit-btn:active { transform: scale(0.95); }
   .submit-btn--prayer {
-    background: color-mix(in srgb, var(--brand-primary) 10%, var(--ui-surface));
-    color: var(--brand-primary);
-    border: 1.5px solid color-mix(in srgb, var(--brand-primary) 25%, transparent);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--brand-primary) 85%, #1278c8), var(--brand-primary));
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--brand-primary) 35%, transparent);
   }
   .submit-btn--prayer:hover {
-    background: color-mix(in srgb, var(--brand-primary) 16%, var(--ui-surface));
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--brand-primary) 45%, transparent);
+    transform: translateY(-1px);
   }
   .submit-btn--praise {
-    background: color-mix(in srgb, var(--light-sea-green) 12%, var(--ui-surface));
-    color: color-mix(in srgb, var(--light-sea-green) 80%, black);
-    border: 1.5px solid color-mix(in srgb, var(--light-sea-green) 28%, transparent);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--light-sea-green) 80%, #00d4ce), var(--light-sea-green));
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--light-sea-green) 35%, transparent);
   }
   .submit-btn--praise:hover {
-    background: color-mix(in srgb, var(--light-sea-green) 20%, var(--ui-surface));
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--light-sea-green) 45%, transparent);
+    transform: translateY(-1px);
   }
   .submit-btn--insight {
-    background: color-mix(in srgb, var(--spicy-paprika) 10%, var(--ui-surface));
-    color: var(--spicy-paprika);
-    border: 1.5px solid color-mix(in srgb, var(--spicy-paprika) 25%, transparent);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--spicy-paprika) 80%, #ff7040), var(--spicy-paprika));
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--spicy-paprika) 35%, transparent);
   }
   .submit-btn--insight:hover {
-    background: color-mix(in srgb, var(--spicy-paprika) 16%, var(--ui-surface));
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--spicy-paprika) 45%, transparent);
+    transform: translateY(-1px);
   }
 
   /* ─── Bottom Navigation ────────────────────────── */
@@ -804,6 +843,78 @@
   }
   .sidebar-footer { border-top-color: var(--brand-muted) !important; }
   .avatar-brand { background-color: var(--brand-primary) !important; color: #fff !important; }
+
+  /* ─── Default-theme dark verse card overrides ─── */
+  /* The verse card is deep blue in the default theme — adapt all inner elements */
+  html:not(.dark):not(.sepia):not(.night) .verse-reference {
+    color: var(--light-sea-green) !important;
+    font-size: 0.8rem !important;
+    letter-spacing: 0.06em !important;
+  }
+
+  /* Chapter button — light pill on dark card */
+  html:not(.dark):not(.sepia):not(.night) #textChapterBtn,
+  html:not(.dark):not(.sepia):not(.night) #imageChapterBtn {
+    background: rgba(253, 254, 249, 0.92) !important;
+    color: var(--dusk-blue) !important;
+    font-weight: 700 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #textChapterBtn:hover,
+  html:not(.dark):not(.sepia):not(.night) #imageChapterBtn:hover {
+    background: rgba(253, 254, 249, 1) !important;
+    transform: translateY(-1px);
+  }
+
+  /* Translation button — ghost on dark card */
+  html:not(.dark):not(.sepia):not(.night) #textTranslationBtn,
+  html:not(.dark):not(.sepia):not(.night) #imageTranslationBtn {
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: rgba(253, 254, 249, 0.85) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #textTranslationBtn:hover,
+  html:not(.dark):not(.sepia):not(.night) #imageTranslationBtn:hover {
+    background: rgba(255, 255, 255, 0.20) !important;
+  }
+
+  /* Engagement strip — frosted dark */
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline {
+    background: rgba(0, 0, 0, 0.22) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn__icon {
+    color: rgba(253, 254, 249, 0.75) !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn__label {
+    color: rgba(253, 254, 249, 0.65) !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn.heart-active .action-btn__icon {
+    color: #ff7070 !important;
+    fill: #ff7070 !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn.heart-active .action-btn__label {
+    color: #ff7070 !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn.active .action-btn__icon,
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn.active .action-btn__label {
+    color: var(--light-sea-green) !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline .w-px {
+    background: rgba(255, 255, 255, 0.14) !important;
+  }
+
+  /* Verse context on dark card */
+  html:not(.dark):not(.sepia):not(.night) .verse-context {
+    border-top-color: rgba(255, 255, 255, 0.15) !important;
+    color: rgba(253, 254, 249, 0.72) !important;
+  }
+
+  /* Personalization badge on dark card */
+  html:not(.dark):not(.sepia):not(.night) #personalizationBadge .inline-flex {
+    background: rgba(4, 183, 177, 0.2) !important;
+    color: rgba(253, 254, 249, 0.9) !important;
+  }
 
   /* ─── PWA Splash ──────────────────────────────── */
   .splash-screen {
