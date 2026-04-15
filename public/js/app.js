@@ -134,9 +134,8 @@ class ChurchTapApp {
 
   updateVersePrivateToolsVisibility() {
     const canUse = this.canUsePrivateVerseTools();
+    // Save button is always visible; favorite state updates via updateFavoriteButton()
     const favoriteBtn = document.getElementById('favoriteBtn');
-
-    // Match how "Favorites" are intended to behave: only show when logged in with an active group.
     if (favoriteBtn) favoriteBtn.classList.toggle('hidden', !canUse);
 
     if (!canUse) {
@@ -1503,6 +1502,7 @@ class ChurchTapApp {
 
     const dateNav = document.getElementById('dateNav');
     if (dateNav) dateNav.classList.add('hidden');
+    this.hideHeaderDate();
 
     const verseContainer = document.getElementById('verseContainer');
     if (verseContainer) verseContainer.classList.add('hidden');
@@ -1762,6 +1762,18 @@ class ChurchTapApp {
             <div class="menu-row__left">
               <div class="menu-row__icon">📝</div>
               <div class="text-sm font-medium" style="color: var(--ui-text);">Notes</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+        </div>
+
+        <!-- Settings -->
+        <div class="section-header">App</div>
+        <div class="page-card mx-0 px-0 py-2 mb-4">
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/menu')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">⚙️</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Settings</div>
             </div>
             <div class="menu-row__right">›</div>
           </button>
@@ -3386,13 +3398,17 @@ class ChurchTapApp {
 
     // Engagement actions
     on('heartBtn', 'click', () => this.toggleHeart());
-    on('favoriteBtn', 'click', () => this.toggleFavorite());
 
-    const addToCollectionBtn = document.getElementById('addToCollectionBtn');
-    if (addToCollectionBtn) {
-      addToCollectionBtn.addEventListener('click', () => {
-        this.showAddToCollectionModal();
+    // Unified save button: tap = favorite, long-press = collection picker
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => this.toggleFavorite());
+      let savePressTimer;
+      saveBtn.addEventListener('pointerdown', () => {
+        savePressTimer = setTimeout(() => this.showAddToCollectionModal(), 500);
       });
+      saveBtn.addEventListener('pointerup', () => clearTimeout(savePressTimer));
+      saveBtn.addEventListener('pointerleave', () => clearTimeout(savePressTimer));
     }
 
     // Note: Notes + Highlights live under the Me tab now.
@@ -3968,23 +3984,34 @@ class ChurchTapApp {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
 
-    const dateStr = dateObj.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    // Legacy hidden elements (kept for compat)
+    const legacyDate = document.getElementById('currentDate');
+    if (legacyDate) legacyDate.textContent = date;
+    const legacyDesc = document.getElementById('dateDescription');
+    if (legacyDesc) legacyDesc.textContent = date === todayStr ? "Today's Verse" : date === yesterdayStr ? "Yesterday's Verse" : "Church Tap";
 
-    document.getElementById('currentDate').textContent = dateStr;
+    // Header date display (compact, right side of header bar)
+    const headerDateBtn = document.getElementById('headerDateBtn');
+    const headerDateDay = document.getElementById('headerDateDay');
+    const headerDateSub = document.getElementById('headerDateSub');
 
-    const description = document.getElementById('dateDescription');
-    if (date === todayStr) {
-      description.textContent = "Today's Verse";
-    } else if (date === yesterdayStr) {
-      description.textContent = "Yesterday's Verse";
-    } else {
-      description.textContent = "Church Tap";
+    if (headerDateBtn && headerDateDay && headerDateSub) {
+      // e.g. "Wed, Apr 15"
+      headerDateDay.textContent = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      if (date === todayStr) {
+        headerDateSub.textContent = 'Today';
+      } else if (date === yesterdayStr) {
+        headerDateSub.textContent = 'Yesterday';
+      } else {
+        headerDateSub.textContent = dateObj.toLocaleDateString('en-US', { year: 'numeric' });
+      }
+      headerDateBtn.classList.remove('hidden');
     }
+  }
+
+  hideHeaderDate() {
+    const headerDateBtn = document.getElementById('headerDateBtn');
+    if (headerDateBtn) headerDateBtn.classList.add('hidden');
   }
 
   navigateDay(direction) {
@@ -5486,12 +5513,16 @@ class ChurchTapApp {
 
   updateFavoriteButton() {
     if (!this.currentVerse) return;
-    
+
+    // Update the unified save button (filled = saved)
+    const saveBtnIcon = document.getElementById('saveBtnIcon');
+    if (saveBtnIcon) {
+      saveBtnIcon.style.fill = this.favorites.includes(this.currentVerse.id) ? 'currentColor' : 'none';
+    }
+    // Legacy selector kept for any external callers
     const favoriteBtn = document.querySelector('#favoriteBtn svg');
-    if (this.favorites.includes(this.currentVerse.id)) {
-      favoriteBtn.style.fill = 'currentColor';
-    } else {
-      favoriteBtn.style.fill = 'none';
+    if (favoriteBtn) {
+      favoriteBtn.style.fill = this.favorites.includes(this.currentVerse.id) ? 'currentColor' : 'none';
     }
   }
 
