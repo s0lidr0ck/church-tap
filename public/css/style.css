@@ -654,6 +654,15 @@ html.dark body {
   color: var(--ui-text);
 }
 
+html.dark #app {
+  background-image:
+      radial-gradient(ellipse 140% 42% at 50% -5%, color-mix(in srgb, var(--brand-primary) 18%, transparent) 0%, transparent 65%),
+      radial-gradient(ellipse 70% 28% at 80% 85%, rgba(4, 183, 177, 0.08) 0%, transparent 55%),
+      url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc0MCcgaGVpZ2h0PSc0OCc+PGxpbmUgeDE9JzIwJyB5MT0nMTAnIHgyPScyMCcgeTI9JzQxJyBzdHJva2U9J3JnYmEoMjU1LDI1NSwyNTUsMC4wOCknIHN0cm9rZS13aWR0aD0nMS41JyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz48bGluZSB4MT0nOScgeTE9JzE4JyB4Mj0nMzEnIHkyPScxOCcgc3Ryb2tlPSdyZ2JhKDI1NSwyNTUsMjU1LDAuMDgpJyBzdHJva2Utd2lkdGg9JzEuNScgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJy8+PC9zdmc+") !important;
+  background-size: auto, auto, 40px 48px !important;
+  background-repeat: no-repeat, no-repeat, repeat !important;
+}
+
 /* ─── Sepia Theme ──────────────────────────────── */
 
 html.sepia {
@@ -692,7 +701,11 @@ html.sepia body {
 }
 
 html.sepia #app {
-  background-image: radial-gradient(ellipse 100% 45% at 50% 0%, rgba(139, 94, 46, 0.12) 0%, transparent 70%) !important;
+  background-image:
+      radial-gradient(ellipse 100% 45% at 50% 0%, rgba(139, 94, 46, 0.12) 0%, transparent 70%),
+      url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc0MCcgaGVpZ2h0PSc0OCc+PGxpbmUgeDE9JzIwJyB5MT0nMTAnIHgyPScyMCcgeTI9JzQxJyBzdHJva2U9J3JnYigxODAsMTU1LDExNSknIHN0cm9rZS13aWR0aD0nMS41JyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz48bGluZSB4MT0nOScgeTE9JzE4JyB4Mj0nMzEnIHkyPScxOCcgc3Ryb2tlPSdyZ2IoMTgwLDE1NSwxMTUpJyBzdHJva2Utd2lkdGg9JzEuNScgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJy8+PC9zdmc+") !important;
+  background-size: auto, 40px 48px !important;
+  background-repeat: no-repeat, repeat !important;
 }
 
 /* ─── Night Theme ─────────────────────────────── */
@@ -736,7 +749,10 @@ html.night #app {
   background-color: var(--ct-app-bg) !important;
   background-image:
       radial-gradient(ellipse 140% 42% at 50% -5%, rgba(18, 120, 200, 0.22) 0%, transparent 65%),
-      radial-gradient(ellipse 70% 28% at 80% 85%, rgba(4, 183, 177, 0.08) 0%, transparent 55%) !important;
+      radial-gradient(ellipse 70% 28% at 80% 85%, rgba(4, 183, 177, 0.08) 0%, transparent 55%),
+      url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc0MCcgaGVpZ2h0PSc0OCc+PGxpbmUgeDE9JzIwJyB5MT0nMTAnIHgyPScyMCcgeTI9JzQxJyBzdHJva2U9J3JnYmEoMjU1LDI1NSwyNTUsMC4wNSknIHN0cm9rZS13aWR0aD0nMS41JyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz48bGluZSB4MT0nOScgeTE9JzE4JyB4Mj0nMzEnIHkyPScxOCcgc3Ryb2tlPSdyZ2JhKDI1NSwyNTUsMjU1LDAuMDUpJyBzdHJva2Utd2lkdGg9JzEuNScgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJy8+PC9zdmc+") !important;
+  background-size: auto, auto, 40px 48px !important;
+  background-repeat: no-repeat, no-repeat, repeat !important;
 }
 
 #app {
@@ -744,7 +760,10 @@ html.night #app {
   background-image:
       radial-gradient(ellipse 140% 42% at 50% -5%, color-mix(in srgb, var(--dusk-blue) 22%, transparent) 0%, transparent 65%),
       radial-gradient(ellipse 80% 30% at 15% 55%, color-mix(in srgb, var(--light-sea-green) 7%, transparent) 0%, transparent 60%),
-      radial-gradient(ellipse 70% 25% at 85% 90%, color-mix(in srgb, var(--spicy-paprika) 5%, transparent) 0%, transparent 55%) !important;
+      radial-gradient(ellipse 70% 25% at 85% 90%, color-mix(in srgb, var(--spicy-paprika) 5%, transparent) 0%, transparent 55%),
+      url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc0MCcgaGVpZ2h0PSc0OCc+PGxpbmUgeDE9JzIwJyB5MT0nMTAnIHgyPScyMCcgeTI9JzQxJyBzdHJva2U9J3JnYigyMDAsMTk2LDE4OCknIHN0cm9rZS13aWR0aD0nMS41JyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz48bGluZSB4MT0nOScgeTE9JzE4JyB4Mj0nMzEnIHkyPScxOCcgc3Ryb2tlPSdyZ2IoMjAwLDE5NiwxODgpJyBzdHJva2Utd2lkdGg9JzEuNScgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJy8+PC9zdmc+") !important;
+  background-size: auto, auto, auto, 40px 48px !important;
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat !important;
 }
 
 .\!container {
@@ -6289,5 +6308,3 @@ html.dark {
     padding-bottom: 14rem;
   }
 }
-
-/* v-revamp-bg */
