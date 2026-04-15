@@ -107,7 +107,7 @@
 
   <!-- Admin Dashboard -->
   <div id="adminDashboard" class="hidden">
-        <div class="flex h-screen" style="background: radial-gradient(1200px 600px at 30% -10%, var(--brand-bg), color-mix(in srgb, var(--brand-primary) 10%, white))">
+        <div class="flex h-screen" style="background: var(--brand-bg);">
       <!-- Desktop Sidebar (Hidden on mobile) -->
       <div class="hidden lg:flex lg:flex-shrink-0">
         <div class="flex flex-col w-72">
@@ -411,58 +411,32 @@
       <!-- Dashboard Tab -->
       <div id="dashboardContent" class="tab-content hidden">
         <h1 class="sr-only">Dashboard</h1>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <div class="modern-card p-6">
-            <div class="flex items-center">
-              <div class="flex-shrink-0">
-                <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                  <span class="text-white text-sm">📖</span>
-                </div>
-              </div>
-              <div class="ml-5 w-0 flex-1">
-                <dl>
-                  <dt class="text-sm font-medium text-gray-500 truncate">Total Verses</dt>
-                  <dd class="text-lg font-medium text-gray-900">--</dd>
-                </dl>
-              </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,var(--brand-primary) 15%,var(--ui-surface))">📖</div>
+            <div>
+              <div class="admin-stat-label">Total Verses</div>
+              <div id="dashTotalVerses" class="admin-stat-value">--</div>
             </div>
           </div>
-          
-          <div class="modern-card p-6">
-            <div class="flex items-center">
-              <div class="flex-shrink-0">
-                <div class="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
-                  <span class="text-white text-sm">👥</span>
-                </div>
-              </div>
-              <div class="ml-5 w-0 flex-1">
-                <dl>
-                  <dt class="text-sm font-medium text-gray-500 truncate">Active Users</dt>
-                  <dd class="text-lg font-medium text-gray-900">--</dd>
-                </dl>
-              </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,var(--brand-secondary) 15%,var(--ui-surface))">👥</div>
+            <div>
+              <div class="admin-stat-label">Active Users</div>
+              <div id="dashActiveUsers" class="admin-stat-value">--</div>
             </div>
           </div>
-          
-          <div class="modern-card p-6">
-            <div class="flex items-center">
-              <div class="flex-shrink-0">
-                <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
-                  <span class="text-white text-sm">❤️</span>
-                </div>
-              </div>
-              <div class="ml-5 w-0 flex-1">
-                <dl>
-                  <dt class="text-sm font-medium text-gray-500 truncate">Total Hearts</dt>
-                  <dd class="text-lg font-medium text-gray-900">--</dd>
-                </dl>
-              </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,var(--brand-accent) 15%,var(--ui-surface))">❤️</div>
+            <div>
+              <div class="admin-stat-label">Total Hearts</div>
+              <div id="dashTotalHearts" class="admin-stat-value">--</div>
             </div>
           </div>
         </div>
         
         <div class="modern-card p-6">
-          <h3 class="text-lg font-medium text-gray-900 mb-4">🚀 Quick Actions</h3>
+          <h3 class="text-lg font-semibold mb-4" style="color:var(--ui-text)">🚀 Quick Actions</h3>
           <div class="flex flex-wrap gap-3">
             <button onclick="adminDashboard.showVerseModal()" class="btn-primary-modern">Create New Verse</button>
             <button onclick="adminDashboard.showTab('analytics')" class="btn-secondary-modern">View Analytics</button>
@@ -509,7 +483,7 @@
           <!-- Desktop Table View -->
           <div class="hidden lg:block overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 admin-table">
-              <thead class="bg-gray-50">
+              <thead class="admin-table-head">
                 <tr>
                   <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
@@ -556,7 +530,7 @@
         <!-- NFC & Tag Stats Cards -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div class="admin-stat-card">
-            <div class="admin-stat-icon" style="background:color-mix(in srgb,#3b82f6 15%,white)">📱</div>
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,var(--brand-primary) 15%,var(--ui-surface))">📱</div>
             <div>
               <div class="admin-stat-label">Total NFC Scans</div>
               <div id="totalScans" class="admin-stat-value">--</div>
@@ -564,7 +538,7 @@
           </div>
 
           <div class="admin-stat-card">
-            <div class="admin-stat-icon" style="background:color-mix(in srgb,#22c55e 15%,white)">👥</div>
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,var(--brand-secondary) 15%,var(--ui-surface))">👥</div>
             <div>
               <div class="admin-stat-label">Unique Sessions</div>
               <div id="uniqueSessions" class="admin-stat-value">--</div>
@@ -572,7 +546,7 @@
           </div>
 
           <div class="admin-stat-card">
-            <div class="admin-stat-icon" style="background:color-mix(in srgb,#a855f7 15%,white)">🏷️</div>
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,var(--brand-accent) 15%,var(--ui-surface))">🏷️</div>
             <div>
               <div class="admin-stat-label">Active Tags</div>
               <div id="activeTags" class="admin-stat-value">--</div>
@@ -580,7 +554,7 @@
           </div>
 
           <div class="admin-stat-card">
-            <div class="admin-stat-icon" style="background:color-mix(in srgb,#f59e0b 15%,white)">❤️</div>
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,var(--brand-accent) 15%,var(--ui-surface))">❤️</div>
             <div>
               <div class="admin-stat-label">Avg Engagement</div>
               <div id="avgEngagement" class="admin-stat-value">--</div>
@@ -684,7 +658,7 @@
         <!-- Community Stats -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div class="admin-stat-card">
-            <div class="admin-stat-icon" style="background:color-mix(in srgb,var(--brand-primary) 12%,white)">🙏</div>
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,var(--brand-primary) 15%,var(--ui-surface))">🙏</div>
             <div>
               <div class="admin-stat-label">Prayer Requests</div>
               <div id="totalPrayerRequests" class="admin-stat-value">--</div>
@@ -692,7 +666,7 @@
           </div>
 
           <div class="admin-stat-card">
-            <div class="admin-stat-icon" style="background:color-mix(in srgb,#f59e0b 12%,white)">🎉</div>
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,var(--brand-secondary) 15%,var(--ui-surface))">🎉</div>
             <div>
               <div class="admin-stat-label">Praise Reports</div>
               <div id="totalPraiseReports" class="admin-stat-value">--</div>
@@ -700,7 +674,7 @@
           </div>
 
           <div class="admin-stat-card">
-            <div class="admin-stat-icon" style="background:color-mix(in srgb,#8b5cf6 12%,white)">💭</div>
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,var(--brand-accent) 15%,var(--ui-surface))">💭</div>
             <div>
               <div class="admin-stat-label">Verse Insights</div>
               <div id="totalVerseInsights" class="admin-stat-value">--</div>
@@ -749,7 +723,7 @@
         <!-- User Statistics -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div class="admin-stat-card">
-            <div class="admin-stat-icon" style="background:color-mix(in srgb,#3b82f6 15%,white)">🏷️</div>
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,var(--brand-primary) 15%,var(--ui-surface))">🏷️</div>
             <div>
               <div class="admin-stat-label">Total Tags</div>
               <div id="totalTags" class="admin-stat-value">--</div>
@@ -757,7 +731,7 @@
           </div>
 
           <div class="admin-stat-card">
-            <div class="admin-stat-icon" style="background:color-mix(in srgb,#22c55e 15%,white)">⚡</div>
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,var(--brand-secondary) 15%,var(--ui-surface))">⚡</div>
             <div>
               <div class="admin-stat-label">Active Tags</div>
               <div id="activeTags" class="admin-stat-value">--</div>
@@ -765,7 +739,7 @@
           </div>
 
           <div class="admin-stat-card">
-            <div class="admin-stat-icon" style="background:color-mix(in srgb,#a855f7 15%,white)">🤝</div>
+            <div class="admin-stat-icon" style="background:color-mix(in srgb,var(--brand-accent) 15%,var(--ui-surface))">🤝</div>
             <div>
               <div class="admin-stat-label">Community Contributors</div>
               <div id="communityContributors" class="admin-stat-value">--</div>
@@ -794,8 +768,8 @@
         <!-- Users Table -->
         <div class="modern-card overflow-hidden">
           <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-medium text-gray-900">Organization Tags</h3>
-            <p class="text-sm text-gray-500">All NFC tags that have interacted with your organization</p>
+            <h3 class="text-lg font-medium" style="color:var(--ui-text)">Organization Tags</h3>
+            <p class="text-sm" style="color:var(--ui-text-muted)">All NFC tags that have interacted with your organization</p>
           </div>
 
           <!-- Loading State -->
@@ -811,15 +785,15 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
               </svg>
             </div>
-            <h3 class="text-lg font-medium text-gray-900 mb-2">No user tags yet</h3>
-            <p class="text-gray-500">When users scan NFC tags associated with your organization, they'll appear here.</p>
+            <h3 class="text-lg font-medium mb-2" style="color:var(--ui-text)">No user tags yet</h3>
+            <p style="color:var(--ui-text-muted)">When users scan NFC tags associated with your organization, they'll appear here.</p>
           </div>
 
           <!-- Users Table - Desktop -->
           <div id="usersTableContainer" class="hidden">
             <div class="overflow-x-auto max-lg:hidden">
               <table class="min-w-full divide-y divide-gray-200 admin-table">
-                <thead class="bg-gray-50">
+                <thead class="admin-table-head">
                   <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tag ID</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Activity</th>
@@ -850,7 +824,7 @@
         <h1 class="sr-only">Bracelet Requests</h1>
         <div class="mb-6 flex justify-between items-center">
           <div>
-            <h2 class="text-2xl font-bold text-gray-900">🏷️ Bracelet Requests</h2>
+            <h2 class="text-2xl font-bold" style="color:var(--ui-text)">🏷️ Bracelet Requests</h2>
             <p class="text-gray-600">Review and approve bracelet membership requests for your organization</p>
           </div>
           <div class="flex items-center space-x-3">
@@ -877,7 +851,7 @@
           <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <span class="text-2xl">🏷️</span>
           </div>
-          <h3 class="text-lg font-medium text-gray-900 mb-2">No bracelet requests</h3>
+          <h3 class="text-lg font-medium mb-2" style="color:var(--ui-text)">No bracelet requests</h3>
           <p class="text-gray-500">When users request to join your organization with their bracelets, they'll appear here for approval.</p>
         </div>
 
@@ -1257,7 +1231,7 @@
           </div>
           <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
+              <thead class="admin-table-head">
                 <tr>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start</th>
@@ -1291,7 +1265,7 @@
           </div>
           <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
+              <thead class="admin-table-head">
                 <tr>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Text</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
