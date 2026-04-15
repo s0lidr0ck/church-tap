@@ -143,25 +143,11 @@ class AdminDashboard {
       e.preventDefault();
       this.showTab('links');
     });
-    const topicsNav = document.getElementById('topicsNav');
-    if (topicsNav) {
-      topicsNav.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.showTab('topics');
-      });
-    }
     const fundraisingNav = document.getElementById('fundraisingNav');
     if (fundraisingNav) {
       fundraisingNav.addEventListener('click', (e) => {
         e.preventDefault();
         this.showTab('fundraising');
-      });
-    }
-    const playlistNav = document.getElementById('playlistNav');
-    if (playlistNav) {
-      playlistNav.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.showTab('playlist');
       });
     }
     const eventsNav = document.getElementById('eventsNav');
@@ -744,9 +730,7 @@ class AdminDashboard {
       'users': 'Users',
       'braceletRequests': 'Bracelet Requests',
       'links': 'Links',
-      'topics': 'Topics',
       'fundraising': 'Fundraising',
-      'playlist': 'Worship Playlist',
       'verseImport': 'Verse Import',
       'events': 'Events',
       'cta': 'CTA Banner',
@@ -770,12 +754,8 @@ class AdminDashboard {
       this.loadBraceletRequests();
     } else if (tabName === 'links') {
       this.loadOrganizationLinks();
-    } else if (tabName === 'topics') {
-      this.loadTopicsAdmin();
     } else if (tabName === 'fundraising') {
       this.loadFundraisingAdmin();
-    } else if (tabName === 'playlist') {
-      this.loadWorshipPlaylistAdmin();
     } else if (tabName === 'verseImport') {
       this.loadVerseImportSettings();
     } else if (tabName === 'events') {
@@ -4359,294 +4339,6 @@ class AdminDashboard {
   // ===========================
   // Topics (Emergency Scripture) - Admin
   // ===========================
-  async loadTopicsAdmin() {
-    try {
-      // Load default (master) topics for enable/disable
-      const defRes = await fetch('/api/admin/organization/default-topics');
-      const defData = await defRes.json().catch(() => null);
-      this.defaultTopics = defData?.success ? (defData.topics || []) : [];
-      this.renderDefaultTopicsAdmin();
-
-      const res = await fetch('/api/admin/organization/topics');
-      const data = await res.json().catch(() => null);
-      this.topics = data?.success ? (data.topics || []) : [];
-
-      // Wire buttons (once)
-      const createBtn = document.getElementById('createTopicBtn');
-      if (createBtn && !createBtn.dataset.wired) {
-        createBtn.dataset.wired = '1';
-        createBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          this.createTopicFromForm();
-        });
-      }
-
-      const addVerseBtn = document.getElementById('addTopicVerseBtn');
-      if (addVerseBtn && !addVerseBtn.dataset.wired) {
-        addVerseBtn.dataset.wired = '1';
-        addVerseBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          this.addTopicVerseFromForm();
-        });
-      }
-
-      this.renderTopicsAdmin();
-
-      // If a topic is already selected, refresh its verses
-      if (this.selectedTopicId) {
-        await this.loadTopicVersesAdmin(this.selectedTopicId);
-      } else {
-        this.renderTopicVersesAdmin([]);
-      }
-    } catch (e) {
-      console.error('Error loading topics:', e);
-      this.topics = [];
-      this.defaultTopics = [];
-      this.renderDefaultTopicsAdmin();
-      this.renderTopicsAdmin();
-      this.renderTopicVersesAdmin([]);
-    }
-  }
-
-  renderDefaultTopicsAdmin() {
-    const noMsg = document.getElementById('noDefaultTopicsMessage');
-    const table = document.getElementById('defaultTopicsTableContainer');
-    const body = document.getElementById('defaultTopicsTableBody');
-    if (!noMsg || !table || !body) return;
-
-    const topics = Array.isArray(this.defaultTopics) ? this.defaultTopics : [];
-    if (topics.length === 0) {
-      noMsg.classList.remove('hidden');
-      table.classList.add('hidden');
-      body.innerHTML = '';
-      return;
-    }
-
-    noMsg.classList.add('hidden');
-    table.classList.remove('hidden');
-
-    body.innerHTML = topics.map(t => `
-      <tr class="hover:bg-gray-50">
-        <td class="px-4 py-3 text-sm font-medium text-gray-900">${this.escapeHtml(t.name)}</td>
-        <td class="px-4 py-3 text-sm text-gray-700">${t.verse_count ?? 0}</td>
-        <td class="px-4 py-3 text-sm text-gray-700">
-          <input type="checkbox" ${t.is_enabled ? 'checked' : ''}
-                 onchange="adminDashboard.setDefaultTopicEnabled(${t.id}, this.checked)"
-                 class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded">
-        </td>
-      </tr>
-    `).join('');
-  }
-
-  async setDefaultTopicEnabled(templateId, enabled) {
-    try {
-      const res = await fetch(`/api/admin/organization/default-topics/${templateId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_enabled: !!enabled })
-      });
-      const data = await res.json().catch(() => null);
-      if (!data?.success) throw new Error(data?.error || 'Failed to update');
-      this.showToast('Default topic updated', 'success');
-      await this.loadTopicsAdmin();
-    } catch (e) {
-      console.error('Error updating default topic:', e);
-      this.showToast(e.message || 'Failed to update default topic', 'error');
-    }
-  }
-
-  renderTopicsAdmin() {
-    const noMsg = document.getElementById('noTopicsMessage');
-    const table = document.getElementById('topicsTableContainer');
-    const body = document.getElementById('topicsTableBody');
-
-    if (!body || !noMsg || !table) return;
-
-    const topics = Array.isArray(this.topics) ? this.topics : [];
-    if (topics.length === 0) {
-      noMsg.classList.remove('hidden');
-      table.classList.add('hidden');
-      body.innerHTML = '';
-      return;
-    }
-
-    noMsg.classList.add('hidden');
-    table.classList.remove('hidden');
-
-    body.innerHTML = topics.map(t => {
-      const isSelected = this.selectedTopicId === t.id;
-      const rowCls = isSelected ? 'bg-blue-50' : 'hover:bg-gray-50';
-      return `
-        <tr class="${rowCls}">
-          <td class="px-4 py-3 text-sm font-medium text-gray-900">
-            <button class="text-left hover:underline" onclick="adminDashboard.selectTopic(${t.id}, '${this.escapeHtml(t.name)}')">
-              ${this.escapeHtml(t.name)}
-            </button>
-          </td>
-          <td class="px-4 py-3 text-sm text-gray-700">${t.verse_count ?? 0}</td>
-          <td class="px-4 py-3 text-right text-sm">
-            <button class="text-red-600 hover:text-red-900 font-medium" onclick="adminDashboard.deleteTopic(${t.id})">Delete</button>
-          </td>
-        </tr>
-      `;
-    }).join('');
-  }
-
-  async createTopicFromForm() {
-    const nameEl = document.getElementById('topicNameInput');
-    const descEl = document.getElementById('topicDescInput');
-    const name = (nameEl?.value || '').trim();
-    const description = (descEl?.value || '').trim();
-
-    if (!name) {
-      this.showToast('Topic name is required', 'error');
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/admin/organization/topics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description })
-      });
-      const data = await res.json().catch(() => null);
-      if (!data?.success) throw new Error(data?.error || 'Failed to create topic');
-
-      if (nameEl) nameEl.value = '';
-      if (descEl) descEl.value = '';
-      this.showToast('Topic created', 'success');
-      await this.loadTopicsAdmin();
-    } catch (e) {
-      console.error('Error creating topic:', e);
-      this.showToast(e.message || 'Failed to create topic', 'error');
-    }
-  }
-
-  async deleteTopic(topicId) {
-    if (!confirm('Delete this topic and all its verses?')) return;
-    try {
-      const res = await fetch(`/api/admin/organization/topics/${topicId}`, { method: 'DELETE' });
-      const data = await res.json().catch(() => null);
-      if (!data?.success) throw new Error(data?.error || 'Failed to delete topic');
-
-      if (this.selectedTopicId === topicId) {
-        this.selectedTopicId = null;
-        const nameEl = document.getElementById('selectedTopicName');
-        if (nameEl) nameEl.textContent = 'None';
-        this.renderTopicVersesAdmin([]);
-      }
-
-      this.showToast('Topic deleted', 'success');
-      await this.loadTopicsAdmin();
-    } catch (e) {
-      console.error('Error deleting topic:', e);
-      this.showToast(e.message || 'Failed to delete topic', 'error');
-    }
-  }
-
-  async selectTopic(topicId, topicName) {
-    this.selectedTopicId = topicId;
-    const nameEl = document.getElementById('selectedTopicName');
-    if (nameEl) nameEl.textContent = topicName || 'Selected';
-    this.renderTopicsAdmin();
-    await this.loadTopicVersesAdmin(topicId);
-  }
-
-  async loadTopicVersesAdmin(topicId) {
-    try {
-      const res = await fetch(`/api/admin/organization/topics/${topicId}/verses`);
-      const data = await res.json().catch(() => null);
-      const verses = data?.success ? (data.verses || []) : [];
-      this.renderTopicVersesAdmin(verses);
-    } catch (e) {
-      console.error('Error loading topic verses:', e);
-      this.renderTopicVersesAdmin([]);
-    }
-  }
-
-  renderTopicVersesAdmin(verses) {
-    const noMsg = document.getElementById('noTopicVersesMessage');
-    const table = document.getElementById('topicVersesTableContainer');
-    const body = document.getElementById('topicVersesTableBody');
-    if (!noMsg || !table || !body) return;
-
-    if (!this.selectedTopicId) {
-      noMsg.classList.remove('hidden');
-      table.classList.add('hidden');
-      body.innerHTML = '';
-      return;
-    }
-
-    const rows = Array.isArray(verses) ? verses : [];
-    if (rows.length === 0) {
-      noMsg.classList.remove('hidden');
-      table.classList.add('hidden');
-      body.innerHTML = '';
-      return;
-    }
-
-    noMsg.classList.add('hidden');
-    table.classList.remove('hidden');
-
-    body.innerHTML = rows.map(v => `
-      <tr class="hover:bg-gray-50">
-        <td class="px-4 py-3 text-sm text-gray-900">${this.escapeHtml(v.bible_reference)}</td>
-        <td class="px-4 py-3 text-sm text-gray-700">${this.escapeHtml(v.translation_code || '')}</td>
-        <td class="px-4 py-3 text-right text-sm">
-          <button class="text-red-600 hover:text-red-900 font-medium" onclick="adminDashboard.deleteTopicVerse(${this.selectedTopicId}, ${v.id})">Remove</button>
-        </td>
-      </tr>
-    `).join('');
-  }
-
-  async addTopicVerseFromForm() {
-    if (!this.selectedTopicId) {
-      this.showToast('Select a topic first', 'error');
-      return;
-    }
-    const refEl = document.getElementById('topicVerseReference');
-    const trEl = document.getElementById('topicVerseTranslation');
-    const bible_reference = (refEl?.value || '').trim();
-    const translation_code = (trEl?.value || '').trim();
-
-    if (!bible_reference) {
-      this.showToast('Bible reference is required', 'error');
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/admin/organization/topics/${this.selectedTopicId}/verses`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bible_reference, translation_code: translation_code || null })
-      });
-      const data = await res.json().catch(() => null);
-      if (!data?.success) throw new Error(data?.error || 'Failed to add verse');
-
-      if (refEl) refEl.value = '';
-      if (trEl) trEl.value = '';
-      this.showToast('Verse added', 'success');
-      await this.loadTopicsAdmin();
-    } catch (e) {
-      console.error('Error adding topic verse:', e);
-      this.showToast(e.message || 'Failed to add verse', 'error');
-    }
-  }
-
-  async deleteTopicVerse(topicId, verseId) {
-    if (!confirm('Remove this verse from the topic?')) return;
-    try {
-      const res = await fetch(`/api/admin/organization/topics/${topicId}/verses/${verseId}`, { method: 'DELETE' });
-      const data = await res.json().catch(() => null);
-      if (!data?.success) throw new Error(data?.error || 'Failed to remove verse');
-      this.showToast('Verse removed', 'success');
-      await this.loadTopicsAdmin();
-    } catch (e) {
-      console.error('Error removing topic verse:', e);
-      this.showToast(e.message || 'Failed to remove verse', 'error');
-    }
-  }
-
   // ===========================
   // Fundraising - Admin
   // ===========================
@@ -4721,55 +4413,6 @@ class AdminDashboard {
   // ===========================
   // Worship Playlist - Admin
   // ===========================
-  async loadWorshipPlaylistAdmin() {
-    try {
-      const res = await fetch('/api/admin/organization/worship-playlist');
-      const data = await res.json().catch(() => null);
-      const p = data?.success ? (data.playlist || null) : null;
-
-      const titleEl = document.getElementById('playlistTitle');
-      const urlEl = document.getElementById('playlistUrl');
-      const activeEl = document.getElementById('playlistIsActive');
-
-      if (titleEl) titleEl.value = p?.title || 'Worship Playlist';
-      if (urlEl) urlEl.value = p?.youtube_url || '';
-      if (activeEl) activeEl.checked = p ? (p.is_active !== false) : true;
-
-      const saveBtn = document.getElementById('savePlaylistBtn');
-      if (saveBtn && !saveBtn.dataset.wired) {
-        saveBtn.dataset.wired = '1';
-        saveBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          this.saveWorshipPlaylistAdmin();
-        });
-      }
-    } catch (e) {
-      console.error('Error loading worship playlist:', e);
-      this.showToast('Failed to load playlist', 'error');
-    }
-  }
-
-  async saveWorshipPlaylistAdmin() {
-    try {
-      const title = (document.getElementById('playlistTitle')?.value || 'Worship Playlist').trim() || 'Worship Playlist';
-      const youtube_url = (document.getElementById('playlistUrl')?.value || '').trim();
-      const is_active = document.getElementById('playlistIsActive')?.checked !== false;
-      if (!youtube_url) throw new Error('YouTube URL is required');
-
-      const res = await fetch('/api/admin/organization/worship-playlist', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, youtube_url, is_active })
-      });
-      const data = await res.json().catch(() => null);
-      if (!data?.success) throw new Error(data?.error || 'Failed to save playlist');
-
-      this.showToast('Playlist saved', 'success');
-    } catch (e) {
-      console.error('Error saving worship playlist:', e);
-      this.showToast(e.message || 'Failed to save playlist', 'error');
-    }
-  }
 }
 
 // Initialize admin dashboard
