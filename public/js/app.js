@@ -5833,6 +5833,154 @@ class ChurchTapApp {
     if (backdrop) { backdrop.classList.remove('open'); }
   }
 
+  // ── Community card long-press ──────────────────────────────────────────────
+
+  setupCommunityLongPress(container) {
+    if (!container) return;
+    const cards = container.querySelectorAll('.community-card');
+    cards.forEach(card => {
+      let timer = null;
+      let didLongPress = false;
+
+      const start = (e) => {
+        didLongPress = false;
+        timer = setTimeout(() => {
+          didLongPress = true;
+          if (navigator.vibrate) navigator.vibrate(40);
+          const type    = card.dataset.communityType;
+          const id      = card.dataset.communityId;
+          const content = card.dataset.communityContent;
+          this.showCommunityActionSheet(type, id, content);
+        }, 500);
+      };
+
+      const cancel = (e) => {
+        clearTimeout(timer);
+      };
+
+      const preventTap = (e) => {
+        if (didLongPress) { e.preventDefault(); e.stopPropagation(); didLongPress = false; }
+      };
+
+      card.addEventListener('touchstart',  start,      { passive: true });
+      card.addEventListener('touchend',    cancel,     { passive: true });
+      card.addEventListener('touchmove',   cancel,     { passive: true });
+      card.addEventListener('mousedown',   start);
+      card.addEventListener('mouseup',     cancel);
+      card.addEventListener('mouseleave',  cancel);
+      card.addEventListener('click',       preventTap, { capture: true });
+    });
+  }
+
+  showCommunityActionSheet(type, id, content) {
+    const typeConfig = {
+      prayer:  { label: 'Prayer Request', icon: '🙏', primaryFn: `prayForRequest(${id})`,    primaryLabel: 'Pray for this',    color: '#3b82f6' },
+      praise:  { label: 'Praise Report',  icon: '🎉', primaryFn: `celebrateReport(${id})`,  primaryLabel: 'Celebrate this',   color: '#f59e0b' },
+      insight: { label: 'Verse Insight',  icon: '💡', primaryFn: `heartInsight(${id}, this)`, primaryLabel: 'Heart this',      color: '#a855f7' },
+    };
+    const cfg = typeConfig[type] || typeConfig.prayer;
+
+    // Quick emoji reactions (stored in memory, no backend required)
+    const quickEmojis = ['❤️','🙌','🔥','😢','😮','💪'];
+    const storedReactions = this.communityReactions?.[`${type}_${id}`] || {};
+
+    const emojiButtons = quickEmojis.map(emoji => {
+      const count = storedReactions[emoji] || 0;
+      const picked = storedReactions[`_picked_${emoji}`];
+      return `
+        <button class="community-emoji-btn ${picked ? 'picked' : ''}"
+                onclick="window.churchTapApp.addCommunityReaction('${type}', '${id}', '${emoji}'); window.churchTapApp.closeActionSheet();"
+                style="display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 10px; border-radius:12px; border:none; background: ${picked ? 'var(--ui-primary-muted, #e0f0ff)' : 'var(--ui-surface-2)'}; cursor:pointer; transition: transform 0.1s, background 0.2s; font-size:24px; line-height:1;">
+          <span>${emoji}</span>
+          ${count > 0 ? `<span style="font-size:10px; color:var(--ui-text-muted);">${count}</span>` : ''}
+        </button>
+      `;
+    }).join('');
+
+    const preview = content.length > 80 ? content.slice(0, 77) + '…' : content;
+
+    this.showActionSheet(`
+      <div class="ct-sheet-handle"></div>
+      <div class="px-4 pt-3 pb-4">
+        <div class="flex items-center gap-2 mb-3">
+          <span style="font-size:18px;">${cfg.icon}</span>
+          <span class="text-xs font-semibold" style="color:var(--ui-text-muted); text-transform:uppercase; letter-spacing:0.06em;">${cfg.label}</span>
+        </div>
+        <p class="text-sm mb-4 leading-relaxed" style="color:var(--ui-text-secondary); font-style:italic;">"${this.escapeHtml(preview)}"</p>
+
+        <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
+          ${emojiButtons}
+        </div>
+        <div style="height:1px; background:var(--ui-border); margin-bottom:12px;"></div>
+
+        <div class="grid gap-0" style="grid-template-columns: 1fr 1fr;">
+          <button class="ct-sheet-action-btn"
+                  onclick="window.churchTapApp.${cfg.primaryFn}; window.churchTapApp.closeActionSheet();">
+            <span class="icon">${cfg.icon}</span>
+            <span class="label">${cfg.primaryLabel}</span>
+          </button>
+          <button class="ct-sheet-action-btn"
+                  onclick="window.churchTapApp.shareCommunityPost('${type}', \`${this.escapeHtml(content)}\`); window.churchTapApp.closeActionSheet();">
+            <span class="icon">↗️</span>
+            <span class="label">Share</span>
+          </button>
+        </div>
+
+        <div class="mt-3">
+          <button class="w-full py-2.5 rounded-xl text-sm font-medium"
+                  style="background:var(--ui-surface-2); color:var(--ui-text-muted);"
+                  onclick="window.churchTapApp.closeActionSheet();">Cancel</button>
+        </div>
+      </div>
+    `);
+  }
+
+  addCommunityReaction(type, id, emoji) {
+    const key = `${type}_${id}`;
+    if (!this.communityReactions) this.communityReactions = {};
+    if (!this.communityReactions[key]) this.communityReactions[key] = {};
+    const reactions = this.communityReactions[key];
+    const pickedKey = `_picked_${emoji}`;
+    if (reactions[pickedKey]) {
+      // Toggle off
+      reactions[emoji] = Math.max(0, (reactions[emoji] || 1) - 1);
+      delete reactions[pickedKey];
+    } else {
+      reactions[emoji] = (reactions[emoji] || 0) + 1;
+      reactions[pickedKey] = true;
+    }
+    // Re-render the reaction bar on the card
+    const card = document.querySelector(`.community-card[data-community-type="${type}"][data-community-id="${id}"]`);
+    if (card) {
+      const bar = card.querySelector('.community-reaction-bar');
+      if (bar) bar.outerHTML = this.buildReactionBar(reactions);
+    }
+    this.showToast(`${emoji} reacted!`);
+  }
+
+  buildReactionBar(reactions) {
+    if (!reactions) return '';
+    const entries = Object.entries(reactions)
+      .filter(([k, v]) => !k.startsWith('_picked_') && v > 0);
+    if (entries.length === 0) return '<div class="community-reaction-bar" style="min-height:0;"></div>';
+    const chips = entries.map(([emoji, count]) => `
+      <span style="display:inline-flex; align-items:center; gap:3px; background:var(--ui-surface-2); border-radius:999px; padding:2px 8px; font-size:13px;">
+        ${emoji}<span style="font-size:11px; color:var(--ui-text-muted);">${count}</span>
+      </span>
+    `).join('');
+    return `<div class="community-reaction-bar" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px;">${chips}</div>`;
+  }
+
+  async shareCommunityPost(type, content) {
+    const typeLabel = { prayer: 'Prayer Request', praise: 'Praise Report', insight: 'Verse Insight' }[type] || 'Post';
+    const text = `${typeLabel} from our church community:\n\n"${content}"`;
+    if (navigator.share) {
+      try { await navigator.share({ text }); } catch(e) { /* cancelled */ }
+    } else {
+      try { await navigator.clipboard.writeText(text); this.showToast('Copied to clipboard'); } catch(e) { this.showToast('Unable to share'); }
+    }
+  }
+
   showVerseActionSheet() {
     const canUse = this.canUsePrivateVerseTools();
     const currentKey = String(this.currentHighlightKey || '').trim().toLowerCase();
@@ -8792,10 +8940,15 @@ class ChurchTapApp {
     
     container.innerHTML = prayerRequests.map(request => {
       const hasUserPrayed = this.userInteractions[`prayer_${request.id}`];
+      const reactions = this.communityReactions?.[`prayer_${request.id}`] || {};
+      const reactionBar = this.buildReactionBar(reactions);
       
       return `
-        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+        <div class="community-card bg-gray-50 dark:bg-gray-700 rounded-xl p-4 select-none"
+             data-community-type="prayer" data-community-id="${request.id}"
+             data-community-content="${this.escapeHtml(request.content)}">
           <p class="text-gray-800 dark:text-gray-200 text-sm mb-3 leading-relaxed">${this.escapeHtml(request.content)}</p>
+          ${reactionBar}
           <div class="flex items-center justify-between">
             <span class="text-xs text-gray-500 dark:text-gray-400">
               ${this.formatTimeAgo(request.created_at)}
@@ -8817,6 +8970,7 @@ class ChurchTapApp {
         </div>
       `;
     }).join('');
+    this.setupCommunityLongPress(container);
   }
 
   displayVerseInsights(verseInsights) {
@@ -8824,9 +8978,13 @@ class ChurchTapApp {
     
     container.innerHTML = verseInsights.map(insight => {
       const hasUserHearted = this.userInteractions[`insight_${insight.id}`];
+      const reactions = this.communityReactions?.[`insight_${insight.id}`] || {};
+      const reactionBar = this.buildReactionBar(reactions);
       
       return `
-        <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
+        <div class="community-card bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 select-none"
+             data-community-type="insight" data-community-id="${insight.id}"
+             data-community-content="${this.escapeHtml(insight.content)}">
           <div class="flex items-start justify-between mb-2">
             <span class="text-xs text-purple-600 dark:text-purple-400 font-medium">${insight.verse_reference || 'Today\'s Verse'}</span>
             <div class="flex items-center space-x-1">
@@ -8837,12 +8995,14 @@ class ChurchTapApp {
             </div>
           </div>
           <p class="text-gray-800 dark:text-gray-200 text-sm mb-3 leading-relaxed">${this.escapeHtml(insight.content)}</p>
+          ${reactionBar}
           <div class="text-xs text-gray-500">
             ${new Date(insight.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
           </div>
         </div>
       `;
     }).join('');
+    this.setupCommunityLongPress(container);
   }
 
   displayPraiseReports(praiseReports) {
@@ -8850,10 +9010,15 @@ class ChurchTapApp {
     
     container.innerHTML = praiseReports.map(report => {
       const hasUserCelebrated = this.userInteractions[`celebration_${report.id}`];
+      const reactions = this.communityReactions?.[`praise_${report.id}`] || {};
+      const reactionBar = this.buildReactionBar(reactions);
       
       return `
-        <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
+        <div class="community-card bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 select-none"
+             data-community-type="praise" data-community-id="${report.id}"
+             data-community-content="${this.escapeHtml(report.content)}">
           <p class="text-gray-800 dark:text-gray-200 text-sm mb-3 leading-relaxed">${this.escapeHtml(report.content)}</p>
+          ${reactionBar}
           <div class="flex items-center justify-between">
             <span class="text-xs text-gray-500 dark:text-gray-400">
               ${this.formatTimeAgo(report.created_at)}
@@ -8875,6 +9040,7 @@ class ChurchTapApp {
         </div>
       `;
     }).join('');
+    this.setupCommunityLongPress(container);
   }
 
   showEmptyCommunity() {

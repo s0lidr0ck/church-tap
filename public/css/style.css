@@ -994,6 +994,18 @@ html.night #app {
 
 /* ─── Community Cards ─────────────────────────── */
 
+.community-card {
+  background-color: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 1rem;
+  padding: 1rem;
+  transition: box-shadow 0.2s ease;
+}
+
+.community-card:hover {
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--brand-black) 8%, transparent);
+}
+
 /* ─── Submit Community Buttons ────────────────── */
 
 .submit-btn {
