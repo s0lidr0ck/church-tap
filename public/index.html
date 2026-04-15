@@ -143,10 +143,18 @@
           </svg>
         </div>
 
-        <!-- Header right: group name or nothing -->
-        <div id="headerGroupChip" class="hidden">
-          <div class="text-xs font-semibold px-3 py-1 rounded-full" style="background: color-mix(in srgb, var(--brand-primary) 10%, var(--ct-app-bg)); color: var(--brand-primary);">
-            <span id="headerGroupName"></span>
+        <!-- Header right: date + group chip -->
+        <div class="flex items-center gap-2">
+          <!-- Compact date (Today tab only) -->
+          <button id="headerDateBtn" class="hidden text-right leading-tight" onclick="window.churchTapApp?.showDatePicker?.()" aria-label="Browse dates">
+            <div id="headerDateDay" class="text-xs font-semibold" style="color: var(--ui-text);"></div>
+            <div id="headerDateSub" class="text-xs" style="color: var(--ui-text-muted);"></div>
+          </button>
+          <!-- Group chip -->
+          <div id="headerGroupChip" class="hidden">
+            <div class="text-xs font-semibold px-3 py-1 rounded-full" style="background: color-mix(in srgb, var(--brand-primary) 10%, var(--ct-app-bg)); color: var(--brand-primary);">
+              <span id="headerGroupName"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -157,18 +165,19 @@
     ════════════════════════════════════════════════ -->
     <main class="pb-28">
 
-      <!-- ── Date Navigator ─────────────────────── -->
-      <div id="dateNav" class="px-4 pt-3 pb-1">
+      <!-- ── Date Navigator (hidden elements kept for JS compatibility) -->
+      <div id="dateNav" class="hidden">
+        <div id="currentDate"></div>
+        <div id="dateDescription"></div>
+        <div id="todayEventPill" class="hidden"><span id="todayEventPillText"></span></div>
+      </div>
+      <!-- Event pill shown in main content when there's a church event today -->
+      <div id="todayEventBanner" class="hidden px-4 pt-2">
         <div class="max-w-lg mx-auto">
-          <button id="datePickerBtn" class="date-nav-btn" aria-label="Browse dates">
-            <div id="currentDate" class="date-title"></div>
-            <div id="dateDescription" class="date-subtitle">Today's Verse</div>
-            <!-- Event pill -->
-            <div id="todayEventPill" class="hidden mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold" style="background: color-mix(in srgb, var(--brand-primary) 10%, var(--ct-app-bg)); color: var(--brand-primary);">
-              <span class="w-1.5 h-1.5 rounded-full" style="background: var(--brand-primary);"></span>
-              <span id="todayEventPillText">Event today</span>
-            </div>
-          </button>
+          <div id="todayEventBannerInner" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold" style="background: color-mix(in srgb, var(--brand-primary) 10%, var(--ct-app-bg)); color: var(--brand-primary);">
+            <span class="w-1.5 h-1.5 rounded-full" style="background: var(--brand-primary);"></span>
+            <span id="todayEventBannerText">Event today</span>
+          </div>
         </div>
       </div>
 
@@ -204,10 +213,7 @@
 
             <!-- ── Text Verse ──────────────────── -->
             <div id="textVerse" class="hidden">
-              <!-- Opening ornament -->
-              <div class="text-center mb-3" aria-hidden="true">
-                <span style="font-size: 1.6rem; color: var(--brand-secondary); opacity: 0.6; line-height: 1;">&ldquo;</span>
-              </div>
+
               <blockquote id="verseText" class="verse-text mb-5" style="font-family: 'Lora', Georgia, serif;"></blockquote>
 
               <!-- Reference row (unified — JS fills both mobile & desktop spans) -->
@@ -218,7 +224,7 @@
               </div>
 
               <!-- Chapter / Translation buttons -->
-              <div class="flex gap-2 mb-4">
+              <div class="flex gap-2 mb-0">
                 <button id="textChapterBtn"
                         onclick="app.readFullChapter(app.currentVerse?.bible_reference)"
                         class="verse-action-link flex-1 justify-center"
@@ -239,7 +245,7 @@
               </div>
 
               <!-- Context (collapsed by default, JS shows it) -->
-              <div id="verseContext" class="verse-context hidden"></div>
+              <div id="verseContext" class="verse-context hidden mt-3"></div>
             </div>
 
             <!-- ── Image Verse ──────────────────── -->
@@ -270,6 +276,36 @@
               <div id="imageContext" class="verse-context hidden mt-4 text-left"></div>
             </div>
 
+            <!-- Engagement strip — sits below both text and image verse variants -->
+            <div id="engagementStripInline" class="flex items-center justify-center gap-1 mt-3 px-0 py-2 rounded-2xl" style="background: var(--ui-surface-2); border: 1px solid var(--ui-border);">
+              <button id="heartBtn" class="action-btn flex-1" aria-label="Like this verse">
+                <svg class="action-btn__icon heart-btn" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                </svg>
+                <span id="heartCount" class="action-btn__label" aria-live="polite">0</span>
+              </button>
+              <div class="w-px h-8" style="background: var(--ui-border);"></div>
+              <button id="saveBtn" class="action-btn flex-1" aria-label="Save this verse">
+                <svg id="saveBtnIcon" class="action-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3-7 3V5z"/>
+                </svg>
+                <span class="action-btn__label">Save</span>
+              </button>
+              <div class="w-px h-8" style="background: var(--ui-border);"></div>
+              <button id="topicsBtn" class="action-btn flex-1" aria-label="Browse topics">
+                <svg class="action-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                </svg>
+                <span class="action-btn__label">Topics</span>
+              </button>
+              <button id="randomVerseBtn" class="action-btn flex-1 hidden" aria-label="Get random verse">
+                <svg class="action-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                <span class="action-btn__label">Random</span>
+              </button>
+            </div>
+
             <!-- Personalization Badge -->
             <div id="personalizationBadge" class="hidden mt-4 mb-1">
               <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
@@ -279,8 +315,8 @@
               </div>
             </div>
 
-            <!-- Verse Tags -->
-            <div id="verseTags" class="flex flex-wrap gap-1.5 mt-4 hidden"></div>
+            <!-- Verse Tags (hidden — chips removed per UX decision) -->
+            <div id="verseTags" class="hidden"></div>
 
           </div><!-- /verseContent -->
 
@@ -295,60 +331,8 @@
         </div><!-- /verse-container -->
       </div><!-- /verseContainer -->
 
-      <!-- ── Engagement Actions ──────────────────── -->
-      <div id="engagementActions" class="px-4 mt-3 hidden">
-        <div class="max-w-lg mx-auto">
-          <div class="flex items-center justify-center gap-1 px-2 py-2 rounded-2xl" style="background: var(--ui-surface); border: 1px solid var(--ui-border);">
-
-            <!-- Heart -->
-            <button id="heartBtn" class="action-btn flex-1" aria-label="Like this verse">
-              <svg class="action-btn__icon heart-btn" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
-              </svg>
-              <span id="heartCount" class="action-btn__label" aria-live="polite">0</span>
-            </button>
-
-            <!-- Divider -->
-            <div class="w-px h-8" style="background: var(--ui-border);"></div>
-
-            <!-- Favorite (hidden until logged in) -->
-            <button id="favoriteBtn" class="action-btn flex-1 hidden" aria-label="Favorite this verse">
-              <svg class="action-btn__icon" style="color: #e8b84d;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
-              </svg>
-              <span class="action-btn__label">Favorite</span>
-            </button>
-
-            <!-- Save to Collection -->
-            <button id="addToCollectionBtn" class="action-btn flex-1" aria-label="Save to a collection">
-              <svg class="action-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3-7 3V5z"/>
-              </svg>
-              <span class="action-btn__label">Save</span>
-            </button>
-
-            <!-- Divider -->
-            <div class="w-px h-8" style="background: var(--ui-border);"></div>
-
-            <!-- Topics -->
-            <button id="topicsBtn" class="action-btn flex-1" aria-label="Browse topics">
-              <svg class="action-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
-              </svg>
-              <span class="action-btn__label">Topics</span>
-            </button>
-
-            <!-- Random (hidden by default) -->
-            <button id="randomVerseBtn" class="action-btn flex-1 hidden" aria-label="Get random verse">
-              <svg class="action-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
-              <span class="action-btn__label">Random</span>
-            </button>
-
-          </div>
-        </div>
-      </div>
+      <!-- Engagement strip moved into verse card (above) — this outer wrapper kept for JS show/hide compat -->
+      <div id="engagementActions" class="hidden" aria-hidden="true" style="display:none!important;"></div>
 
       <!-- ── Community Section ───────────────────── -->
       <div id="communitySection" class="px-4 mt-5 hidden">
@@ -465,12 +449,8 @@
           <span class="nav-item__label" data-tab-label="links">Links</span>
         </button>
 
-        <button id="menuToggle" data-tab="menu" class="nav-item" aria-label="Menu" aria-expanded="false">
-          <svg data-tab-icon="menu" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/>
-          </svg>
-          <span class="nav-item__label" data-tab-label="menu">Settings</span>
-        </button>
+        <!-- Settings moved to Me tab -->
+        <button id="menuToggle" data-tab="menu" class="nav-item hidden" aria-label="Menu" aria-expanded="false" aria-hidden="true"></button>
 
         <button id="tabMeBtn" data-tab="me" class="nav-item" aria-label="Me">
           <svg data-tab-icon="me" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
