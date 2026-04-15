@@ -614,6 +614,10 @@ class AdminDashboard {
         orgContextEl.textContent = this.currentAdmin.organization_name;
         orgContextEl.classList.add('text-brand-muted');
       }
+      const orgContextDesktopEl = document.getElementById('organizationContextDesktop');
+      if (orgContextDesktopEl) {
+        orgContextDesktopEl.textContent = this.currentAdmin.organization_name;
+      }
       
       // Update page title to include organization
       document.title = `${this.currentAdmin.organization_name} - Daily Verse Admin`;
@@ -699,11 +703,12 @@ class AdminDashboard {
   }
 
   showTab(tabName) {
-    // Update sidebar navigation
+    // Update sidebar navigation (desktop) — safely, since some tabs don't have nav items
     document.querySelectorAll('.nav-item').forEach(btn => {
       btn.classList.remove('active');
     });
-    document.getElementById(`${tabName}Nav`).classList.add('active');
+    const navEl = document.getElementById(`${tabName}Nav`);
+    if (navEl) navEl.classList.add('active');
 
     // Update content
     document.querySelectorAll('.tab-content').forEach(content => {
@@ -712,22 +717,45 @@ class AdminDashboard {
     
     document.getElementById(`${tabName}Content`).classList.remove('hidden');
 
+    // Update bottom nav active state (mobile)
+    const primaryTabs = ['dashboard', 'verses', 'community', 'analytics'];
+    document.querySelectorAll('.admin-bottom-tab').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    if (primaryTabs.includes(tabName)) {
+      const bottomTab = document.querySelector(`.admin-bottom-tab[data-tab="${tabName}"]`);
+      if (bottomTab) bottomTab.classList.add('active');
+    } else {
+      // Show "More" as active for secondary tabs
+      const moreBtn = document.getElementById('adminMoreBtn');
+      if (moreBtn) moreBtn.classList.add('active');
+    }
+
+    // Scroll to top of content
+    const mainContent = document.getElementById('adminMainContent');
+    if (mainContent) mainContent.scrollTop = 0;
+
     // Update page title
     const titleMap = {
       'dashboard': 'Dashboard',
       'verses': 'Manage Verses',
       'analytics': 'Analytics Dashboard', 
-      'community': 'Community Management',
-      'users': 'User Management',
+      'community': 'Community',
+      'users': 'Users',
       'braceletRequests': 'Bracelet Requests',
-      'links': 'Organization Links',
+      'links': 'Links',
       'topics': 'Topics',
       'fundraising': 'Fundraising',
       'playlist': 'Worship Playlist',
       'verseImport': 'Verse Import',
+      'events': 'Events',
+      'cta': 'CTA Banner',
       'settings': 'Settings'
     };
-    document.getElementById('pageTitle').textContent = titleMap[tabName] || 'Dashboard';
+    const titleText = titleMap[tabName] || 'Dashboard';
+    document.getElementById('pageTitle').textContent = titleText;
+    const desktopTitle = document.getElementById('pageTitleDesktop');
+    if (desktopTitle) desktopTitle.textContent = titleText;
 
     // Load data for specific tabs
     if (tabName === 'dashboard') {
@@ -787,6 +815,22 @@ class AdminDashboard {
         mobileNavItem.classList.add('active');
       }
     }
+  }
+
+  openMoreDrawer() {
+    const overlay = document.getElementById('adminMoreOverlay');
+    const drawer = document.getElementById('adminMoreDrawer');
+    if (overlay) overlay.classList.add('open');
+    if (drawer) drawer.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  closeMoreDrawer() {
+    const overlay = document.getElementById('adminMoreOverlay');
+    const drawer = document.getElementById('adminMoreDrawer');
+    if (overlay) overlay.classList.remove('open');
+    if (drawer) drawer.classList.remove('open');
+    document.body.style.overflow = '';
   }
 
   async loadVerses() {
@@ -2300,6 +2344,16 @@ class AdminDashboard {
             badge.classList.remove('hidden');
           } else {
             badge.classList.add('hidden');
+          }
+        }
+        // Also update more drawer badge
+        const drawerBadge = document.getElementById('moreDrawerBraceletBadge');
+        if (drawerBadge) {
+          if (pendingCount > 0) {
+            drawerBadge.textContent = pendingCount;
+            drawerBadge.classList.remove('hidden');
+          } else {
+            drawerBadge.classList.add('hidden');
           }
         }
       } else {
