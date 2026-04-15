@@ -1,0 +1,6 @@
+# CSS is pre-compiled and committed — skip the Tailwind rebuild during deploy
+[phases.build]
+cmds = []
+
+[start]
+cmd = "node server.js"
