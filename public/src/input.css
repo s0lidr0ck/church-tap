@@ -60,9 +60,10 @@
     --ui-secondary-hover: color-mix(in srgb, var(--brand-secondary) 85%, black);
 
     /* ─── Verse card ────────────────────────────── */
-    --verse-card-bg: #ffffff;
-    --verse-card-gradient: linear-gradient(155deg, #1278c8 0%, #055089 42%, #033460 100%);
-    --verse-card-shadow: 0 12px 48px -8px rgba(3, 52, 96, 0.55), 0 4px 16px rgba(3, 52, 96, 0.25);
+    --verse-card-bg: rgba(5, 80, 137, 0.28);
+    --verse-card-gradient: rgba(5, 80, 137, 0.28);
+    --verse-card-shadow: 0 8px 32px rgba(3, 52, 96, 0.28), 0 2px 8px rgba(3, 52, 96, 0.14);
+    --verse-card-border: 1px solid rgba(255, 255, 255, 0.28);
     --verse-text-color: var(--porcelain);
 
     /* ─── Bottom nav ────────────────────────────── */
@@ -100,9 +101,10 @@
     --ui-secondary-hover: color-mix(in srgb, var(--brand-secondary) 85%, white);
 
     /* Verse card in dark mode */
-    --verse-card-bg: var(--ui-surface);
-    --verse-card-gradient: var(--ui-surface);
-    --verse-card-shadow: 0 4px 32px -8px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3);
+    --verse-card-bg: rgba(13, 26, 46, 0.55);
+    --verse-card-gradient: rgba(13, 26, 46, 0.55);
+    --verse-card-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
+    --verse-card-border: 1px solid rgba(255, 255, 255, 0.1);
     --verse-text-color: var(--brand-bg);
 
     /* Nav in dark mode */
@@ -149,9 +151,10 @@
     --ui-secondary: #6b8c6e;
     --ui-secondary-hover: #547057;
 
-    --verse-card-bg: #faf5eb;
-    --verse-card-gradient: linear-gradient(155deg, #fdf8ee 0%, #faf5eb 60%, #f5edd8 100%);
-    --verse-card-shadow: 0 4px 32px -8px rgba(107,62,30,0.18), 0 1px 4px rgba(107,62,30,0.08);
+    --verse-card-bg: rgba(253, 248, 238, 0.5);
+    --verse-card-gradient: rgba(253, 248, 238, 0.5);
+    --verse-card-shadow: 0 8px 32px rgba(107,62,30,0.22), 0 2px 8px rgba(107,62,30,0.1);
+    --verse-card-border: 1px solid rgba(255, 255, 255, 0.55);
     --verse-text-color: #2e1c0a;
 
     --nav-bg: rgba(243,237,224,0.95);
@@ -198,9 +201,10 @@
     --ui-secondary: #2e8b7a;
     --ui-secondary-hover: #40a890;
 
-    --verse-card-bg: #0d1a2e;
-    --verse-card-gradient: linear-gradient(155deg, #0f2240 0%, #0d1a2e 60%, #080f1c 100%);
-    --verse-card-shadow: 0 4px 32px -8px rgba(0,0,0,0.6), 0 1px 4px rgba(0,0,0,0.5);
+    --verse-card-bg: rgba(8, 15, 28, 0.65);
+    --verse-card-gradient: rgba(8, 15, 28, 0.65);
+    --verse-card-shadow: 0 8px 32px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.5);
+    --verse-card-border: 1px solid rgba(255, 255, 255, 0.07);
     --verse-text-color: #c8dcf0;
 
     --nav-bg: rgba(8,15,28,0.97);
@@ -261,9 +265,11 @@
     background: var(--verse-card-gradient, var(--verse-card-bg));
     box-shadow: var(--verse-card-shadow);
     border-radius: 1.5rem;
-    border: none;
+    border: var(--verse-card-border, none);
     position: relative;
     overflow: hidden;
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
     @apply p-6 mx-4 my-6;
     transition: box-shadow 0.3s ease;
   }
