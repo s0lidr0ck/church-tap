@@ -604,8 +604,9 @@ body {
   --ui-secondary-hover: color-mix(in srgb, var(--brand-secondary) 85%, black);
   /* ─── Verse card ────────────────────────────── */
   --verse-card-bg: #ffffff;
-  --verse-card-shadow: 0 4px 32px -8px rgba(5, 80, 137, 0.13), 0 1px 4px rgba(5, 80, 137, 0.06);
-  --verse-text-color: var(--coffee-bean);
+  --verse-card-gradient: linear-gradient(155deg, #1278c8 0%, #055089 42%, #033460 100%);
+  --verse-card-shadow: 0 12px 48px -8px rgba(3, 52, 96, 0.55), 0 4px 16px rgba(3, 52, 96, 0.25);
+  --verse-text-color: var(--porcelain);
   /* ─── Bottom nav ────────────────────────────── */
   --nav-bg: rgba(253, 254, 249, 0.94);
   --nav-border: rgba(196, 202, 208, 0.5);
@@ -636,6 +637,7 @@ html.dark {
   --ui-secondary-hover: color-mix(in srgb, var(--brand-secondary) 85%, white);
   /* Verse card in dark mode */
   --verse-card-bg: var(--ui-surface);
+  --verse-card-gradient: var(--ui-surface);
   --verse-card-shadow: 0 4px 32px -8px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3);
   --verse-text-color: var(--brand-bg);
   /* Nav in dark mode */
@@ -671,6 +673,7 @@ html.sepia {
   --ui-secondary: #6b8c6e;
   --ui-secondary-hover: #547057;
   --verse-card-bg: #faf5eb;
+  --verse-card-gradient: linear-gradient(155deg, #fdf8ee 0%, #faf5eb 60%, #f5edd8 100%);
   --verse-card-shadow: 0 4px 32px -8px rgba(107,62,30,0.18), 0 1px 4px rgba(107,62,30,0.08);
   --verse-text-color: #2e1c0a;
   --nav-bg: rgba(243,237,224,0.95);
@@ -686,6 +689,10 @@ html.sepia {
 html.sepia body {
   background-color: var(--ct-app-bg);
   color: var(--ui-text);
+}
+
+html.sepia #app {
+  background-image: radial-gradient(ellipse 100% 45% at 50% 0%, rgba(139, 94, 46, 0.12) 0%, transparent 70%) !important;
 }
 
 /* ─── Night Theme ─────────────────────────────── */
@@ -707,6 +714,7 @@ html.night {
   --ui-secondary: #2e8b7a;
   --ui-secondary-hover: #40a890;
   --verse-card-bg: #0d1a2e;
+  --verse-card-gradient: linear-gradient(155deg, #0f2240 0%, #0d1a2e 60%, #080f1c 100%);
   --verse-card-shadow: 0 4px 32px -8px rgba(0,0,0,0.6), 0 1px 4px rgba(0,0,0,0.5);
   --verse-text-color: #c8dcf0;
   --nav-bg: rgba(8,15,28,0.97);
@@ -726,11 +734,12 @@ html.night body {
 
 html.night #app {
   background-color: var(--ct-app-bg) !important;
+  background-image: radial-gradient(ellipse 100% 45% at 50% 0%, rgba(30, 60, 100, 0.25) 0%, transparent 70%) !important;
 }
 
 #app {
   background-color: var(--ct-app-bg) !important;
-  background-image: none !important;
+  background-image: radial-gradient(ellipse 100% 45% at 50% 0%, color-mix(in srgb, var(--brand-primary) 10%, transparent) 0%, transparent 75%) !important;
 }
 
 .\!container {
@@ -796,16 +805,44 @@ html.night #app {
 /* Legacy alias (used in JS templates) */
 
 .verse-container {
-  background-color: var(--verse-card-bg);
+  background: var(--verse-card-gradient, var(--verse-card-bg));
   box-shadow: var(--verse-card-shadow);
-  border-radius: 1.25rem;
-  border: 1px solid var(--ui-border);
+  border-radius: 1.5rem;
+  border: none;
+  position: relative;
+  overflow: hidden;
   margin-left: 1rem;
   margin-right: 1rem;
   margin-top: 1.5rem;
   margin-bottom: 1.5rem;
   padding: 1.5rem;
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  transition: box-shadow 0.3s ease;
+}
+
+/* Decorative watermark cross inside the verse card */
+
+.verse-container::before {
+  content: "✝";
+  position: absolute;
+  right: -0.5rem;
+  top: -1.5rem;
+  font-size: 11rem;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 0;
+  color: rgba(255, 255, 255, 0.045);
+  font-family: Georgia, serif;
+  font-style: normal;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+}
+
+/* Ensure verse content renders above the watermark */
+
+.verse-container > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* ─── Verse Typography ────────────────────────── */
@@ -813,28 +850,24 @@ html.night #app {
 .verse-text {
   font-family: 'Georgia', 'Times New Roman', serif;
   color: var(--verse-text-color);
-  line-height: 1.75;
+  line-height: 1.9;
   text-align: center;
-  font-size: 1.25rem;
-  line-height: 1.75rem;
-  letter-spacing: -0.01em;
+  font-size: 1.2rem;
+  letter-spacing: 0.005em;
   font-style: italic;
   transition: font-size 0.2s ease;
 }
 
 .verse-text.size-small {
-  font-size: 1rem;
-  line-height: 1.5rem;
+  font-size: 0.95rem;
 }
 
 .verse-text.size-medium {
-  font-size: 1.25rem;
-  line-height: 1.75rem;
+  font-size: 1.2rem;
 }
 
 .verse-text.size-large {
-  font-size: 1.5rem;
-  line-height: 2rem;
+  font-size: 1.45rem;
 }
 
 .verse-reference {
@@ -911,6 +944,14 @@ html.night #app {
 .btn-primary {
   background-color: var(--ui-primary);
   color: var(--ui-on-primary);
+}
+
+html:not(.dark):not(.sepia):not(.night) #personalizationBadge .btn-primary {
+  background: rgba(4, 183, 177, 0.2);
+  color: rgba(253, 254, 249, 0.9);
+}
+
+.btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -945,6 +986,14 @@ html.night #app {
   background-color: var(--ui-surface);
   color: var(--ui-text);
   border: 1px solid var(--ui-border);
+}
+
+html:not(.dark):not(.sepia):not(.night) #personalizationBadge .btn-secondary {
+  background: rgba(4, 183, 177, 0.2);
+  color: rgba(253, 254, 249, 0.9);
+}
+
+.btn-secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -971,6 +1020,14 @@ html.night #app {
   background: transparent;
   color: var(--ui-primary);
   border: 1.5px solid var(--ui-primary);
+}
+
+html:not(.dark):not(.sepia):not(.night) #personalizationBadge .btn-outline {
+  background: rgba(4, 183, 177, 0.2);
+  color: rgba(253, 254, 249, 0.9);
+}
+
+.btn-outline {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1014,17 +1071,25 @@ html.night #app {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 12px 8px;
-  border-radius: 14px;
-  font-weight: 600;
-  font-size: 0.75rem;
-  letter-spacing: 0.02em;
+  gap: 6px;
+  padding: 16px 8px;
+  border-radius: 18px;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
   transition: all 0.18s ease;
   touch-action: manipulation;
   border: none;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  color: white;
+}
+
+.submit-btn .text-2xl,
+  .submit-btn span[style*="font-size: 1.25rem"],
+  .submit-btn span:first-child {
+  font-size: 1.6rem !important;
+  line-height: 1;
 }
 
 .submit-btn:active {
@@ -1032,33 +1097,33 @@ html.night #app {
 }
 
 .submit-btn--prayer {
-  background: color-mix(in srgb, var(--brand-primary) 10%, var(--ui-surface));
-  color: var(--brand-primary);
-  border: 1.5px solid color-mix(in srgb, var(--brand-primary) 25%, transparent);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--brand-primary) 85%, #1278c8), var(--brand-primary));
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--brand-primary) 35%, transparent);
 }
 
 .submit-btn--prayer:hover {
-  background: color-mix(in srgb, var(--brand-primary) 16%, var(--ui-surface));
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--brand-primary) 45%, transparent);
+  transform: translateY(-1px);
 }
 
 .submit-btn--praise {
-  background: color-mix(in srgb, var(--light-sea-green) 12%, var(--ui-surface));
-  color: color-mix(in srgb, var(--light-sea-green) 80%, black);
-  border: 1.5px solid color-mix(in srgb, var(--light-sea-green) 28%, transparent);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--light-sea-green) 80%, #00d4ce), var(--light-sea-green));
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--light-sea-green) 35%, transparent);
 }
 
 .submit-btn--praise:hover {
-  background: color-mix(in srgb, var(--light-sea-green) 20%, var(--ui-surface));
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--light-sea-green) 45%, transparent);
+  transform: translateY(-1px);
 }
 
 .submit-btn--insight {
-  background: color-mix(in srgb, var(--spicy-paprika) 10%, var(--ui-surface));
-  color: var(--spicy-paprika);
-  border: 1.5px solid color-mix(in srgb, var(--spicy-paprika) 25%, transparent);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--spicy-paprika) 80%, #ff7040), var(--spicy-paprika));
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--spicy-paprika) 35%, transparent);
 }
 
 .submit-btn--insight:hover {
-  background: color-mix(in srgb, var(--spicy-paprika) 16%, var(--ui-surface));
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--spicy-paprika) 45%, transparent);
+  transform: translateY(-1px);
 }
 
 /* ─── Bottom Navigation ────────────────────────── */
@@ -1454,6 +1519,14 @@ html.dark #textTranslationBtn,
 
 .btn-primary-modern {
   background-color: var(--brand-accent);
+}
+
+html:not(.dark):not(.sepia):not(.night) #personalizationBadge .btn-primary-modern {
+  background: rgba(4, 183, 177, 0.2);
+  color: rgba(253, 254, 249, 0.9);
+}
+
+.btn-primary-modern {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -1483,6 +1556,11 @@ html.dark #textTranslationBtn,
 
 .btn-primary-modern:hover, .btn-primary-modern:active {
   background-color: var(--brand-primary);
+}
+
+html:not(.dark):not(.sepia):not(.night) #personalizationBadge .btn-secondary-modern {
+  background: rgba(4, 183, 177, 0.2);
+  color: rgba(253, 254, 249, 0.9);
 }
 
 .btn-secondary-modern {
@@ -1583,6 +1661,11 @@ html.dark #textTranslationBtn,
   background-color: rgb(31 41 55 / 0.8);
 }
 
+html:not(.dark):not(.sepia):not(.night) #personalizationBadge .status-badge {
+  background: rgba(4, 183, 177, 0.2);
+  color: rgba(253, 254, 249, 0.9);
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -1639,6 +1722,93 @@ html.dark #textTranslationBtn,
 .avatar-brand {
   background-color: var(--brand-primary) !important;
   color: #fff !important;
+}
+
+/* ─── Default-theme dark verse card overrides ─── */
+
+/* The verse card is deep blue in the default theme — adapt all inner elements */
+
+html:not(.dark):not(.sepia):not(.night) .verse-reference {
+  color: var(--light-sea-green) !important;
+  font-size: 0.8rem !important;
+  letter-spacing: 0.06em !important;
+}
+
+/* Chapter button — light pill on dark card */
+
+html:not(.dark):not(.sepia):not(.night) #textChapterBtn,
+  html:not(.dark):not(.sepia):not(.night) #imageChapterBtn {
+  background: rgba(253, 254, 249, 0.92) !important;
+  color: var(--dusk-blue) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+}
+
+html:not(.dark):not(.sepia):not(.night) #textChapterBtn:hover,
+  html:not(.dark):not(.sepia):not(.night) #imageChapterBtn:hover {
+  background: rgba(253, 254, 249, 1) !important;
+  transform: translateY(-1px);
+}
+
+/* Translation button — ghost on dark card */
+
+html:not(.dark):not(.sepia):not(.night) #textTranslationBtn,
+  html:not(.dark):not(.sepia):not(.night) #imageTranslationBtn {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: rgba(253, 254, 249, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+}
+
+html:not(.dark):not(.sepia):not(.night) #textTranslationBtn:hover,
+  html:not(.dark):not(.sepia):not(.night) #imageTranslationBtn:hover {
+  background: rgba(255, 255, 255, 0.20) !important;
+}
+
+/* Engagement strip — frosted dark */
+
+html:not(.dark):not(.sepia):not(.night) #engagementStripInline {
+  background: rgba(0, 0, 0, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn__icon {
+  color: rgba(253, 254, 249, 0.75) !important;
+}
+
+html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn__label {
+  color: rgba(253, 254, 249, 0.65) !important;
+}
+
+html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn.heart-active .action-btn__icon {
+  color: #ff7070 !important;
+  fill: #ff7070 !important;
+}
+
+html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn.heart-active .action-btn__label {
+  color: #ff7070 !important;
+}
+
+html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn.active .action-btn__icon,
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn.active .action-btn__label {
+  color: var(--light-sea-green) !important;
+}
+
+html:not(.dark):not(.sepia):not(.night) #engagementStripInline .w-px {
+  background: rgba(255, 255, 255, 0.14) !important;
+}
+
+/* Verse context on dark card */
+
+html:not(.dark):not(.sepia):not(.night) .verse-context {
+  border-top-color: rgba(255, 255, 255, 0.15) !important;
+  color: rgba(253, 254, 249, 0.72) !important;
+}
+
+/* Personalization badge on dark card */
+
+html:not(.dark):not(.sepia):not(.night) #personalizationBadge .inline-flex {
+  background: rgba(4, 183, 177, 0.2) !important;
+  color: rgba(253, 254, 249, 0.9) !important;
 }
 
 /* ─── PWA Splash ──────────────────────────────── */
@@ -5013,6 +5183,20 @@ html.dark {
 
  #exploreReadTile .focus\:text-gray-600:focus, #exploreStudyTile .focus\:text-gray-600:focus {
   color: var(--brand-bg) !important;
+}
+
+@media (min-width: 768px) {
+  html:not(.dark):not(.sepia):not(.night) #personalizationBadge .md\:inline-flex {
+    background: rgba(4, 183, 177, 0.2) !important;
+    color: rgba(253, 254, 249, 0.9) !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  html:not(.dark):not(.sepia):not(.night) #personalizationBadge .lg\:inline-flex {
+    background: rgba(4, 183, 177, 0.2) !important;
+    color: rgba(253, 254, 249, 0.9) !important;
+  }
 }
 
 .file\:mr-4::file-selector-button {
