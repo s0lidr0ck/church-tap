@@ -414,23 +414,109 @@
 
   /* ─── Community Cards ─────────────────────────── */
   .community-card {
-    background-color: var(--ui-surface);
+    background: var(--ui-surface);
     border: 1px solid var(--ui-border);
-    border-radius: 1rem;
-    padding: 1rem;
-    transition: box-shadow 0.2s ease;
+    border-radius: 1.1rem;
+    padding: 1rem 1.1rem;
+    transition: box-shadow 0.2s ease, transform 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
   }
-  .community-card:hover {
-    box-shadow: 0 2px 12px color-mix(in srgb, var(--brand-black) 8%, transparent);
+  .community-card:active {
+    transform: scale(0.985);
   }
   .community-card--prayer {
+    background: color-mix(in srgb, var(--card-prayer-accent) 7%, var(--ui-surface));
     border-left: 3px solid var(--card-prayer-accent);
+    border-color: color-mix(in srgb, var(--card-prayer-accent) 18%, var(--ui-border));
   }
   .community-card--praise {
+    background: color-mix(in srgb, var(--card-praise-accent) 7%, var(--ui-surface));
     border-left: 3px solid var(--card-praise-accent);
+    border-color: color-mix(in srgb, var(--card-praise-accent) 18%, var(--ui-border));
   }
   .community-card--insight {
+    background: color-mix(in srgb, var(--card-insight-accent) 7%, var(--ui-surface));
     border-left: 3px solid var(--card-insight-accent);
+    border-color: color-mix(in srgb, var(--card-insight-accent) 18%, var(--ui-border));
+  }
+
+  /* Interaction button inside community cards */
+  .community-interact-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    transition: all 0.15s ease;
+    border: none;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .community-interact-btn--pray {
+    background: var(--brand-primary);
+    color: white;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--brand-primary) 30%, transparent);
+  }
+  .community-interact-btn--pray:hover {
+    background: color-mix(in srgb, var(--brand-primary) 85%, black);
+    box-shadow: 0 3px 12px color-mix(in srgb, var(--brand-primary) 40%, transparent);
+    transform: translateY(-1px);
+  }
+  .community-interact-btn--pray-done {
+    background: color-mix(in srgb, var(--brand-primary) 12%, var(--ui-surface));
+    color: var(--brand-primary);
+    cursor: default;
+  }
+  .community-interact-btn--celebrate {
+    background: var(--card-praise-accent);
+    color: white;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--card-praise-accent) 30%, transparent);
+  }
+  .community-interact-btn--celebrate:hover {
+    background: color-mix(in srgb, var(--card-praise-accent) 85%, black);
+    transform: translateY(-1px);
+  }
+  .community-interact-btn--celebrate-done {
+    background: color-mix(in srgb, var(--card-praise-accent) 12%, var(--ui-surface));
+    color: color-mix(in srgb, var(--card-praise-accent) 80%, black);
+    cursor: default;
+  }
+  .community-interact-btn--heart {
+    background: color-mix(in srgb, var(--card-insight-accent) 10%, var(--ui-surface));
+    color: var(--card-insight-accent);
+  }
+  .community-interact-btn--heart:hover {
+    background: color-mix(in srgb, var(--card-insight-accent) 18%, var(--ui-surface));
+    transform: scale(1.05);
+  }
+  .community-interact-btn--heart-done {
+    background: color-mix(in srgb, #ef4444 10%, var(--ui-surface));
+    color: #ef4444;
+    cursor: default;
+  }
+
+  /* Section sub-header (Prayer Requests, Verse Insights, etc.) */
+  .community-section-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 4px 0;
+    margin-bottom: 10px;
+  }
+  .community-section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--ui-border);
+    opacity: 0.7;
   }
 
   /* ─── Submit Community Buttons ────────────────── */
@@ -1417,6 +1503,169 @@
   border-left: 2px solid rgba(255,255,255,0.7);
 }
 .admin-sidebar .nav-item.active .nav-icon { color: white; }
+
+/* ── Admin Bottom Navigation (mobile) ──────────────────────── */
+.admin-bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(180deg, var(--brand-primary) 0%, color-mix(in srgb, var(--brand-primary) 85%, black) 100%);
+  display: flex;
+  align-items: stretch;
+  height: 62px;
+  z-index: 50;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-shadow: 0 -2px 16px rgba(0,0,0,0.18);
+}
+.admin-bottom-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.6);
+  font-size: 10px;
+  font-weight: 500;
+  gap: 3px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 6px 2px;
+  transition: color 0.15s, background 0.15s;
+  min-width: 0;
+  letter-spacing: 0.01em;
+  -webkit-tap-highlight-color: transparent;
+}
+.admin-bottom-tab svg { width: 22px; height: 22px; flex-shrink: 0; }
+.admin-bottom-tab:active { background: rgba(255,255,255,0.08); }
+.admin-bottom-tab.active { color: #fff; }
+.admin-bottom-tab.active svg { filter: drop-shadow(0 0 4px rgba(255,255,255,0.4)); }
+.admin-bottom-tab-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px; }
+
+/* Badge on bottom tab */
+.admin-bottom-tab-badge {
+  position: absolute;
+  top: 6px; right: calc(50% - 14px);
+  min-width: 16px; height: 16px;
+  background: #ef4444;
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+}
+
+/* More drawer overlay */
+.admin-more-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 45;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+.admin-more-overlay.open { opacity: 1; pointer-events: auto; }
+
+/* More drawer sheet */
+.admin-more-drawer {
+  position: fixed;
+  bottom: 62px; left: 0; right: 0;
+  background: white;
+  border-radius: 18px 18px 0 0;
+  z-index: 46;
+  padding: 16px 16px 8px;
+  transform: translateY(100%);
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.admin-more-drawer.open { transform: translateY(0); }
+.admin-more-drawer-handle {
+  width: 36px; height: 4px;
+  background: #d1d5db;
+  border-radius: 2px;
+  margin: 0 auto 14px;
+}
+.admin-more-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 12px;
+  border-radius: 12px;
+  color: #1f2937;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+  border: none; background: none; width: 100%; text-align: left;
+}
+.admin-more-item:active, .admin-more-item:hover { background: #f3f4f6; }
+.admin-more-item svg { width: 20px; height: 20px; color: var(--brand-primary); flex-shrink: 0; }
+.admin-more-item-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--brand-primary) 12%, transparent);
+  flex-shrink: 0;
+}
+.admin-more-item-icon svg { color: var(--brand-primary); }
+.admin-more-section-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: #9ca3af;
+  padding: 4px 12px 8px;
+}
+
+/* Admin stat cards — unified */
+.admin-stat-card {
+  @apply rounded-xl shadow-sm border p-5 flex items-center gap-4;
+  background: white;
+  border-color: color-mix(in srgb, var(--brand-muted) 60%, white);
+}
+.admin-stat-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  font-size: 20px;
+}
+.admin-stat-label { font-size: 13px; color: #6b7280; font-weight: 500; }
+.admin-stat-value { font-size: 22px; font-weight: 700; color: #111827; line-height: 1.1; }
+
+/* Admin page header */
+.admin-page-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  margin-bottom: 20px; flex-wrap: wrap;
+}
+.admin-page-title { font-size: 22px; font-weight: 700; color: #111827; line-height: 1.2; }
+.admin-page-subtitle { font-size: 14px; color: #6b7280; margin-top: 2px; }
+
+/* Main content area needs bottom padding when bottom nav shows */
+@media (max-width: 1023px) {
+  #adminMainContent { padding-bottom: 80px !important; }
+}
+
+/* Admin section cards (replace bare bg-white shadow) */
+.admin-section-card {
+  @apply rounded-xl shadow-sm border overflow-hidden;
+  background: white;
+  border-color: color-mix(in srgb, var(--brand-muted) 60%, white);
+}
+.admin-section-card-header {
+  @apply px-5 py-4 border-b;
+  border-color: color-mix(in srgb, var(--brand-muted) 40%, white);
+}
+.admin-section-card-title { font-size: 16px; font-weight: 600; color: #111827; }
+.admin-section-card-subtitle { font-size: 13px; color: #6b7280; margin-top: 2px; }
+
+/* Modal backgrounds — clean white */
+.admin-modal-inner {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
 
 /* Make sure active state text stays visible on admin sidebar */
 #masterPageTitle { color: #374151; }
