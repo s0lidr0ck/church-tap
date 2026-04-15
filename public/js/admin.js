@@ -2293,25 +2293,13 @@ class AdminDashboard {
 
   renderDashboard(stats) {
     console.log('Rendering dashboard with stats:', stats);
-    // Update dashboard statistics cards
-    const dashboardContent = document.getElementById('dashboardContent');
-    if (dashboardContent) {
-      const statsCards = dashboardContent.querySelectorAll('dd');
-      console.log('Found', statsCards.length, 'stat cards');
-      
-      if (statsCards.length >= 3) {
-        statsCards[0].textContent = (stats.total_verses || 0).toLocaleString();
-        statsCards[1].textContent = (stats.active_users || 0).toLocaleString();
-        statsCards[2].textContent = (stats.total_hearts || 0).toLocaleString();
-        console.log('Updated dashboard cards with:', {
-          verses: stats.total_verses,
-          users: stats.active_users,
-          hearts: stats.total_hearts
-        });
-      }
-    } else {
-      console.error('Dashboard content element not found');
-    }
+    const setEl = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    };
+    setEl('dashTotalVerses', (stats.total_verses || 0).toLocaleString());
+    setEl('dashActiveUsers', (stats.active_users || 0).toLocaleString());
+    setEl('dashTotalHearts', (stats.total_hearts || 0).toLocaleString());
   }
 
   async loadBraceletRequests() {
