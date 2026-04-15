@@ -14,15 +14,15 @@
   }
 
   :root {
-    /* Palette tokens */
-    --dusk-blue: #055089;         /* primary */
-    --porcelain: #FDFEF9;         /* background */
-    --light-sea-green: #04b7b1;   /* secondary */
-    --coffee-bean: #14080e;       /* dark surface / text */
-    --spicy-paprika: #eb5e28;     /* accent / attention */
-    --french-gray: #C4CAD0;       /* muted gray */
+    /* ─── Palette tokens ────────────────────────── */
+    --dusk-blue: #055089;
+    --porcelain: #FDFEF9;
+    --light-sea-green: #04b7b1;
+    --coffee-bean: #14080e;
+    --spicy-paprika: #eb5e28;
+    --french-gray: #C4CAD0;
 
-    /* Brand tokens (used throughout UI) */
+    /* ─── Brand tokens ──────────────────────────── */
     --brand-primary: var(--dusk-blue);
     --brand-secondary: var(--light-sea-green);
     --brand-accent: var(--spicy-paprika);
@@ -30,22 +30,21 @@
     --brand-muted: var(--french-gray);
     --brand-success: var(--light-sea-green);
     --brand-black: var(--coffee-bean);
-    /* Sidebar menu text color: defaults to background for high contrast on dark menu */
     --menu-text: var(--brand-bg);
 
-    /* Logo tokens */
-    --ct-logo-church: #055089; /* Light: Church */
-    --ct-logo-tap: #04b7b1;    /* Both: Tap */
+    /* ─── Logo tokens ───────────────────────────── */
+    --ct-logo-church: #055089;
+    --ct-logo-tap: #04b7b1;
 
-    /* App background tokens */
+    /* ─── App background ────────────────────────── */
     --ct-app-bg: var(--brand-bg);
 
-    /* UI semantic tokens (light) */
+    /* ─── UI semantic tokens (light) ───────────── */
     --ui-text: var(--brand-black);
-    --ui-text-muted: color-mix(in srgb, var(--brand-black) 65%, var(--brand-muted));
-    --ui-border: color-mix(in srgb, var(--brand-muted) 70%, var(--brand-bg));
+    --ui-text-muted: color-mix(in srgb, var(--brand-black) 55%, var(--brand-muted));
+    --ui-border: color-mix(in srgb, var(--brand-muted) 60%, var(--brand-bg));
     --ui-surface: #ffffff;
-    --ui-surface-2: color-mix(in srgb, #ffffff 70%, var(--brand-bg));
+    --ui-surface-2: color-mix(in srgb, #ffffff 80%, var(--brand-bg));
 
     /* Primary action */
     --ui-primary: var(--brand-primary);
@@ -59,263 +58,1063 @@
     /* Secondary */
     --ui-secondary: var(--brand-secondary);
     --ui-secondary-hover: color-mix(in srgb, var(--brand-secondary) 85%, black);
+
+    /* ─── Verse card ────────────────────────────── */
+    --verse-card-bg: #1278c8;
+    --verse-card-gradient: linear-gradient(155deg, #1278c8 0%, #055089 42%, #033460 100%);
+    --verse-card-shadow: 0 12px 48px -8px rgba(3, 52, 96, 0.5), 0 4px 16px rgba(3, 52, 96, 0.22);
+    --verse-card-border: none;
+    --verse-text-color: var(--porcelain);
+
+    /* ─── Bottom nav ────────────────────────────── */
+    --nav-bg: rgba(253, 254, 249, 0.94);
+    --nav-border: rgba(196, 202, 208, 0.5);
+    --nav-active-color: var(--brand-primary);
+    --nav-inactive-color: color-mix(in srgb, var(--brand-black) 40%, var(--brand-muted));
+
+    /* ─── Header ────────────────────────────────── */
+    --header-bg: rgba(253, 254, 249, 0.92);
+
+    /* ─── Community cards ───────────────────────── */
+    --card-prayer-accent: var(--brand-primary);
+    --card-praise-accent: var(--light-sea-green);
+    --card-insight-accent: var(--spicy-paprika);
   }
 
   html.dark {
-    --ct-logo-church: #FDFEF9; /* Dark: Church */
+    --ct-logo-church: #FDFEF9;
     --ct-app-bg: var(--brand-black);
 
-    /* UI semantic tokens (dark) */
     --ui-text: var(--brand-bg);
-    --ui-text-muted: color-mix(in srgb, var(--brand-bg) 75%, var(--brand-black));
-    --ui-border: color-mix(in srgb, var(--brand-bg) 14%, var(--brand-black));
-
-    /* Surfaces: much darker (10% Dusk Blue / 90% Coffee Bean) */
+    --ui-text-muted: color-mix(in srgb, var(--brand-bg) 65%, var(--brand-black));
+    --ui-border: color-mix(in srgb, var(--brand-bg) 11%, var(--brand-black));
     --ui-surface: color-mix(in srgb, var(--brand-primary) 10%, var(--brand-black));
-    --ui-surface-2: color-mix(in srgb, var(--brand-primary) 7%, var(--brand-black));
+    --ui-surface-2: color-mix(in srgb, var(--brand-primary) 6%, var(--brand-black));
 
-    /* Primary action on Coffee Bean background */
     --ui-primary: var(--brand-primary);
     --ui-primary-hover: color-mix(in srgb, var(--brand-primary) 85%, white);
     --ui-on-primary: var(--brand-bg);
 
-    /* Accent/secondary on dark */
     --ui-accent: var(--brand-accent);
     --ui-accent-hover: color-mix(in srgb, var(--brand-accent) 85%, white);
     --ui-secondary: var(--brand-secondary);
     --ui-secondary-hover: color-mix(in srgb, var(--brand-secondary) 85%, white);
+
+    /* Verse card in dark mode */
+    --verse-card-bg: rgba(13, 26, 46, 0.55);
+    --verse-card-gradient: rgba(13, 26, 46, 0.55);
+    --verse-card-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
+    --verse-card-border: 1px solid rgba(255, 255, 255, 0.1);
+    --verse-text-color: var(--brand-bg);
+
+    /* Nav in dark mode */
+    --nav-bg: rgba(20, 8, 14, 0.96);
+    --nav-border: color-mix(in srgb, var(--brand-bg) 10%, var(--brand-black));
+    --nav-active-color: var(--light-sea-green);
+    --nav-inactive-color: color-mix(in srgb, var(--brand-bg) 38%, var(--brand-black));
+
+    /* Header in dark */
+    --header-bg: rgba(20, 8, 14, 0.94);
   }
 
   html.dark body {
     background-color: var(--ct-app-bg);
     color: var(--ui-text);
   }
+  html.dark #app {
+    background-image:
+      radial-gradient(ellipse 140% 42% at 50% -5%, color-mix(in srgb, var(--brand-primary) 18%, transparent) 0%, transparent 65%),
+      radial-gradient(ellipse 70% 28% at 80% 85%, rgba(4, 183, 177, 0.08) 0%, transparent 55%),
+      var(--cross-tile, none) !important;
+    background-size: auto, auto, 280px 360px !important;
+    background-repeat: no-repeat, no-repeat, repeat !important;
+  }
 
-  /* Ensure the app shell uses our brand background colors (override Tailwind gradient classes) */
+  /* ─── Sepia Theme ──────────────────────────────── */
+  html.sepia {
+    --ct-app-bg: #f3ede0;
+    --ct-logo-church: #6b3e1e;
+    --ct-logo-tap: #b87a3d;
+
+    --ui-text: #3b2412;
+    --ui-text-muted: #8b6347;
+    --ui-border: rgba(160, 110, 70, 0.25);
+    --ui-surface: #faf5eb;
+    --ui-surface-2: #f5efdf;
+
+    --ui-primary: #8b5e2e;
+    --ui-primary-hover: #6b4520;
+    --ui-on-primary: #faf5eb;
+
+    --ui-accent: #c0622a;
+    --ui-accent-hover: #9e4e20;
+    --ui-secondary: #6b8c6e;
+    --ui-secondary-hover: #547057;
+
+    --verse-card-bg: #faf5eb;
+    --verse-card-gradient: linear-gradient(155deg, #fdf8ee 0%, #faf5eb 60%, #f5edd8 100%);
+    --verse-card-shadow: 0 4px 32px -8px rgba(107,62,30,0.18), 0 1px 4px rgba(107,62,30,0.08);
+    --verse-card-border: none;
+    --verse-text-color: #2e1c0a;
+
+    --nav-bg: rgba(243,237,224,0.95);
+    --nav-border: rgba(160,110,70,0.2);
+    --nav-active-color: #8b5e2e;
+    --nav-inactive-color: #b89070;
+
+    --header-bg: rgba(243,237,224,0.93);
+
+    --card-prayer-accent: #8b5e2e;
+    --card-praise-accent: #6b8c6e;
+    --card-insight-accent: #c0622a;
+  }
+  html.sepia body {
+    background-color: var(--ct-app-bg);
+    color: var(--ui-text);
+  }
+  html.sepia #app {
+    background-image:
+      radial-gradient(ellipse 100% 45% at 50% 0%, rgba(139, 94, 46, 0.12) 0%, transparent 70%),
+      var(--cross-tile, none) !important;
+    background-size: auto, 280px 360px !important;
+    background-repeat: no-repeat, repeat !important;
+  }
+
+  /* ─── Night Theme ─────────────────────────────── */
+  html.night {
+    --ct-app-bg: #080f1c;
+    --ct-logo-church: #7faacc;
+    --ct-logo-tap: #4b8fb5;
+
+    --ui-text: #b8cde0;
+    --ui-text-muted: #5880a0;
+    --ui-border: rgba(80, 130, 180, 0.12);
+    --ui-surface: #0d1a2e;
+    --ui-surface-2: #0a1525;
+
+    --ui-primary: #5890b8;
+    --ui-primary-hover: #7aaad0;
+    --ui-on-primary: #080f1c;
+
+    --ui-accent: #c0622a;
+    --ui-accent-hover: #e07840;
+    --ui-secondary: #2e8b7a;
+    --ui-secondary-hover: #40a890;
+
+    --verse-card-bg: rgba(8, 15, 28, 0.65);
+    --verse-card-gradient: rgba(8, 15, 28, 0.65);
+    --verse-card-shadow: 0 8px 32px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.5);
+    --verse-card-border: 1px solid rgba(255, 255, 255, 0.07);
+    --verse-text-color: #c8dcf0;
+
+    --nav-bg: rgba(8,15,28,0.97);
+    --nav-border: rgba(80,130,180,0.1);
+    --nav-active-color: #5890b8;
+    --nav-inactive-color: #3a5c7a;
+
+    --header-bg: rgba(8,15,28,0.95);
+
+    --card-prayer-accent: #5890b8;
+    --card-praise-accent: #2e8b7a;
+    --card-insight-accent: #c0622a;
+  }
+  html.night body {
+    background-color: var(--ct-app-bg);
+    color: var(--ui-text);
+  }
+  html.night #app {
+    background-color: var(--ct-app-bg) !important;
+    background-image:
+      radial-gradient(ellipse 140% 42% at 50% -5%, rgba(18, 120, 200, 0.22) 0%, transparent 65%),
+      radial-gradient(ellipse 70% 28% at 80% 85%, rgba(4, 183, 177, 0.08) 0%, transparent 55%),
+      var(--cross-tile, none) !important;
+    background-size: auto, auto, 280px 360px !important;
+    background-repeat: no-repeat, no-repeat, repeat !important;
+  }
+
   #app {
     background-color: var(--ct-app-bg) !important;
-    background-image: none !important;
+    background-image:
+      radial-gradient(ellipse 160% 55% at 50% -8%, color-mix(in srgb, var(--dusk-blue) 32%, transparent) 0%, transparent 70%),
+      radial-gradient(ellipse 80% 30% at 15% 55%, color-mix(in srgb, var(--light-sea-green) 10%, transparent) 0%, transparent 60%),
+      radial-gradient(ellipse 70% 25% at 85% 90%, color-mix(in srgb, var(--spicy-paprika) 7%, transparent) 0%, transparent 55%),
+      var(--cross-tile, none) !important;
+    background-size: auto, auto, auto, 280px 360px !important;
+    background-repeat: no-repeat, no-repeat, no-repeat, repeat !important;
   }
 }
 
+/* ─────────────────────────────────────────────────────
+   COMPONENTS
+───────────────────────────────────────────────────── */
 @layer components {
-  .verse-container {
-    @apply bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mx-4 my-8;
-    transition: all 0.3s ease;
+
+  /* ─── Verse Card ──────────────────────────────── */
+  .verse-card {
+    background: var(--verse-card-gradient, var(--verse-card-bg));
+    box-shadow: var(--verse-card-shadow);
+    border-radius: 1.5rem;
+    transition: box-shadow 0.3s ease;
+    border: none;
+    position: relative;
+    overflow: hidden;
   }
-  
+
+  /* Legacy alias (used in JS templates) */
+  .verse-container {
+    background: var(--verse-card-gradient, var(--verse-card-bg));
+    box-shadow: var(--verse-card-shadow);
+    border-radius: 1.5rem;
+    border: var(--verse-card-border, none);
+    position: relative;
+    overflow: hidden;
+    @apply p-6 mx-4 my-6;
+    transition: box-shadow 0.3s ease;
+  }
+
+  /* Frosted glass only for dark/night themes (rich backgrounds support it) */
+  html.dark .verse-container,
+  html.night .verse-container {
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  }
+
+  /* Decorative watermark cross inside the verse card */
+  .verse-container::before {
+    content: "✝";
+    position: absolute;
+    right: -0.5rem;
+    top: -1.5rem;
+    font-size: 11rem;
+    line-height: 1;
+    pointer-events: none;
+    z-index: 0;
+    color: rgba(255, 255, 255, 0.045);
+    font-family: Georgia, serif;
+    font-style: normal;
+    user-select: none;
+  }
+
+  /* Ensure verse content renders above the watermark */
+  .verse-container > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ─── Verse Typography ────────────────────────── */
   .verse-text {
-    @apply font-verse text-lg md:text-xl leading-relaxed text-center;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    color: var(--verse-text-color);
+    line-height: 1.9;
+    @apply text-center;
+    font-size: 1.2rem;
+    letter-spacing: 0.005em;
+    font-style: normal;
     transition: font-size 0.2s ease;
   }
-  
-  .verse-text.size-small {
-    @apply text-base md:text-lg;
+
+  .verse-text.size-small { font-size: 0.95rem; }
+  .verse-text.size-medium { font-size: 1.2rem; }
+  .verse-text.size-large { font-size: 1.45rem; }
+
+  .verse-reference {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 600;
+    font-style: normal;
+    letter-spacing: 0.03em;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--ui-primary);
   }
-  
-  .verse-text.size-medium {
-    @apply text-lg md:text-xl;
+
+  /* ─── Action Buttons (below verse) ───────────── */
+  .action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    min-width: 60px;
+    min-height: 56px;
+    background: transparent;
+    transition: background 0.18s ease, transform 0.12s ease;
+    touch-action: manipulation;
+    cursor: pointer;
+    border: none;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
   }
-  
-  .verse-text.size-large {
-    @apply text-xl md:text-2xl;
+  .action-btn:hover,
+  .action-btn:focus-visible {
+    background: color-mix(in srgb, var(--ui-primary) 8%, transparent);
   }
-  
+  .action-btn:active {
+    transform: scale(0.93);
+  }
+  .action-btn__icon {
+    width: 24px;
+    height: 24px;
+    color: var(--ui-text-muted);
+    transition: color 0.18s ease;
+  }
+  .action-btn__label {
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--ui-text-muted);
+    transition: color 0.18s ease;
+  }
+  .action-btn.active .action-btn__icon,
+  .action-btn.active .action-btn__label {
+    color: var(--ui-accent);
+  }
+  .action-btn.heart-active .action-btn__icon {
+    color: #e85454;
+    fill: #e85454;
+  }
+  .action-btn.heart-active .action-btn__label {
+    color: #e85454;
+  }
+
+  /* ─── Primary / Secondary Buttons ────────────── */
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+    background-color: var(--ui-primary);
+    color: var(--ui-on-primary);
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 shadow-sm;
   }
-  
+  .btn-primary:hover {
+    background-color: var(--ui-primary-hover);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--ui-primary) 30%, transparent);
+    transform: translateY(-1px);
+  }
+  .btn-primary:active { transform: translateY(0); }
+
   .btn-secondary {
-    @apply bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+    background-color: var(--ui-surface);
+    color: var(--ui-text);
+    border: 1px solid var(--ui-border);
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200;
   }
-  
-  .heart-btn {
-    @apply text-red-500 hover:text-red-600 transition-colors duration-200;
-  }
-  
-  .heart-btn.active {
-    @apply text-red-600;
-  }
-
-  /* Admin/Master UI dividers */
-  .content-divider {
-    @apply border-l border-gray-200;
+  .btn-secondary:hover {
+    background-color: color-mix(in srgb, var(--ui-primary) 6%, var(--ui-surface));
+    border-color: color-mix(in srgb, var(--ui-primary) 30%, var(--ui-border));
   }
 
-  .admin-header-divider {
-    @apply border-b border-gray-200;
+  .btn-outline {
+    background: transparent;
+    color: var(--ui-primary);
+    border: 1.5px solid var(--ui-primary);
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200;
+  }
+  .btn-outline:hover {
+    background: color-mix(in srgb, var(--ui-primary) 8%, transparent);
   }
 
-  /* Sidebar background to visually separate menu from content */
-  .admin-sidebar {
-    @apply bg-white dark:bg-gray-900 shadow-sm;
+  /* ─── Community Cards ─────────────────────────── */
+  .community-card {
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
+    border-radius: 1.1rem;
+    padding: 1rem 1.1rem;
+    transition: box-shadow 0.2s ease, transform 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .community-card:active {
+    transform: scale(0.985);
+  }
+  .community-card--prayer {
+    background: color-mix(in srgb, var(--card-prayer-accent) 7%, var(--ui-surface));
+    border-left: 3px solid var(--card-prayer-accent);
+    border-color: color-mix(in srgb, var(--card-prayer-accent) 18%, var(--ui-border));
+  }
+  .community-card--praise {
+    background: color-mix(in srgb, var(--card-praise-accent) 7%, var(--ui-surface));
+    border-left: 3px solid var(--card-praise-accent);
+    border-color: color-mix(in srgb, var(--card-praise-accent) 18%, var(--ui-border));
+  }
+  .community-card--insight {
+    background: color-mix(in srgb, var(--card-insight-accent) 7%, var(--ui-surface));
+    border-left: 3px solid var(--card-insight-accent);
+    border-color: color-mix(in srgb, var(--card-insight-accent) 18%, var(--ui-border));
   }
 
-  /* Navigation item tweaks: no sticky backgrounds */
+  /* Interaction button inside community cards */
+  .community-interact-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    transition: all 0.15s ease;
+    border: none;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .community-interact-btn--pray {
+    background: var(--brand-primary);
+    color: white;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--brand-primary) 30%, transparent);
+  }
+  .community-interact-btn--pray:hover {
+    background: color-mix(in srgb, var(--brand-primary) 85%, black);
+    box-shadow: 0 3px 12px color-mix(in srgb, var(--brand-primary) 40%, transparent);
+    transform: translateY(-1px);
+  }
+  .community-interact-btn--pray-done {
+    background: color-mix(in srgb, var(--brand-primary) 12%, var(--ui-surface));
+    color: var(--brand-primary);
+    cursor: default;
+  }
+  .community-interact-btn--celebrate {
+    background: var(--card-praise-accent);
+    color: white;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--card-praise-accent) 30%, transparent);
+  }
+  .community-interact-btn--celebrate:hover {
+    background: color-mix(in srgb, var(--card-praise-accent) 85%, black);
+    transform: translateY(-1px);
+  }
+  .community-interact-btn--celebrate-done {
+    background: color-mix(in srgb, var(--card-praise-accent) 12%, var(--ui-surface));
+    color: color-mix(in srgb, var(--card-praise-accent) 80%, black);
+    cursor: default;
+  }
+  .community-interact-btn--heart {
+    background: color-mix(in srgb, var(--card-insight-accent) 10%, var(--ui-surface));
+    color: var(--card-insight-accent);
+  }
+  .community-interact-btn--heart:hover {
+    background: color-mix(in srgb, var(--card-insight-accent) 18%, var(--ui-surface));
+    transform: scale(1.05);
+  }
+  .community-interact-btn--heart-done {
+    background: color-mix(in srgb, #ef4444 10%, var(--ui-surface));
+    color: #ef4444;
+    cursor: default;
+  }
+
+  /* Section sub-header (Prayer Requests, Verse Insights, etc.) */
+  .community-section-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 4px 0;
+    margin-bottom: 10px;
+  }
+  .community-section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--ui-border);
+    opacity: 0.7;
+  }
+
+  /* ─── Submit Community Buttons ────────────────── */
+  .submit-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 16px 8px;
+    border-radius: 18px;
+    font-weight: 700;
+    font-size: 0.78rem;
+    letter-spacing: 0.01em;
+    transition: all 0.18s ease;
+    touch-action: manipulation;
+    border: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    color: white;
+  }
+  .submit-btn .text-2xl,
+  .submit-btn span[style*="font-size: 1.25rem"],
+  .submit-btn span:first-child { font-size: 1.6rem !important; line-height: 1; }
+  .submit-btn:active { transform: scale(0.95); }
+  .submit-btn--prayer {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--brand-primary) 85%, #1278c8), var(--brand-primary));
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--brand-primary) 35%, transparent);
+  }
+  .submit-btn--prayer:hover {
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--brand-primary) 45%, transparent);
+    transform: translateY(-1px);
+  }
+  .submit-btn--praise {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--light-sea-green) 80%, #00d4ce), var(--light-sea-green));
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--light-sea-green) 35%, transparent);
+  }
+  .submit-btn--praise:hover {
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--light-sea-green) 45%, transparent);
+    transform: translateY(-1px);
+  }
+  .submit-btn--insight {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--spicy-paprika) 80%, #ff7040), var(--spicy-paprika));
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--spicy-paprika) 35%, transparent);
+  }
+  .submit-btn--insight:hover {
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--spicy-paprika) 45%, transparent);
+    transform: translateY(-1px);
+  }
+
+  /* ─── Bottom Navigation ────────────────────────── */
+  .bottom-nav {
+    background: var(--nav-bg);
+    border-top: 1px solid var(--nav-border);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
   .nav-item {
-    @apply hover:bg-transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    min-width: 52px;
+    min-height: 52px;
+    touch-action: manipulation;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s ease;
+    color: var(--nav-inactive-color);
+  }
+  .nav-item:hover { background: color-mix(in srgb, var(--ui-primary) 6%, transparent); }
+  .nav-item.active { color: var(--nav-active-color); }
+  .nav-item.active svg { color: var(--nav-active-color); }
+  .nav-item svg {
+    width: 22px;
+    height: 22px;
+    color: var(--nav-inactive-color);
+    transition: color 0.15s ease;
+    stroke-width: 1.75;
+  }
+  .nav-item.active svg { stroke-width: 2.2; }
+  .nav-item__label {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
-  .nav-item.active {
-    @apply bg-transparent border-l-4 border-blue-500 text-blue-700;
+  /* ─── Page Card (Explore, Me, Menu, etc.) ─────── */
+  .page-card {
+    background-color: var(--ui-surface);
+    border: 1px solid var(--ui-border);
+    border-radius: 1.25rem;
+    box-shadow: 0 2px 16px -4px color-mix(in srgb, var(--brand-black) 8%, transparent);
+    @apply mx-4 mt-4 p-6;
   }
 
-  .nav-item.active .nav-icon {
-    @apply text-blue-500;
+  .page-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--ui-text);
+    letter-spacing: -0.02em;
   }
 
-  /* Softer header title color */
-  #masterPageTitle {
-    @apply text-gray-700;
+  /* ─── Explore Tiles ────────────────────────────── */
+  .explore-tile {
+    border-radius: 1rem;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border: 1px solid var(--ui-border);
+    background: var(--ui-surface);
+    transition: all 0.18s ease;
+    touch-action: manipulation;
+    cursor: pointer;
+    text-align: left;
+  }
+  .explore-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px -4px color-mix(in srgb, var(--brand-black) 14%, transparent);
+  }
+  .explore-tile:active { transform: translateY(0) scale(0.97); }
+  .explore-tile__emoji { font-size: 1.5rem; line-height: 1; }
+  .explore-tile__title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--ui-text);
+    margin-top: 4px;
+  }
+  .explore-tile__subtitle {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--ui-text-muted);
+    opacity: 0.85;
   }
 
-  /* Modern admin UI components */
+  /* Colored variant tiles */
+  .explore-tile--read {
+    background: linear-gradient(135deg, #04b7b1 0%, #038b87 100%);
+    border-color: #038b87;
+    color: white;
+  }
+  .explore-tile--read .explore-tile__title,
+  .explore-tile--read .explore-tile__subtitle { color: white; }
+  .explore-tile--read .explore-tile__subtitle { opacity: 0.85; }
+
+  .explore-tile--study {
+    background: linear-gradient(135deg, #eb5e28 0%, #c84e1e 100%);
+    border-color: #c84e1e;
+    color: white;
+  }
+  .explore-tile--study .explore-tile__title,
+  .explore-tile--study .explore-tile__subtitle { color: white; }
+  .explore-tile--study .explore-tile__subtitle { opacity: 0.85; }
+
+  .explore-tile--locked {
+    background: var(--ui-surface-2);
+    opacity: 0.8;
+  }
+
+  /* ─── Section Header ───────────────────────────── */
+  .section-header {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ui-text-muted);
+    @apply mb-3 px-1;
+  }
+
+  /* ─── Menu Rows ────────────────────────────────── */
+  .menu-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-radius: 12px;
+    transition: background 0.15s ease;
+    cursor: pointer;
+    touch-action: manipulation;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .menu-row:hover { background: color-mix(in srgb, var(--ui-primary) 5%, var(--ui-surface)); }
+  .menu-row__left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--ui-text);
+  }
+  .menu-row__icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--ui-primary) 10%, var(--ui-surface));
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+  .menu-row__right {
+    font-size: 0.8rem;
+    color: var(--ui-text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* ─── Me Profile Card ─────────────────────────── */
+  .profile-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  /* ─── Verse Context ───────────────────────────── */
+  .verse-context {
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: var(--ui-text-muted);
+    border-top: 1px solid var(--ui-border);
+    padding-top: 1rem;
+    margin-top: 1rem;
+  }
+
+  /* ─── Tags ────────────────────────────────────── */
+  .verse-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    background: color-mix(in srgb, var(--brand-secondary) 12%, var(--ui-surface));
+    color: color-mix(in srgb, var(--brand-secondary) 70%, var(--brand-black));
+    border: 1px solid color-mix(in srgb, var(--brand-secondary) 20%, var(--ui-border));
+    transition: background 0.15s ease;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+  .verse-tag:hover {
+    background: color-mix(in srgb, var(--brand-secondary) 20%, var(--ui-surface));
+  }
+
+  /* ─── Date Navigator ──────────────────────────── */
+  .date-nav-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 12px 0 8px;
+    touch-action: manipulation;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .date-nav-btn:hover .date-title { color: var(--ui-primary); }
+
+  .date-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ui-text);
+    letter-spacing: -0.01em;
+    transition: color 0.15s ease;
+  }
+  .date-subtitle {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--ui-text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  /* ─── Bible Verse Read / Translation Buttons ──── */
+  .verse-action-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 13px;
+    border-radius: 9px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: all 0.18s ease;
+    touch-action: manipulation;
+    cursor: pointer;
+    border: none;
+  }
+  #textChapterBtn, #textChapterBtnDesktop,
+  #imageChapterBtn, #imageChapterBtnDesktop {
+    background: var(--ui-primary) !important;
+    color: var(--ui-on-primary) !important;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--ui-primary) 25%, transparent);
+  }
+  #textChapterBtn:hover, #textChapterBtnDesktop:hover,
+  #imageChapterBtn:hover, #imageChapterBtnDesktop:hover {
+    background: var(--ui-primary-hover) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--ui-primary) 30%, transparent);
+  }
+  #textTranslationBtn, #textTranslationBtnDesktop,
+  #imageTranslationBtn, #imageTranslationBtnDesktop {
+    background: color-mix(in srgb, var(--ui-secondary) 14%, var(--ui-surface)) !important;
+    color: color-mix(in srgb, var(--ui-secondary) 80%, black) !important;
+    border: 1px solid color-mix(in srgb, var(--ui-secondary) 30%, var(--ui-border)) !important;
+  }
+  html.dark #textTranslationBtn,
+  html.dark #textTranslationBtnDesktop,
+  html.dark #imageTranslationBtn,
+  html.dark #imageTranslationBtnDesktop {
+    color: var(--brand-bg) !important;
+  }
+  #textTranslationBtn:hover, #textTranslationBtnDesktop:hover,
+  #imageTranslationBtn:hover, #imageTranslationBtnDesktop:hover {
+    background: color-mix(in srgb, var(--ui-secondary) 22%, var(--ui-surface)) !important;
+  }
+
+  /* ─── Community Submit Buttons ────────────────── */
+  #submitPrayerBtn {
+    background: color-mix(in srgb, var(--brand-primary) 10%, var(--ui-surface)) !important;
+    color: var(--brand-primary) !important;
+    border: 1.5px solid color-mix(in srgb, var(--brand-primary) 25%, transparent) !important;
+  }
+  #submitPrayerBtn:hover {
+    background: color-mix(in srgb, var(--brand-primary) 16%, var(--ui-surface)) !important;
+  }
+  #submitPraiseBtn.bg-yellow-500 {
+    background: color-mix(in srgb, var(--light-sea-green) 12%, var(--ui-surface)) !important;
+    color: color-mix(in srgb, var(--light-sea-green) 75%, black) !important;
+    border: 1.5px solid color-mix(in srgb, var(--light-sea-green) 28%, transparent) !important;
+  }
+  #submitInsightBtn.bg-purple-500 {
+    background: color-mix(in srgb, var(--spicy-paprika) 10%, var(--ui-surface)) !important;
+    color: var(--spicy-paprika) !important;
+    border: 1.5px solid color-mix(in srgb, var(--spicy-paprika) 25%, transparent) !important;
+  }
+
+  /* ─── Explore Tile Overrides ──────────────────── */
+  #exploreReadTile {
+    background: linear-gradient(135deg, var(--brand-secondary) 0%, color-mix(in srgb, var(--brand-secondary) 75%, black) 100%) !important;
+    border-color: color-mix(in srgb, var(--brand-secondary) 70%, black) !important;
+    color: var(--brand-bg) !important;
+  }
+  #exploreStudyTile {
+    background: linear-gradient(135deg, var(--brand-accent) 0%, color-mix(in srgb, var(--brand-accent) 75%, black) 100%) !important;
+    border-color: color-mix(in srgb, var(--brand-accent) 70%, black) !important;
+    color: var(--brand-bg) !important;
+  }
+  #exploreReadTile .text-gray-900, #exploreReadTile .text-gray-600,
+  #exploreStudyTile .text-gray-900, #exploreStudyTile .text-gray-600 {
+    color: var(--brand-bg) !important;
+  }
+
+  /* ─── Tags in verse ───────────────────────────── */
+  #verseTags > span {
+    background-color: color-mix(in srgb, var(--ui-secondary) 12%, var(--ui-surface-2)) !important;
+    color: color-mix(in srgb, var(--ui-text) 88%, var(--ui-text-muted)) !important;
+    border: 1px solid var(--ui-border) !important;
+    border-radius: 999px !important;
+    padding: 3px 10px !important;
+    font-size: 0.7rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.03em !important;
+  }
+
+  /* ─── Glass Header ────────────────────────────── */
+  .app-header {
+    background: var(--header-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  /* ─── Admin UI (preserve) ─────────────────────── */
   .modern-card {
-    background-image: linear-gradient(180deg, var(--brand-bg), #ffffff);
+    background-image: linear-gradient(180deg, var(--brand-bg), var(--ui-surface));
     @apply rounded-xl shadow-md border dark:border-gray-700 transition-colors;
-    border-color: var(--brand-muted);
+    border-color: var(--ui-border);
   }
-
   .btn-primary-modern {
     background-color: var(--brand-accent);
     @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white shadow-md focus:outline-none focus:ring-2 transition-colors duration-200;
   }
-  .btn-primary-modern:hover,
-  .btn-primary-modern:active {
+  .btn-primary-modern:hover, .btn-primary-modern:active {
     background-color: var(--brand-primary);
   }
-
   .btn-secondary-modern {
     @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 dark:text-gray-200 bg-gradient-to-r from-white to-gray-50 dark:from-gray-800 dark:to-gray-700 border border-gray-300 dark:border-gray-700 hover:from-gray-50 hover:to-white dark:hover:from-gray-700 dark:hover:to-gray-600 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600;
   }
-
-  .admin-table thead {
-    background-image: linear-gradient(90deg, color-mix(in srgb, var(--brand-muted) 20%, white), var(--brand-bg));
+  .admin-table thead,
+  .admin-table-head {
+    background-image: linear-gradient(90deg, color-mix(in srgb, var(--brand-muted) 20%, var(--ui-surface)), var(--brand-bg));
   }
-
-  .admin-table thead th {
+  .admin-table thead th,
+  .admin-table-head th {
     @apply px-6 py-3 text-left text-xs font-medium uppercase tracking-wider;
     color: var(--brand-primary);
   }
-
-  .admin-table tbody tr:nth-child(even) {
-    @apply bg-indigo-50/20 dark:bg-gray-800/30;
-  }
-
-  .admin-table tbody tr:hover {
-    @apply bg-indigo-50/40 dark:bg-gray-800/80;
-  }
-
-  .status-badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
-  }
-
+  .admin-table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--brand-primary) 4%, var(--ui-surface)); }
+  .admin-table tbody tr:hover { background: color-mix(in srgb, var(--brand-primary) 7%, var(--ui-surface)); }
+  .status-badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
   .status-badge.status-published {
     background-color: color-mix(in srgb, var(--brand-success) 15%, white);
     color: color-mix(in srgb, var(--brand-success) 70%, black);
   }
-
   .status-badge.status-draft {
     background-color: color-mix(in srgb, var(--brand-accent) 20%, white);
     color: color-mix(in srgb, var(--brand-accent) 65%, black);
   }
-
   .admin-header {
     backdrop-filter: blur(10px);
     background-image: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-accent) 100%);
     @apply text-white border-b border-transparent;
   }
-
-  .admin-header .text-gray-900,
-  .admin-header .text-gray-800,
-  .admin-header .text-gray-700,
-  .admin-header .text-gray-600,
-  .admin-header .text-gray-500,
-  .admin-header .text-gray-400 {
-    @apply text-white;
-  }
-
-  .admin-header .text-gray-500 { @apply text-white/90; }
-  .admin-header .text-gray-400 { @apply text-white/80; }
-
   .admin-sidebar {
     background-image: linear-gradient(180deg, var(--brand-primary) 0%, var(--brand-primary) 100%);
     @apply text-white shadow-sm;
   }
-
   .sidebar-header {
     background-image: linear-gradient(180deg, var(--brand-primary) 0%, color-mix(in srgb, var(--brand-primary) 85%, black) 100%);
     color: white;
   }
-
   .sidebar-footer { border-top-color: var(--brand-muted) !important; }
   .avatar-brand { background-color: var(--brand-primary) !important; color: #fff !important; }
 
-  .nav-item { color: var(--menu-text); opacity: 0.9; }
-  .nav-item .nav-icon { color: var(--menu-text); opacity: 0.7; }
-  .nav-item:hover { @apply bg-white/10; }
-
-  .nav-item.active {
-    @apply bg-white/10 text-white border-l-2 border-white/70;
+  /* ─── Default-theme dark verse card overrides ─── */
+  /* The verse card is deep blue in the default theme — adapt all inner elements */
+  html:not(.dark):not(.sepia):not(.night) .verse-reference {
+    color: var(--light-sea-green) !important;
+    font-size: 0.8rem !important;
+    letter-spacing: 0.06em !important;
   }
 
-  .nav-item.active .nav-icon { @apply text-white; }
+  /* Chapter button — light pill on dark card */
+  html:not(.dark):not(.sepia):not(.night) #textChapterBtn,
+  html:not(.dark):not(.sepia):not(.night) #imageChapterBtn {
+    background: rgba(253, 254, 249, 0.92) !important;
+    color: var(--dusk-blue) !important;
+    font-weight: 700 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #textChapterBtn:hover,
+  html:not(.dark):not(.sepia):not(.night) #imageChapterBtn:hover {
+    background: rgba(253, 254, 249, 1) !important;
+    transform: translateY(-1px);
+  }
+
+  /* Translation button — ghost on dark card */
+  html:not(.dark):not(.sepia):not(.night) #textTranslationBtn,
+  html:not(.dark):not(.sepia):not(.night) #imageTranslationBtn {
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: rgba(253, 254, 249, 0.85) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #textTranslationBtn:hover,
+  html:not(.dark):not(.sepia):not(.night) #imageTranslationBtn:hover {
+    background: rgba(255, 255, 255, 0.20) !important;
+  }
+
+  /* Engagement strip — frosted dark */
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline {
+    background: rgba(0, 0, 0, 0.22) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn__icon {
+    color: rgba(253, 254, 249, 0.75) !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn__label {
+    color: rgba(253, 254, 249, 0.65) !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn.heart-active .action-btn__icon {
+    color: #ff7070 !important;
+    fill: #ff7070 !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn.heart-active .action-btn__label {
+    color: #ff7070 !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn.active .action-btn__icon,
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline .action-btn.active .action-btn__label {
+    color: var(--light-sea-green) !important;
+  }
+  html:not(.dark):not(.sepia):not(.night) #engagementStripInline .w-px {
+    background: rgba(255, 255, 255, 0.14) !important;
+  }
+
+  /* Verse context on dark card */
+  html:not(.dark):not(.sepia):not(.night) .verse-context {
+    border-top-color: rgba(255, 255, 255, 0.15) !important;
+    color: rgba(253, 254, 249, 0.72) !important;
+  }
+
+  /* Personalization badge on dark card */
+  html:not(.dark):not(.sepia):not(.night) #personalizationBadge .inline-flex {
+    background: rgba(4, 183, 177, 0.2) !important;
+    color: rgba(253, 254, 249, 0.9) !important;
+  }
+
+  /* ─── PWA Splash ──────────────────────────────── */
+  .splash-screen {
+    @apply fixed inset-0 flex items-center justify-center z-50;
+    background-color: var(--brand-primary);
+    overflow: hidden;
+  }
+  .splash-screen::after {
+    content: "";
+    position: absolute;
+    inset: -35% -60%;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(110deg, transparent 0%, rgba(253,254,249,0.00) 35%, rgba(253,254,249,0.60) 50%, rgba(253,254,249,0.00) 65%, transparent 100%);
+    transform: translateX(-130%) skewX(-16deg);
+    mix-blend-mode: soft-light;
+    filter: blur(0.6px);
+    animation: ctSplashSwoosh 3600ms ease-in-out infinite;
+    z-index: 0;
+  }
+  .splash-screen::before {
+    content: "";
+    position: absolute;
+    inset: -35% -60%;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(110deg, transparent 0%, rgba(253,254,249,0.00) 35%, rgba(4,183,177,0.55) 50%, rgba(253,254,249,0.00) 65%, transparent 100%);
+    transform: translateX(-130%) skewX(-16deg);
+    mix-blend-mode: soft-light;
+    filter: blur(0.8px);
+    animation: ctSplashSwoosh 3600ms ease-in-out infinite;
+    animation-delay: 160ms;
+    z-index: 0;
+  }
+  .splash-screen > * { position: relative; z-index: 1; }
+  .splash-logo { @apply text-white text-4xl font-bold; }
 }
 
+/* ─────────────────────────────────────────────────────
+   UTILITIES
+───────────────────────────────────────────────────── */
 @layer utilities {
+  /* ─── Brand text / bg overrides ────────────────── */
   .text-brand-primary { color: var(--brand-primary) !important; }
   .text-brand-accent { color: var(--brand-accent) !important; }
   .text-brand-muted { color: var(--brand-muted) !important; }
   .text-brand-success { color: var(--brand-success) !important; }
   .text-brand-black { color: var(--brand-black) !important; }
 
-  .link-brand {
-    color: var(--brand-primary);
-    text-decoration: none;
-    transition: color .2s ease;
-  }
-  .link-brand:hover {
-    color: color-mix(in srgb, var(--brand-primary) 80%, black);
-  }
+  .link-brand { color: var(--brand-primary); text-decoration: none; transition: color .2s ease; }
+  .link-brand:hover { color: color-mix(in srgb, var(--brand-primary) 80%, black); }
 
+  /* ─── Glass effect ──────────────────────────────── */
   .glass-effect {
-    backdrop-filter: blur(10px);
-    /* Light theme: slightly darker + glassy over Porcelain background */
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     background-color: color-mix(in srgb, var(--brand-bg) 88%, var(--brand-primary) 12%);
-    border: 1px solid color-mix(in srgb, var(--brand-primary) 14%, transparent);
-    box-shadow: 0 10px 25px -18px color-mix(in srgb, var(--brand-black) 35%, transparent);
+    border: 1px solid color-mix(in srgb, var(--brand-primary) 10%, transparent);
+    box-shadow: 0 8px 24px -12px color-mix(in srgb, var(--brand-black) 20%, transparent);
   }
-
-  /* Harmonize glass effect overlays against brand-primary background */
   .glass-effect:is(.dark *) {
     background-color: color-mix(in srgb, var(--ui-surface) 65%, transparent);
   }
-  
-  .touch-manipulation {
-    touch-action: manipulation;
-  }
 
-  /* Logo helpers (inline SVG theming via CSS variables) */
+  .touch-manipulation { touch-action: manipulation; }
+
+  /* ─── Logo helpers ──────────────────────────────── */
   .ct-logo svg { display: block; width: auto; }
   .ct-logo--header svg { height: 18px; }
   .ct-logo--splash svg { height: 40px; margin: 0 auto; }
   .ct-logo--marketing svg { height: 20px; }
   .ct-logo--marketing-footer svg { height: 18px; }
 
-  .ct-logo .logo-church path,
-  .ct-logo #logo-church path { fill: var(--ct-logo-church); }
+  .ct-logo .logo-church path, .ct-logo #logo-church path { fill: var(--ct-logo-church); }
+  .ct-logo .logo-tap path, .ct-logo #logo-tap path { fill: var(--ct-logo-tap); }
+  .ct-logo--splash { --ct-logo-church: #FDFEF9; --ct-logo-tap: #04b7b1; }
 
-  .ct-logo .logo-tap path,
-  .ct-logo #logo-tap path { fill: var(--ct-logo-tap); }
-
-  .ct-logo--splash {
-    /* Splash is always on primary-blue background, so keep the mark readable
-       even before the theme toggle has applied. */
-    --ct-logo-church: #FDFEF9;
-    --ct-logo-tap: #04b7b1;
-  }
-
-  /* Splash logo animation (swaps between wordmark + glyph) */
+  /* Splash animations */
   .ct-splash-anim {
     display: grid;
     place-items: center;
@@ -324,7 +1123,6 @@
     position: relative;
     overflow: visible;
   }
-
   .ct-splash-anim .ct-splash-logo {
     grid-area: 1 / 1;
     display: flex;
@@ -333,14 +1131,8 @@
     will-change: opacity, transform, filter;
     transform-origin: 50% 60%;
   }
-
-  .ct-splash-anim .ct-splash-logo--full {
-    animation: ctSplashFullBold 3600ms cubic-bezier(0.2, 0.9, 0.2, 1) infinite;
-  }
-
-  .ct-splash-anim .ct-splash-logo--glyph {
-    animation: ctSplashGlyphBold 3600ms cubic-bezier(0.2, 0.9, 0.2, 1) infinite;
-  }
+  .ct-splash-anim .ct-splash-logo--full { animation: ctSplashFullBold 3600ms cubic-bezier(0.2, 0.9, 0.2, 1) infinite; }
+  .ct-splash-anim .ct-splash-logo--glyph { animation: ctSplashGlyphBold 3600ms cubic-bezier(0.2, 0.9, 0.2, 1) infinite; }
 
   @keyframes ctSplashSwoosh {
     0%, 18% { opacity: 0; transform: translateX(-130%) skewX(-16deg); }
@@ -348,7 +1140,6 @@
     46% { opacity: 0.0; transform: translateX(130%) skewX(-16deg); }
     100% { opacity: 0; transform: translateX(130%) skewX(-16deg); }
   }
-
   @keyframes ctSplashFullBold {
     0% { opacity: 0; transform: translateY(6px) rotate(-6deg) scale(0.96); filter: blur(1.5px); }
     8% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); filter: blur(0px); }
@@ -356,7 +1147,6 @@
     40% { opacity: 0; transform: translateY(6px) rotate(-18deg) scale(0.92); filter: blur(2.5px); }
     100% { opacity: 0; transform: translateY(6px) rotate(-18deg) scale(0.92); filter: blur(2.5px); }
   }
-
   @keyframes ctSplashGlyphBold {
     0%, 28% { opacity: 0; transform: translateY(6px) rotate(22deg) scale(0.90); filter: blur(2.5px); }
     46% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1.08); filter: blur(0px); }
@@ -366,67 +1156,49 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .splash-screen::after,
-    .splash-screen::before { animation: none; display: none; }
-
     .ct-splash-anim .ct-splash-logo--full,
     .ct-splash-anim .ct-splash-logo--glyph { animation: none; filter: none; transform: none; }
-
     .ct-splash-anim .ct-splash-logo--full { opacity: 1; }
     .ct-splash-anim .ct-splash-logo--glyph { opacity: 0; }
   }
 
-  /* Splash sizing: make the glyph much larger than the wordmark */
   .ct-logo--splash .ct-splash-logo--full svg { height: 40px; }
-  .ct-logo--splash .ct-splash-logo--glyph svg { height: 160px; /* ~4x the wordmark */ }
+  .ct-logo--splash .ct-splash-logo--glyph svg { height: 160px; }
 
-  /* =========================================================
-     Brand Overrides (map Tailwind utility colors to UI tokens)
-     ========================================================= */
-
-  /* Primary backgrounds (common in HTML + JS templates) */
+  /* ─── Tailwind primary/blue override map ─────── */
   .bg-primary-500 { background-color: var(--ui-primary) !important; }
   .bg-primary-600 { background-color: var(--ui-primary) !important; }
   .bg-primary-700 { background-color: var(--ui-primary-hover) !important; }
   .hover\:bg-primary-700:hover { background-color: var(--ui-primary-hover) !important; }
-
   .bg-blue-500 { background-color: var(--ui-primary) !important; }
   .bg-blue-600 { background-color: var(--ui-primary) !important; }
   .hover\:bg-blue-600:hover { background-color: var(--ui-primary-hover) !important; }
   .hover\:bg-blue-700:hover { background-color: var(--ui-primary-hover) !important; }
 
-  /* “Soft” primary tints */
   .bg-primary-50 { background-color: color-mix(in srgb, var(--ui-primary) 7%, var(--ct-app-bg)) !important; }
   .bg-primary-100 { background-color: color-mix(in srgb, var(--ui-primary) 14%, var(--ct-app-bg)) !important; }
   .hover\:bg-primary-200:hover { background-color: color-mix(in srgb, var(--ui-primary) 20%, var(--ct-app-bg)) !important; }
-
   .bg-blue-50 { background-color: color-mix(in srgb, var(--ui-primary) 10%, var(--ct-app-bg)) !important; }
   .bg-blue-100 { background-color: color-mix(in srgb, var(--ui-primary) 16%, var(--ct-app-bg)) !important; }
   .hover\:bg-blue-200:hover { background-color: color-mix(in srgb, var(--ui-primary) 24%, var(--ct-app-bg)) !important; }
 
-  /* Text */
   .text-primary-600 { color: var(--ui-primary) !important; }
   .text-primary-700 { color: var(--ui-primary) !important; }
   .text-blue-600 { color: var(--ui-primary) !important; }
   .text-blue-700 { color: var(--ui-primary) !important; }
   .text-blue-800 { color: var(--ui-primary) !important; }
 
-  /* Borders */
   .border-primary-100 { border-color: var(--ui-border) !important; }
   .border-primary-500 { border-color: var(--ui-primary) !important; }
   .border-primary-600 { border-color: var(--ui-primary) !important; }
   .border-primary-700 { border-color: var(--ui-primary-hover) !important; }
-
   .border-blue-200 { border-color: var(--ui-border) !important; }
   .border-blue-300 { border-color: var(--ui-border) !important; }
   .border-blue-700 { border-color: var(--ui-primary-hover) !important; }
 
-  /* Rings / focus */
   .ring-primary-300 { --tw-ring-color: color-mix(in srgb, var(--ui-primary) 45%, transparent) !important; }
   .ring-primary-500 { --tw-ring-color: color-mix(in srgb, var(--ui-primary) 60%, transparent) !important; }
-  .outline-primary-400 { outline-color: color-mix(in srgb, var(--ui-primary) 70%, white) !important; }
 
-  /* Dark-mode variants that appear frequently in markup */
   .dark\:text-primary-400:is(.dark *) { color: color-mix(in srgb, var(--ui-on-primary) 88%, var(--ui-accent)) !important; }
   .dark\:text-primary-300:is(.dark *) { color: color-mix(in srgb, var(--ui-on-primary) 80%, var(--ui-accent)) !important; }
   .dark\:text-blue-400:is(.dark *) { color: color-mix(in srgb, var(--ui-on-primary) 85%, var(--ui-primary)) !important; }
@@ -436,22 +1208,16 @@
   .dark\:bg-blue-900:is(.dark *) { background-color: var(--ui-surface) !important; }
   .dark\:bg-blue-900\/20:is(.dark *) { background-color: color-mix(in srgb, var(--ui-on-primary) 18%, transparent) !important; }
   .dark\:hover\:bg-blue-800:hover:is(.dark *) { background-color: var(--ui-surface-2) !important; }
-
   .dark\:bg-primary-900:is(.dark *) { background-color: var(--ui-surface-2) !important; }
   .dark\:bg-primary-900\/20:is(.dark *) { background-color: color-mix(in srgb, var(--ui-on-primary) 16%, transparent) !important; }
   .dark\:bg-primary-800:is(.dark *) { background-color: var(--ui-surface) !important; }
   .dark\:hover\:bg-primary-800:hover:is(.dark *) { background-color: var(--ui-surface-2) !important; }
-
   .dark\:border-primary-800:is(.dark *) { border-color: var(--ui-border) !important; }
   .dark\:border-blue-700:is(.dark *) { border-color: var(--ui-border) !important; }
 
-  /* Make sure “primary buttons” read well everywhere */
   .text-white { color: var(--ui-on-primary) !important; }
 
-  /* =========================================================
-     Dark surfaces + contrast (map gray utilities to UI tokens)
-     ========================================================= */
-
+  /* ─── Dark surface overrides ──────────────────── */
   .dark\:bg-gray-900:is(.dark *) { background-color: var(--ct-app-bg) !important; }
   .dark\:bg-gray-900\/40:is(.dark *) { background-color: color-mix(in srgb, var(--ui-on-primary) 14%, transparent) !important; }
   .dark\:bg-gray-900\/20:is(.dark *) { background-color: color-mix(in srgb, var(--ui-on-primary) 10%, transparent) !important; }
@@ -460,268 +1226,506 @@
   .dark\:hover\:bg-gray-700:hover:is(.dark *) { background-color: color-mix(in srgb, var(--ui-surface-2) 85%, white) !important; }
   .dark\:hover\:bg-gray-700\/40:hover:is(.dark *) { background-color: color-mix(in srgb, var(--ui-surface-2) 55%, transparent) !important; }
   .dark\:hover\:bg-gray-600:hover:is(.dark *) { background-color: color-mix(in srgb, var(--ui-surface-2) 70%, white) !important; }
-
   .dark\:border-gray-700:is(.dark *) { border-color: var(--ui-border) !important; }
   .dark\:border-gray-600:is(.dark *) { border-color: var(--ui-border) !important; }
-
   .dark\:text-gray-100:is(.dark *) { color: var(--ui-text) !important; }
   .dark\:text-gray-200:is(.dark *) { color: var(--ui-text) !important; }
   .dark\:text-gray-300:is(.dark *) { color: color-mix(in srgb, var(--ui-text) 92%, var(--ui-text-muted)) !important; }
   .dark\:text-gray-400:is(.dark *) { color: var(--ui-text-muted) !important; }
   .dark\:text-gray-500:is(.dark *) { color: color-mix(in srgb, var(--ui-text-muted) 85%, transparent) !important; }
-
   .dark\:placeholder-gray-400:is(.dark *)::placeholder { color: var(--ui-text-muted) !important; }
-  .dark\:placeholder-gray-400:is(.dark *)::-moz-placeholder { color: var(--ui-text-muted) !important; }
 
-  /* Verse card surface on dark mode */
+  /* ─── Verse card dark mode ────────────────────── */
   .verse-container:is(.dark *) {
     background-color: var(--ui-surface);
-    box-shadow: 0 10px 25px -10px color-mix(in srgb, var(--brand-bg) 18%, transparent);
+    box-shadow: 0 8px 32px -8px rgba(0,0,0,0.4);
   }
 
-  /* =========================================================
-     Community CTAs (brand-derived trio; keep other yellow/purple uses intact)
-     ========================================================= */
-
-  /* Prayer: outlined */
-  #submitPrayerBtn {
-    background-color: transparent !important;
-    border: 2px solid var(--ui-primary) !important;
-    color: var(--ui-on-primary) !important; /* dark mode default */
+  /* ─── Highlight system ────────────────────────── */
+  :root {
+    --hl-yellow-bg: #fef9c3;
+    --hl-amber-bg: #fef3c7;
+    --hl-orange-bg: #ffedd5;
+    --hl-red-bg: #fee2e2;
+    --hl-pink-bg: #fce7f3;
+    --hl-purple-bg: #ede9fe;
+    --hl-blue-bg: #dbeafe;
+    --hl-green-bg: #dcfce7;
   }
-  html:not(.dark) #submitPrayerBtn { color: var(--ui-primary) !important; /* light mode */ }
-  #submitPrayerBtn:hover { background-color: color-mix(in srgb, var(--ui-primary) 14%, transparent) !important; }
-
-  /* Praise: secondary (teal) */
-  #submitPraiseBtn.bg-yellow-500 { background-color: var(--ui-secondary) !important; }
-  #submitPraiseBtn.hover\:bg-yellow-600:hover { background-color: var(--ui-secondary-hover) !important; }
-
-  /* Insight: accent (paprika) */
-  #submitInsightBtn.bg-purple-500 { background-color: var(--ui-accent) !important; }
-  #submitInsightBtn.hover\:bg-purple-600:hover { background-color: var(--ui-accent-hover) !important; }
-
-  /* Verse action buttons: make Chapter the primary action, Translation the secondary */
-  #textChapterBtn,
-  #textChapterBtnDesktop,
-  #imageChapterBtn,
-  #imageChapterBtnDesktop {
-    background-color: var(--ui-primary) !important;
-    color: var(--ui-on-primary) !important;
-    border: 1px solid color-mix(in srgb, var(--ui-primary) 70%, white) !important;
+  html.dark {
+    --hl-yellow-bg: rgba(254,249,195,0.15);
+    --hl-amber-bg: rgba(254,243,199,0.13);
+    --hl-orange-bg: rgba(255,237,213,0.13);
+    --hl-red-bg: rgba(254,226,226,0.13);
+    --hl-pink-bg: rgba(252,231,243,0.13);
+    --hl-purple-bg: rgba(237,233,254,0.13);
+    --hl-blue-bg: rgba(219,234,254,0.13);
+    --hl-green-bg: rgba(220,252,231,0.13);
   }
-
-  #textChapterBtn:hover,
-  #textChapterBtnDesktop:hover,
-  #imageChapterBtn:hover,
-  #imageChapterBtnDesktop:hover {
-    background-color: var(--ui-primary-hover) !important;
-  }
-
-  #textTranslationBtn,
-  #textTranslationBtnDesktop,
-  #imageTranslationBtn,
-  #imageTranslationBtnDesktop {
-    background-color: color-mix(in srgb, var(--ui-secondary) 22%, var(--ui-surface)) !important;
-    color: var(--ui-text) !important;
-    border: 1px solid color-mix(in srgb, var(--ui-secondary) 55%, var(--ui-border)) !important;
-  }
-
-  #textTranslationBtn:hover,
-  #textTranslationBtnDesktop:hover,
-  #imageTranslationBtn:hover,
-  #imageTranslationBtnDesktop:hover {
-    background-color: color-mix(in srgb, var(--ui-secondary) 30%, var(--ui-surface)) !important;
-  }
-
-  html.dark #textTranslationBtn,
-  html.dark #textTranslationBtnDesktop,
-  html.dark #imageTranslationBtn,
-  html.dark #imageTranslationBtnDesktop {
-    /* ensure contrast against blue-forward surfaces in dark mode */
-    color: var(--brand-bg) !important;
-  }
-
-  /* Verse tags: shift from “button-like” to “chip-like” */
-  #verseTags > span {
-    background-color: color-mix(in srgb, var(--ui-secondary) 14%, var(--ui-surface-2)) !important;
-    color: color-mix(in srgb, var(--ui-text) 92%, var(--ui-text-muted)) !important;
-    border: 1px solid var(--ui-border) !important;
-  }
-
-  html.dark #verseTags > span {
-    background-color: color-mix(in srgb, var(--ui-secondary) 10%, var(--ui-surface-2)) !important;
-    color: var(--ui-text) !important;
-  }
-
-  /* =========================================================
-     Explore tiles: brand colors
-     ========================================================= */
-
-  #exploreReadTile {
-    background-color: var(--brand-secondary) !important; /* #04B7B1 */
-    border-color: color-mix(in srgb, var(--brand-secondary) 70%, black) !important;
-  }
-
-  #exploreStudyTile {
-    background-color: var(--brand-accent) !important; /* #EB5E28 */
-    border-color: color-mix(in srgb, var(--brand-accent) 70%, black) !important;
-  }
-
-  #exploreReadTile:hover { background-color: var(--ui-secondary-hover) !important; }
-  #exploreStudyTile:hover { background-color: var(--ui-accent-hover) !important; }
-
-  /* Ensure Explore tile text reads on colored backgrounds */
-  #exploreReadTile,
-  #exploreStudyTile { color: var(--brand-bg) !important; /* #FDFEF9 */ }
-
-  #exploreReadTile .text-gray-900,
-  #exploreReadTile .text-gray-600,
-  #exploreStudyTile .text-gray-900,
-  #exploreStudyTile .text-gray-600,
-  #exploreReadTile .dark\:text-white:is(.dark *),
-  #exploreReadTile .dark\:text-gray-400:is(.dark *),
-  #exploreStudyTile .dark\:text-white:is(.dark *),
-  #exploreStudyTile .dark\:text-gray-400:is(.dark *) {
-    color: var(--brand-bg) !important;
-    opacity: 0.92;
-  }
+  /* highlight classes are now defined globally below (with left border accent) */
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
+/* ─────────────────────────────────────────────────────
+   GLOBAL STYLES (outside layers)
+───────────────────────────────────────────────────── */
 
-::-webkit-scrollbar-track {
-  @apply bg-gray-100 dark:bg-gray-800;
-}
+/* ─────────────────────────────────────────────────────
+   ACTION SHEET
+───────────────────────────────────────────────────── */
 
-::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 dark:bg-gray-600 rounded-full;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400 dark:bg-gray-500;
-}
-
-/* PWA splash screen styles */
-.splash-screen {
-  @apply fixed inset-0 flex items-center justify-center z-50;
-  background-color: var(--brand-primary);
-  overflow: hidden;
-}
-
-.splash-screen::after {
-  content: "";
-  position: absolute;
-  inset: -35% -60%;
+.ct-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 890;
+  background: rgba(0, 0, 0, 0);
   pointer-events: none;
-  opacity: 0;
-  background: linear-gradient(
-    110deg,
-    transparent 0%,
-    rgba(253, 254, 249, 0.00) 35%,
-    rgba(253, 254, 249, 0.60) 50%,
-    rgba(253, 254, 249, 0.00) 65%,
-    transparent 100%
-  );
-  transform: translateX(-130%) skewX(-16deg);
-  mix-blend-mode: soft-light;
-  filter: blur(0.6px);
-  animation: ctSplashSwoosh 3600ms ease-in-out infinite;
-  z-index: 0;
+  transition: background 0.28s ease;
+}
+.ct-sheet-backdrop.open {
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
 }
 
-.splash-screen::before {
-  content: "";
-  position: absolute;
-  inset: -35% -60%;
-  pointer-events: none;
-  opacity: 0;
-  background: linear-gradient(
-    110deg,
-    transparent 0%,
-    rgba(253, 254, 249, 0.00) 35%,
-    rgba(4, 183, 177, 0.55) 50%,
-    rgba(253, 254, 249, 0.00) 65%,
-    transparent 100%
-  );
-  transform: translateX(-130%) skewX(-16deg);
-  mix-blend-mode: soft-light;
-  filter: blur(0.8px);
-  animation: ctSplashSwoosh 3600ms ease-in-out infinite;
-  animation-delay: 160ms;
-  z-index: 0;
+.ct-action-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 891;
+  background: var(--ui-surface);
+  border-radius: 20px 20px 0 0;
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.22), 0 -1px 0 var(--ui-border);
+  transform: translateY(102%);
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
+}
+.ct-action-sheet.open {
+  transform: translateY(0);
 }
 
-.splash-screen > * {
+.ct-sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ui-border);
+  margin: 12px auto 0;
+}
+
+.ct-sheet-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 6px;
+  border-radius: 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.ct-sheet-action-btn:active {
+  background: color-mix(in srgb, var(--ui-primary) 10%, transparent);
+  transform: scale(0.93);
+}
+.ct-sheet-action-btn .icon {
+  font-size: 1.375rem;
+  line-height: 1;
+}
+.ct-sheet-action-btn .label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ui-text);
+  white-space: nowrap;
+}
+
+/* Highlight swatches in action sheet */
+.hl-swatch-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.hl-swatch-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.hl-swatch-btn:active .hl-swatch-circle {
+  transform: scale(0.9);
+}
+.hl-swatch-btn.active .hl-swatch-circle {
+  box-shadow: 0 0 0 3px var(--ui-primary), 0 2px 8px rgba(0,0,0,0.22);
+}
+.hl-swatch-label {
+  font-size: 0.65rem;
+  color: var(--ui-text-muted);
+  font-weight: 500;
+}
+
+/* ─────────────────────────────────────────────────────
+   THEME SWATCHES
+───────────────────────────────────────────────────── */
+.theme-swatch-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid var(--ui-border);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
   position: relative;
-  z-index: 1;
+  outline: none;
+}
+.theme-swatch-btn.active {
+  border-color: var(--ui-primary);
+  box-shadow: 0 0 0 2px var(--ui-primary);
+  transform: scale(1.1);
+}
+.theme-swatch-btn:active {
+  transform: scale(0.92);
 }
 
-/* Back-compat for any older splash text usage */
-.splash-logo {
-  @apply text-white text-4xl font-bold;
+/* ─────────────────────────────────────────────────────
+   VERSE WORD TAP
+───────────────────────────────────────────────────── */
+.verse-word {
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.15s ease;
+  -webkit-tap-highlight-color: rgba(5,80,137,0.12);
+}
+.verse-word:active,
+.verse-word.tapped {
+  background: color-mix(in srgb, var(--ui-primary) 14%, transparent);
 }
 
-/* Verse image styles */
+.word-def-chip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+  z-index: 800;
+  min-width: 200px;
+  max-width: 280px;
+  animation: chipPop 0.2s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+@keyframes chipPop {
+  from { opacity: 0; transform: translateX(-50%) scale(0.88); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
+/* ─────────────────────────────────────────────────────
+   PAGE TRANSITIONS
+───────────────────────────────────────────────────── */
+.page-enter {
+  animation: pageEnter 0.26s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(14px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ─────────────────────────────────────────────────────
+   HIGHLIGHT STRIP — verse card left border on highlight
+───────────────────────────────────────────────────── */
+.ct-highlight-yellow .verse-container { background: var(--hl-yellow-bg) !important; box-shadow: inset 4px 0 0 #fbbf24, var(--verse-card-shadow) !important; }
+.ct-highlight-amber  .verse-container { background: var(--hl-amber-bg)  !important; box-shadow: inset 4px 0 0 #f59e0b, var(--verse-card-shadow) !important; }
+.ct-highlight-orange .verse-container { background: var(--hl-orange-bg) !important; box-shadow: inset 4px 0 0 #f97316, var(--verse-card-shadow) !important; }
+.ct-highlight-red    .verse-container { background: var(--hl-red-bg)    !important; box-shadow: inset 4px 0 0 #ef4444, var(--verse-card-shadow) !important; }
+.ct-highlight-pink   .verse-container { background: var(--hl-pink-bg)   !important; box-shadow: inset 4px 0 0 #ec4899, var(--verse-card-shadow) !important; }
+.ct-highlight-purple .verse-container { background: var(--hl-purple-bg) !important; box-shadow: inset 4px 0 0 #a855f7, var(--verse-card-shadow) !important; }
+.ct-highlight-blue   .verse-container { background: var(--hl-blue-bg)   !important; box-shadow: inset 4px 0 0 #3b82f6, var(--verse-card-shadow) !important; }
+.ct-highlight-green  .verse-container { background: var(--hl-green-bg)  !important; box-shadow: inset 4px 0 0 #22c55e, var(--verse-card-shadow) !important; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--ui-border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ui-text-muted); }
+
+/* Verse image */
 .verse-image {
-  @apply w-full max-w-sm mx-auto rounded-lg shadow-md;
+  @apply w-full max-w-sm mx-auto rounded-2xl shadow-lg;
   aspect-ratio: 9/16;
   object-fit: cover;
 }
 
-/* Navigation styles */
-.nav-dots {
-  @apply flex justify-center space-x-2 mt-4;
+/* Nav dots */
+.nav-dots { @apply flex justify-center space-x-2 mt-4; }
+.nav-dot { @apply w-2 h-2 bg-gray-300 dark:bg-gray-600 rounded-full transition-colors duration-200; }
+.nav-dot.active { background-color: var(--ui-primary); }
+
+/* Responsive table */
+.responsive-table { display: block; width: 100%; overflow-x: auto; }
+
+/* Animations */
+.fade-in-up { animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.nav-dot {
-  @apply w-2 h-2 bg-gray-300 dark:bg-gray-600 rounded-full transition-colors duration-200;
-}
-
-.nav-dot.active {
-  @apply bg-primary-500;
-}
-
-/* Responsive table helper: allow horizontal scroll on small screens */
-.responsive-table {
-  display: block;
-  width: 100%;
-  overflow-x: auto;
-}
-
-/* Animation classes */
-.fade-in-up {
-  animation: fadeIn 0.5s ease-out;
-}
-
-.slide-in-right {
-  animation: slideInRight 0.3s ease-out;
-}
-
-.slide-in-left {
-  animation: slideInLeft 0.3s ease-out;
-}
+.slide-in-right { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.slide-in-left { animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 
 @keyframes slideInRight {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
-@keyframes slideInLeft {
-  from {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+/* CTA Crawl */
+#ctaCrawl { display: none; }
+#ctaCrawl.visible { display: block; }
+
+/* Admin/nav sidebar compat */
+.admin-sidebar .nav-item { color: var(--menu-text); opacity: 0.9; }
+.admin-sidebar .nav-item .nav-icon { color: var(--menu-text); opacity: 0.7; }
+.admin-sidebar .nav-item:hover { background: rgba(255,255,255,0.1); }
+.admin-sidebar .nav-item.active {
+  background: rgba(255,255,255,0.1);
+  color: white;
+  border-left: 2px solid rgba(255,255,255,0.7);
+}
+.admin-sidebar .nav-item.active .nav-icon { color: white; }
+
+/* ── Admin Bottom Navigation (mobile) ──────────────────────── */
+.admin-bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(180deg, var(--brand-primary) 0%, color-mix(in srgb, var(--brand-primary) 85%, black) 100%);
+  display: flex;
+  align-items: stretch;
+  height: 62px;
+  z-index: 50;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-shadow: 0 -2px 16px rgba(0,0,0,0.18);
+}
+.admin-bottom-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.6);
+  font-size: 10px;
+  font-weight: 500;
+  gap: 3px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 6px 2px;
+  transition: color 0.15s, background 0.15s;
+  min-width: 0;
+  letter-spacing: 0.01em;
+  -webkit-tap-highlight-color: transparent;
+}
+.admin-bottom-tab svg { width: 22px; height: 22px; flex-shrink: 0; }
+.admin-bottom-tab:active { background: rgba(255,255,255,0.08); }
+.admin-bottom-tab.active { color: #fff; }
+.admin-bottom-tab.active svg { filter: drop-shadow(0 0 4px rgba(255,255,255,0.4)); }
+.admin-bottom-tab-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px; }
+
+/* Badge on bottom tab */
+.admin-bottom-tab-badge {
+  position: absolute;
+  top: 6px; right: calc(50% - 14px);
+  min-width: 16px; height: 16px;
+  background: #ef4444;
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+}
+
+/* More drawer overlay */
+.admin-more-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 45;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+.admin-more-overlay.open { opacity: 1; pointer-events: auto; }
+
+/* More drawer sheet */
+.admin-more-drawer {
+  position: fixed;
+  bottom: 62px; left: 0; right: 0;
+  background: var(--ui-surface);
+  border-radius: 18px 18px 0 0;
+  z-index: 46;
+  padding: 16px 16px 8px;
+  transform: translateY(100%);
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.admin-more-drawer.open { transform: translateY(0); }
+.admin-more-drawer-handle {
+  width: 36px; height: 4px;
+  background: var(--ui-border);
+  border-radius: 2px;
+  margin: 0 auto 14px;
+}
+.admin-more-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 12px;
+  border-radius: 12px;
+  color: var(--ui-text);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+  border: none; background: none; width: 100%; text-align: left;
+}
+.admin-more-item:active, .admin-more-item:hover { background: var(--ui-surface-2); }
+.admin-more-item svg { width: 20px; height: 20px; color: var(--brand-primary); flex-shrink: 0; }
+.admin-more-item-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--brand-primary) 12%, transparent);
+  flex-shrink: 0;
+}
+.admin-more-item-icon svg { color: var(--brand-primary); }
+.admin-more-section-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ui-text-muted);
+  padding: 4px 12px 8px;
+}
+
+/* Admin stat cards — unified */
+.admin-stat-card {
+  @apply rounded-xl shadow-sm border p-5 flex items-center gap-4;
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
+}
+.admin-stat-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  font-size: 20px;
+}
+.admin-stat-label { font-size: 13px; color: var(--ui-text-muted); font-weight: 500; }
+.admin-stat-value { font-size: 22px; font-weight: 700; color: var(--ui-text); line-height: 1.1; }
+
+/* Admin page header */
+.admin-page-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  margin-bottom: 20px; flex-wrap: wrap;
+}
+.admin-page-title { font-size: 22px; font-weight: 700; color: var(--ui-text); line-height: 1.2; }
+.admin-page-subtitle { font-size: 14px; color: var(--ui-text-muted); margin-top: 2px; }
+
+/* Main content area needs bottom padding when bottom nav shows */
+@media (max-width: 1023px) {
+  #adminMainContent { padding-bottom: 80px !important; }
+}
+
+/* Admin section cards (replace bare bg-white shadow) */
+.admin-section-card {
+  @apply rounded-xl shadow-sm border overflow-hidden;
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
+}
+.admin-section-card-header {
+  @apply px-5 py-4 border-b;
+  border-color: var(--ui-border);
+}
+.admin-section-card-title { font-size: 16px; font-weight: 600; color: var(--ui-text); }
+.admin-section-card-subtitle { font-size: 13px; color: var(--ui-text-muted); margin-top: 2px; }
+
+/* Modal backgrounds — clean white */
+.admin-modal-inner {
+  background: var(--ui-surface);
+  border-radius: 12px;
+  border: 1px solid var(--ui-border);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+
+/* Make sure active state text stays visible on admin sidebar */
+#masterPageTitle { color: #374151; }
+
+/* Content dividers */
+.content-divider { border-left: 1px solid var(--ui-border); }
+.admin-header-divider { border-bottom: 1px solid var(--ui-border); }
+
+/* ── Skeleton loaders ───────────────────────────────────────── */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.skeleton-card {
+  background: var(--ui-surface-2, #f3f4f6);
+}
+.dark .skeleton-card {
+  background: var(--ui-surface-2, #1f2937);
+}
+
+.skeleton-line {
+  background: linear-gradient(
+    90deg,
+    var(--ui-surface-2, #e5e7eb) 25%,
+    color-mix(in srgb, var(--ui-surface-2, #e5e7eb) 60%, white) 50%,
+    var(--ui-surface-2, #e5e7eb) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+.dark .skeleton-line {
+  background: linear-gradient(
+    90deg,
+    var(--ui-surface-2, #374151) 25%,
+    color-mix(in srgb, var(--ui-surface-2, #374151) 60%, #6b7280) 50%,
+    var(--ui-surface-2, #374151) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+/* ── Admin: override generic Tailwind grays with brand tokens ────────── */
+#adminDashboard .text-gray-900,
+#adminDashboard .text-gray-800 { color: var(--ui-text); }
+#adminDashboard .text-gray-700 { color: var(--ui-text); }
+#adminDashboard .text-gray-500,
+#adminDashboard .text-gray-600 { color: var(--ui-text-muted); }
+#adminDashboard .text-gray-400 { color: var(--ui-text-muted); opacity: 0.7; }
+#adminDashboard table .bg-white,
+#adminDashboard .bg-white:not(.admin-bottom-nav *):not(.admin-more-drawer *) { background-color: var(--ui-surface) !important; }
+#adminDashboard .bg-gray-50 { background-color: var(--ui-surface-2) !important; }
+#adminDashboard .bg-gray-100 { background-color: var(--ui-surface-2) !important; }
+#adminDashboard .divide-gray-200 > * + * { border-color: var(--ui-border); }
+#adminDashboard .border-gray-200 { border-color: var(--ui-border) !important; }
+#adminDashboard .border-gray-300 { border-color: var(--ui-border) !important; }
+#adminDashboard .placeholder-gray-400::placeholder { color: var(--ui-text-muted); opacity: 0.6; }
+/* Admin: modern card uses brand-bg gradient */
+#adminDashboard .modern-card {
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
 }

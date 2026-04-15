@@ -134,9 +134,8 @@ class ChurchTapApp {
 
   updateVersePrivateToolsVisibility() {
     const canUse = this.canUsePrivateVerseTools();
+    // Save button is always visible; favorite state updates via updateFavoriteButton()
     const favoriteBtn = document.getElementById('favoriteBtn');
-
-    // Match how "Favorites" are intended to behave: only show when logged in with an active group.
     if (favoriteBtn) favoriteBtn.classList.toggle('hidden', !canUse);
 
     if (!canUse) {
@@ -1503,6 +1502,7 @@ class ChurchTapApp {
 
     const dateNav = document.getElementById('dateNav');
     if (dateNav) dateNav.classList.add('hidden');
+    this.hideHeaderDate();
 
     const verseContainer = document.getElementById('verseContainer');
     if (verseContainer) verseContainer.classList.add('hidden');
@@ -1520,8 +1520,7 @@ class ChurchTapApp {
     const pageContainer = document.getElementById('pageContainer');
     if (pageContainer) pageContainer.classList.add('hidden');
 
-    const dateNav = document.getElementById('dateNav');
-    if (dateNav) dateNav.classList.remove('hidden');
+    // dateNav permanently hidden — date lives in header bar now
 
     const verseContainer = document.getElementById('verseContainer');
     if (verseContainer) verseContainer.classList.remove('hidden');
@@ -1564,125 +1563,123 @@ class ChurchTapApp {
   renderExplorePage() {
     const studyEnabled = this.isStudyModeEnabled();
     const studyTile = studyEnabled
-      ? `
-          <button id="exploreStudyTile" class="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-gray-200 dark:border-gray-700 text-left hover:bg-purple-100 dark:hover:bg-purple-800 transition-colors"
-                  onclick="window.churchTapApp.navigate('/study')">
-            <div class="text-lg">📚</div>
-            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Study</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Definitions • Commentary</div>
-          </button>
-        `
-      : `
-          <button id="exploreStudyTile" class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  onclick="window.churchTapApp.navigate('/menu'); window.churchTapApp.showToast('Turn on Study Mode in Menu to unlock Study tools')">
-            <div class="text-lg">🔒</div>
-            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Study</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Turn on Study Mode in Menu</div>
-          </button>
-        `;
+      ? `<button id="exploreStudyTile" class="explore-tile explore-tile--study"
+                onclick="window.churchTapApp.navigate('/study')">
+            <span class="explore-tile__emoji">📚</span>
+            <div class="explore-tile__title">Study</div>
+            <div class="explore-tile__subtitle">Definitions · Commentary</div>
+          </button>`
+      : `<button id="exploreStudyTile" class="explore-tile explore-tile--locked"
+                onclick="window.churchTapApp.navigate('/menu'); window.churchTapApp.showToast('Turn on Study Mode in Settings to unlock Study tools')">
+            <span class="explore-tile__emoji">🔒</span>
+            <div class="explore-tile__title" style="color: var(--ui-text);">Study</div>
+            <div class="explore-tile__subtitle">Enable in Settings</div>
+          </button>`;
 
     this.setPageContent(`
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Explore</h2>
-          <button class="btn-secondary text-sm" onclick="window.churchTapApp.goToToday()">Today</button>
+      <div class="max-w-lg mx-auto px-1 pt-2 pb-4">
+        <!-- Page header -->
+        <div class="flex items-center justify-between mb-5 px-1">
+          <h2 class="page-title">Explore</h2>
+          <button class="btn-secondary text-xs py-1.5 px-3" onclick="window.churchTapApp.goToToday()">← Today</button>
         </div>
 
-        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Search, browse history, or discover something new.
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <button id="exploreReadTile" class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        <!-- Primary tiles (colored) -->
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <button id="exploreReadTile" class="explore-tile explore-tile--read"
                   onclick="window.churchTapApp.showBibleReadModal()">
-            <div class="text-lg">📖</div>
-            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Read</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Book • Chapter • Verse</div>
-          </button>
-
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  onclick="window.churchTapApp.showVerseSearchModal()">
-            <div class="text-lg">🔍</div>
-            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Search</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Verses & Bible</div>
+            <span class="explore-tile__emoji">📖</span>
+            <div class="explore-tile__title">Read</div>
+            <div class="explore-tile__subtitle">Book · Chapter · Verse</div>
           </button>
 
           ${studyTile}
+        </div>
 
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        <!-- Secondary tiles -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <button class="explore-tile"
+                  onclick="window.churchTapApp.showVerseSearchModal()">
+            <span class="explore-tile__emoji">🔍</span>
+            <div class="explore-tile__title">Search</div>
+            <div class="explore-tile__subtitle">Verses & Bible</div>
+          </button>
+
+          <button class="explore-tile"
                   onclick="window.churchTapApp.showHistory()">
-            <div class="text-lg">🕐</div>
-            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">History</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Last 60 days</div>
+            <span class="explore-tile__emoji">🕐</span>
+            <div class="explore-tile__title">History</div>
+            <div class="explore-tile__subtitle">Last 60 days</div>
           </button>
 
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          <button class="explore-tile"
                   onclick="window.churchTapApp.openCalendarModal()">
-            <div class="text-lg">📅</div>
-            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Calendar</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Pick a date</div>
+            <span class="explore-tile__emoji">📅</span>
+            <div class="explore-tile__title">Calendar</div>
+            <div class="explore-tile__subtitle">Pick a date</div>
           </button>
 
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          <button class="explore-tile"
                   onclick="window.churchTapApp.showRandomVerse()">
-            <div class="text-lg">🎲</div>
-            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Random</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Surprise me</div>
+            <span class="explore-tile__emoji">🎲</span>
+            <div class="explore-tile__title">Random</div>
+            <div class="explore-tile__subtitle">Surprise me</div>
           </button>
         </div>
 
-        <div class="mt-4">
-          <button class="w-full btn-primary" onclick="window.churchTapApp.showTopicsWordCloud()">
-            🏷️ Browse Topics
-          </button>
-        </div>
+        <!-- Browse Topics CTA -->
+        <button class="w-full btn-primary py-3 rounded-2xl text-sm"
+                onclick="window.churchTapApp.showTopicsWordCloud()">
+          🏷️ Browse Topics
+        </button>
       </div>
     `);
   }
 
   renderSavedPage() {
     this.setPageContent(`
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Saved</h2>
-          <button class="btn-secondary text-sm" onclick="window.churchTapApp.goToToday()">Today</button>
-        </div>
-        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Your collections and personal prayers.
+      <div class="max-w-lg mx-auto px-1 pt-2 pb-4">
+        <div class="flex items-center justify-between mb-5 px-1">
+          <h2 class="page-title">Saved</h2>
+          <button class="btn-secondary text-xs py-1.5 px-3" onclick="window.churchTapApp.goToToday()">← Today</button>
         </div>
 
-        <div class="space-y-3">
-          <button class="w-full p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
-                  onclick="window.churchTapApp.navigate('/collections')">
-            <div class="flex items-center justify-between">
+        <div class="page-card mx-0 px-0 py-2">
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/collections')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">📚</div>
               <div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white">📚 Collections</div>
-                <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Group verses by theme</div>
+                <div class="text-sm font-semibold" style="color: var(--ui-text);">Collections</div>
+                <div class="text-xs" style="color: var(--ui-text-muted);">Group verses by theme</div>
               </div>
-              <div class="text-gray-400">›</div>
             </div>
+            <div class="menu-row__right">›</div>
           </button>
 
-          <button class="w-full p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
-                  onclick="window.churchTapApp.navigate('/my-prayers')">
-            <div class="flex items-center justify-between">
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/my-prayers')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">🙏</div>
               <div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white">🙏 My Prayers</div>
-                <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Personal prayer list</div>
+                <div class="text-sm font-semibold" style="color: var(--ui-text);">My Prayers</div>
+                <div class="text-xs" style="color: var(--ui-text-muted);">Personal prayer list</div>
               </div>
-              <div class="text-gray-400">›</div>
             </div>
+            <div class="menu-row__right">›</div>
           </button>
 
-          <button class="w-full p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
-                  onclick="window.churchTapApp.showMyStuffSearchModal()">
-            <div class="flex items-center justify-between">
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button class="menu-row w-full" onclick="window.churchTapApp.showMyStuffSearchModal()">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">🔍</div>
               <div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white">🔍 Search My Stuff</div>
-                <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Notes, collections, and prayers</div>
+                <div class="text-sm font-semibold" style="color: var(--ui-text);">Search My Stuff</div>
+                <div class="text-xs" style="color: var(--ui-text-muted);">Notes, collections, prayers</div>
               </div>
-              <div class="text-gray-400">›</div>
             </div>
+            <div class="menu-row__right">›</div>
           </button>
         </div>
       </div>
@@ -1692,56 +1689,109 @@ class ChurchTapApp {
   renderMePage() {
     const name = this.currentUser?.displayName || this.currentUser?.firstName || null;
     const title = name ? this.escapeHtml(String(name)) : 'Account';
+    const email = this.currentUser?.email ? this.escapeHtml(String(this.currentUser.email)) : '';
     const isLoggedIn = !!this.currentUser;
+    const initials = name ? name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2) : '👤';
 
     this.setPageContent(`
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Me</h2>
-          <button class="btn-secondary text-sm" onclick="window.churchTapApp.goToToday()">Today</button>
-        </div>
-        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          ${isLoggedIn ? `Signed in as <span class="font-medium text-gray-900 dark:text-gray-200">${title}</span>` : 'Sign in to sync favorites and join groups.'}
+      <div class="max-w-lg mx-auto px-1 pt-2 pb-4">
+        <div class="flex items-center justify-between mb-5 px-1">
+          <h2 class="page-title">Me</h2>
+          <button class="btn-secondary text-xs py-1.5 px-3" onclick="window.churchTapApp.goToToday()">← Today</button>
         </div>
 
-        <div class="space-y-3">
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/favorites')">
-            ❤️ Favorites
-          </button>
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/collections')">
-            📚 My Categories
-          </button>
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/my-prayers')">
-            🙏 My Prayers
-          </button>
-
-          <div class="pt-2 border-t border-gray-200 dark:border-gray-700"></div>
-
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/my-highlights')">
-            🖍️ My Highlights
-          </button>
-
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/my-notes')">
-            📝 My Notes
-          </button>
-
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.currentUser ? window.churchTapApp.showProfileModal() : window.churchTapApp.showLoginModal()">
-            👤 Profile
+        <!-- Profile Card -->
+        <div class="page-card mx-0 mb-4 flex items-center gap-4">
+          <div class="profile-avatar">${isLoggedIn ? initials : '👤'}</div>
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold text-sm" style="color: var(--ui-text);">${isLoggedIn ? title : 'Guest'}</div>
+            ${email ? `<div class="text-xs truncate" style="color: var(--ui-text-muted);">${email}</div>` : ''}
+            ${!isLoggedIn ? `<div class="text-xs" style="color: var(--ui-text-muted);">Sign in to sync your data</div>` : ''}
+          </div>
+          <button class="btn-outline text-xs py-1.5 px-3 shrink-0"
+                  onclick="window.churchTapApp.currentUser ? window.churchTapApp.showProfileModal() : window.churchTapApp.showLoginModal()">
+            ${isLoggedIn ? 'Edit' : 'Sign in'}
           </button>
         </div>
 
-        <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3">
+        <!-- Personal Library -->
+        <div class="section-header">My Library</div>
+        <div class="page-card mx-0 px-0 py-2 mb-4">
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/favorites')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">❤️</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Favorites</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/collections')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">📚</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Collections</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/my-prayers')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">🙏</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">My Prayers</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/my-highlights')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">🖍️</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Highlights</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/my-notes')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">📝</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Notes</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+        </div>
+
+        <!-- Settings -->
+        <div class="section-header">App</div>
+        <div class="page-card mx-0 px-0 py-2 mb-4">
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/menu')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">⚙️</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Settings</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+        </div>
+
+        <!-- Auth actions -->
+        <div class="space-y-2">
           ${isLoggedIn ? `
-            <button class="w-full px-4 py-2 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 transition-colors"
+            <button class="w-full py-2.5 px-4 rounded-xl text-sm font-medium transition-colors"
+                    style="background: color-mix(in srgb, #ef4444 8%, var(--ui-surface)); color: #ef4444; border: 1px solid color-mix(in srgb, #ef4444 20%, var(--ui-border));"
                     onclick="window.churchTapApp.handleLogout()">
-              🚪 Logout
+              🚪 Sign Out
             </button>
           ` : `
-            <button class="w-full btn-primary" onclick="window.churchTapApp.showLoginModal()">
-              🔑 Sign in
+            <button class="w-full btn-primary py-3 rounded-2xl" onclick="window.churchTapApp.showLoginModal()">
+              🔑 Sign In
             </button>
-            <button class="w-full btn-secondary" onclick="window.churchTapApp.showRegisterModal()">
-              ✨ Create account
+            <button class="w-full btn-outline py-3 rounded-2xl" onclick="window.churchTapApp.showRegisterModal()">
+              ✨ Create Account
             </button>
           `}
         </div>
@@ -1759,46 +1809,47 @@ class ChurchTapApp {
   // ===========================
   renderLinksPage() {
     this.setPageContent(`
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Links</h2>
-          <button class="btn-secondary text-sm" onclick="window.churchTapApp.goToToday()">Today</button>
-        </div>
-        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Quick links from your current group.
+      <div class="max-w-lg mx-auto px-1 pt-2 pb-4">
+        <div class="flex items-center justify-between mb-5 px-1">
+          <h2 class="page-title">Links</h2>
+          <button class="btn-secondary text-xs py-1.5 px-3" onclick="window.churchTapApp.goToToday()">← Today</button>
         </div>
 
-        <!-- Fundraising (if active) -->
-        <button id="fundraisingCard" class="hidden w-full text-left px-3 py-3 mb-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+        <!-- Fundraising card (hidden by default, loaded dynamically) -->
+        <button id="fundraisingCard" class="hidden w-full text-left mb-4 rounded-2xl overflow-hidden"
+                style="background: linear-gradient(135deg, var(--brand-primary) 0%, color-mix(in srgb, var(--brand-primary) 80%, var(--brand-secondary)) 100%); color: white; padding: 1rem 1.25rem;"
                 onclick="window.churchTapApp.openFundraisingModal()">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
               <div class="flex items-center justify-between gap-2">
-                <div class="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-                  🎯 <span id="fundraisingTitle">Fundraising</span>
-                </div>
-                <div id="fundraisingPct" class="text-xs font-semibold text-green-700 dark:text-green-300 tabular-nums whitespace-nowrap">0%</div>
+                <div class="text-sm font-bold truncate">🎯 <span id="fundraisingTitle">Fundraising</span></div>
+                <div id="fundraisingPct" class="text-sm font-bold tabular-nums whitespace-nowrap opacity-90">0%</div>
               </div>
-
               <div class="mt-2 flex items-center gap-2">
-                <div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-                  <div id="fundraisingProgressBar" class="h-1.5 bg-green-600" style="width:0%"></div>
+                <div class="flex-1 rounded-full h-1.5 overflow-hidden" style="background: rgba(255,255,255,0.3);">
+                  <div id="fundraisingProgressBar" class="h-1.5" style="width:0%; background: white;"></div>
                 </div>
-                <div id="fundraisingAmounts" class="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">--</div>
+                <div id="fundraisingAmounts" class="text-xs opacity-80 whitespace-nowrap">--</div>
               </div>
-
-              <div id="fundraisingDeadline" class="mt-2 text-xs text-gray-500 dark:text-gray-400"></div>
+              <div id="fundraisingDeadline" class="mt-1.5 text-xs opacity-70"></div>
             </div>
           </div>
         </button>
 
-        <button id="playlistBtn" class="hidden w-full text-left px-3 py-2 mb-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+        <!-- Worship Playlist (hidden by default) -->
+        <button id="playlistBtn" class="hidden w-full text-left menu-row mb-3 rounded-2xl"
+                style="background: var(--ui-surface); border: 1px solid var(--ui-border);"
                 onclick="window.churchTapApp.openPlaylistModal()">
-          📺 Worship Playlist
+          <div class="menu-row__left">
+            <div class="menu-row__icon">📺</div>
+            <div class="text-sm font-medium" style="color: var(--ui-text);">Worship Playlist</div>
+          </div>
+          <div class="menu-row__right">›</div>
         </button>
 
-        <div id="linksPageList" class="space-y-1">
-          <div class="text-sm text-gray-500 dark:text-gray-400 py-2">Loading…</div>
+        <!-- Dynamic links list -->
+        <div id="linksPageList" class="space-y-2">
+          <div class="text-sm py-3 text-center" style="color: var(--ui-text-muted);">Loading…</div>
         </div>
       </div>
     `);
@@ -1809,48 +1860,45 @@ class ChurchTapApp {
   }
 
   // ===========================
-  // Menu Page (/menu)
+  // Menu Page (/menu)  [now "Settings"]
   // ===========================
   renderMenuPage() {
     this.setPageContent(`
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Menu</h2>
-          <button class="btn-secondary text-sm" onclick="window.churchTapApp.goToToday()">Today</button>
-        </div>
-        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Tools and settings.
+      <div class="max-w-lg mx-auto px-1 pt-2 pb-4">
+        <div class="flex items-center justify-between mb-5 px-1">
+          <h2 class="page-title">Settings</h2>
+          <button class="btn-secondary text-xs py-1.5 px-3" onclick="window.churchTapApp.goToToday()">← Today</button>
         </div>
 
-        <div class="mb-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/20">
-          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
-            Defaults
-          </div>
-
+        <!-- Bible Defaults -->
+        <div class="section-header">Bible Defaults</div>
+        <div class="page-card mx-0 mb-4">
           <div class="space-y-3">
             <div>
-              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Bible Translation</label>
+              <label class="block text-xs font-semibold mb-1.5" style="color: var(--ui-text-muted);">Translation</label>
               <select id="menuDefaultTranslationSelect"
-                      class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                      class="w-full px-3 py-2 rounded-xl text-sm"
+                      style="background: var(--ui-surface-2); border: 1px solid var(--ui-border); color: var(--ui-text);"
                       onchange="window.churchTapApp.handleMenuDefaultTranslationChange(this.value)">
                 <option value="">Loading…</option>
               </select>
-              <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">Used for “View in Translation” and full chapter reading.</div>
+              <div class="mt-1 text-xs" style="color: var(--ui-text-muted);">Used for "View in Translation" and chapter reading.</div>
             </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Commentary</label>
+                <label class="block text-xs font-semibold mb-1.5" style="color: var(--ui-text-muted);">Commentary</label>
                 <select id="menuDefaultCommentarySelect"
-                        class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                        class="w-full px-3 py-2 rounded-xl text-sm"
+                        style="background: var(--ui-surface-2); border: 1px solid var(--ui-border); color: var(--ui-text);"
                         onchange="window.churchTapApp.handleMenuDefaultCommentaryChange(this.value)">
                   <option value="">Loading…</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Dictionary</label>
+                <label class="block text-xs font-semibold mb-1.5" style="color: var(--ui-text-muted);">Dictionary</label>
                 <select id="menuDefaultDictionarySelect"
-                        class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                        class="w-full px-3 py-2 rounded-xl text-sm"
+                        style="background: var(--ui-surface-2); border: 1px solid var(--ui-border); color: var(--ui-text);"
                         onchange="window.churchTapApp.handleMenuDefaultDictionaryChange(this.value)">
                   <option value="">Loading…</option>
                 </select>
@@ -1859,89 +1907,135 @@ class ChurchTapApp {
           </div>
         </div>
 
-        <div class="space-y-2">
-          <button class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  onclick="window.location.href='/store'">
-            🛍️ Store
+        <!-- Appearance -->
+        <div class="section-header">Appearance</div>
+        <div class="page-card mx-0 px-0 py-2 mb-4">
+          <button class="menu-row w-full" onclick="window.churchTapApp.cycleTextSize(); window.churchTapApp.updateMenuIndicators();">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">📝</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Text Size</div>
+            </div>
+            <div class="menu-row__right">
+              <span id="textSizeIndicator" class="text-xs font-semibold" style="color: var(--ui-primary);">Medium</span>
+              <span style="color: var(--ui-text-muted);">›</span>
+            </div>
           </button>
-        </div>
 
-        <div id="groupSection" class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
-          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-1">
-            Current Group
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <div class="menu-row" style="cursor:default; align-items:center;">
+            <div class="menu-row__left" style="flex:1; min-width:0;">
+              <div class="menu-row__icon"><span id="themeMenuIcon">☀️</span></div>
+              <div>
+                <div class="text-sm font-medium" style="color: var(--ui-text);">Theme</div>
+                <div class="text-xs mt-0.5" style="color: var(--ui-text-muted);" id="themeIndicator">Light</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 pr-1">
+              <button id="themeSwatchBtn-light" class="theme-swatch-btn" title="Light"
+                style="background: #FDFEF9;"
+                onclick="window.churchTapApp.setTheme('light')"></button>
+              <button id="themeSwatchBtn-dark" class="theme-swatch-btn" title="Dark"
+                style="background: #14080e;"
+                onclick="window.churchTapApp.setTheme('dark')"></button>
+              <button id="themeSwatchBtn-sepia" class="theme-swatch-btn" title="Sepia"
+                style="background: #f3ede0;"
+                onclick="window.churchTapApp.setTheme('sepia')"></button>
+              <button id="themeSwatchBtn-night" class="theme-swatch-btn" title="Night"
+                style="background: #080f1c;"
+                onclick="window.churchTapApp.setTheme('night')"></button>
+            </div>
           </div>
 
-          <div id="currentGroupDisplay" class="px-1 mb-2">
-            <div class="text-sm font-medium text-gray-700 dark:text-gray-300" id="currentGroupName">Loading...</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">Tap a chip to switch quickly</div>
-          </div>
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
 
-          <div id="groupQuickList" class="mb-2"></div>
-
-          <button id="changeGroupBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  onclick="window.churchTapApp.changeGroup()">
-            🔄 Switch Group
-          </button>
-          <button id="requestGroupBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  onclick="window.churchTapApp.requestGroup()">
-            ➕ Join a Group
-          </button>
-        </div>
-
-        <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
-          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-1">
-            Settings
-          </div>
-
-          <button class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center justify-between"
-                  onclick="window.churchTapApp.cycleTextSize(); window.churchTapApp.updateMenuIndicators();">
-            <span class="flex items-center space-x-2"><span>📝</span><span>Text Size</span></span>
-            <span id="textSizeIndicator" class="text-sm text-gray-500 dark:text-gray-400">Medium</span>
-          </button>
-
-          <button class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center justify-between"
-                  onclick="window.churchTapApp.toggleTheme(); window.churchTapApp.updateMenuIndicators();">
-            <span class="flex items-center space-x-2"><span id="themeMenuIcon">🌙</span><span>Theme</span></span>
-            <span id="themeIndicator" class="text-sm text-gray-500 dark:text-gray-400">Light</span>
-          </button>
-
-          <label class="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-            <span class="flex items-center space-x-2"><span>📚</span><span>Study Mode</span></span>
-            <input id="studyModeMenuToggle" type="checkbox" class="h-5 w-5 accent-primary-600"
-                   onchange="window.churchTapApp.handleStudyModeToggle(this.checked); window.churchTapApp.updateMenuIndicators();"
-                   aria-label="Toggle Study Mode" />
+          <label class="menu-row w-full cursor-pointer" style="user-select: none;">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">📚</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Study Mode</div>
+            </div>
+            <div class="menu-row__right">
+              <input id="studyModeMenuToggle" type="checkbox" class="h-5 w-5 rounded"
+                     style="accent-color: var(--brand-primary);"
+                     onchange="window.churchTapApp.handleStudyModeToggle(this.checked); window.churchTapApp.updateMenuIndicators();"
+                     aria-label="Toggle Study Mode" />
+            </div>
           </label>
+        </div>
+
+        <!-- Group -->
+        <div class="section-header">Group</div>
+        <div id="groupSection" class="page-card mx-0 px-0 py-2 mb-4">
+          <div class="px-4 py-2">
+            <div class="text-sm font-semibold" id="currentGroupName" style="color: var(--ui-text);">Loading…</div>
+            <div class="text-xs mt-0.5" style="color: var(--ui-text-muted);">Tap a chip to switch quickly</div>
+          </div>
+          <div id="currentGroupDisplay" class="px-4 pb-1"></div>
+          <div id="groupQuickList" class="px-4 pb-2"></div>
+
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button id="changeGroupBtn" class="menu-row w-full" onclick="window.churchTapApp.changeGroup()">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">🔄</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Switch Group</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button id="requestGroupBtn" class="menu-row w-full" onclick="window.churchTapApp.requestGroup()">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">➕</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Join a Group</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+        </div>
+
+        <!-- More -->
+        <div class="section-header">More</div>
+        <div class="page-card mx-0 px-0 py-2 mb-4">
+          <button class="menu-row w-full" onclick="window.location.href='/store'">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">🛍️</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Store</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button class="menu-row w-full" onclick="window.churchTapApp.openFeedback()">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">💬</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Send Feedback</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
 
           <div id="menuInstallInsertPoint"></div>
+
+          <button id="adminPanelBtn" class="hidden menu-row w-full" onclick="window.location.href='/admin'">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">🛠️</div>
+              <div class="text-sm font-medium" style="color: var(--brand-primary);">Admin Panel</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
         </div>
 
-        <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
-          <button id="adminPanelBtn" class="hidden w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-indigo-700 dark:text-indigo-300"
-                  onclick="window.location.href='/admin'">
-            🛠️ Admin Panel
-          </button>
-
-          <div id="tagSessionInfo" class="hidden pt-2">
-            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-1">
-              NFC Session
+        <!-- NFC Session (hidden by default) -->
+        <div id="tagSessionInfo" class="hidden mb-4">
+          <div class="section-header">NFC Session</div>
+          <div class="page-card mx-0 px-4 py-3" style="background: color-mix(in srgb, var(--brand-primary) 8%, var(--ui-surface));">
+            <div class="flex items-center gap-2 text-sm" style="color: var(--brand-primary);">
+              <span>🏷️</span>
+              <span class="font-medium">NFC Connected</span>
             </div>
-            <div class="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg mb-2">
-              <div class="flex items-center justify-between">
-                <div class="text-sm">
-                  <span class="text-blue-600 dark:text-blue-400">🏷️</span>
-                  <span class="text-gray-700 dark:text-gray-300">NFC Connected</span>
-                </div>
-              </div>
-              <div class="hidden">
-                <span id="tagSessionId">NFC Connected</span>
-              </div>
-            </div>
+            <div class="hidden"><span id="tagSessionId">NFC Connected</span></div>
           </div>
-
-          <button class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  onclick="window.churchTapApp.openFeedback()">
-            💬 Send Feedback
-          </button>
         </div>
       </div>
     `);
@@ -2717,6 +2811,10 @@ class ChurchTapApp {
     const inner = pageContainer?.querySelector('.max-w-lg');
     if (!inner) return;
     inner.innerHTML = html;
+    // Page enter animation
+    inner.classList.remove('page-enter');
+    void inner.offsetWidth; // force reflow
+    inner.classList.add('page-enter');
   }
 
   renderAuthRequired(title, message) {
@@ -3299,13 +3397,17 @@ class ChurchTapApp {
 
     // Engagement actions
     on('heartBtn', 'click', () => this.toggleHeart());
-    on('favoriteBtn', 'click', () => this.toggleFavorite());
 
-    const addToCollectionBtn = document.getElementById('addToCollectionBtn');
-    if (addToCollectionBtn) {
-      addToCollectionBtn.addEventListener('click', () => {
-        this.showAddToCollectionModal();
+    // Unified save button: tap = favorite, long-press = collection picker
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => this.toggleFavorite());
+      let savePressTimer;
+      saveBtn.addEventListener('pointerdown', () => {
+        savePressTimer = setTimeout(() => this.showAddToCollectionModal(), 500);
       });
+      saveBtn.addEventListener('pointerup', () => clearTimeout(savePressTimer));
+      saveBtn.addEventListener('pointerleave', () => clearTimeout(savePressTimer));
     }
 
     // Note: Notes + Highlights live under the Me tab now.
@@ -3364,13 +3466,13 @@ class ChurchTapApp {
       lastTap = currentTime;
     });
 
-    // Long press for quick share
+    // Long press → verse action sheet (highlight, copy, share, note)
     let pressTimer;
     document.getElementById('verseContainer').addEventListener('touchstart', (e) => {
       pressTimer = setTimeout(() => {
-        navigator.vibrate && navigator.vibrate(50);
-        this.shareVerse();
-      }, 800);
+        navigator.vibrate && navigator.vibrate(40);
+        this.showVerseActionSheet();
+      }, 550);
     });
 
     document.getElementById('verseContainer').addEventListener('touchend', () => {
@@ -3687,10 +3789,11 @@ class ChurchTapApp {
     if (el.dataset) el.dataset.studyWordTapToday = '1';
 
     el.style.cursor = 'text';
+    el.style.userSelect = 'text';
 
+    // Word tap: works for everyone (not gated to study mode).
+    // Shows a definition chip on the Today screen for any tapped word.
     el.addEventListener('click', async (e) => {
-      if (!this.isStudyModeEnabled()) return;
-
       // If user is selecting text, don't hijack taps.
       const sel = window.getSelection?.();
       if (sel && !sel.isCollapsed && String(sel.toString() || '').trim()) return;
@@ -3698,8 +3801,68 @@ class ChurchTapApp {
       const word = this.getWordFromPoint(e.clientX, e.clientY);
       if (!word) return;
 
-      await this.showDefinitionForWord(word);
+      // Clean punctuation
+      const clean = word.replace(/[^a-zA-Z'-]/g, '').trim();
+      if (!clean || clean.length < 3) return;
+
+      await this.showTodayWordChip(clean, el, e);
     });
+  }
+
+  // Show an inline word chip (definition popup) near the tapped word
+  async showTodayWordChip(word, containerEl, event) {
+    // Remove any existing chip
+    const existing = document.getElementById('todayWordChip');
+    if (existing) existing.remove();
+
+    const chip = document.createElement('div');
+    chip.id = 'todayWordChip';
+    chip.className = 'word-def-chip';
+    chip.style.cssText = 'position:absolute; z-index:800;';
+    chip.innerHTML = `
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-xs font-bold uppercase" style="color:var(--ui-primary); letter-spacing:0.05em;">${this.escapeHtml(word)}</span>
+        <button onclick="document.getElementById('todayWordChip')?.remove()" style="color:var(--ui-text-muted); font-size:1rem; line-height:1; padding:2px 4px;">×</button>
+      </div>
+      <div id="todayWordChipDef" class="text-xs" style="color:var(--ui-text-muted);">Looking up…</div>
+      <button class="mt-2 text-xs font-semibold" style="color:var(--ui-primary);"
+              onclick="window.churchTapApp.studyDefineSelectedWord('${this.escapeHtml(word.replace(/'/g, "\\'"))}'); document.getElementById('todayWordChip')?.remove();">
+        Full Study →
+      </button>
+    `;
+
+    // Position near the tap
+    const rect = containerEl.getBoundingClientRect();
+    const scrollTop = window.scrollY || document.documentElement.scrollTop;
+    const tapY = event.clientY + scrollTop - rect.top + containerEl.scrollTop;
+
+    chip.style.top = `${tapY - 10}px`;
+    chip.style.left = '50%';
+    chip.style.transform = 'translateX(-50%)';
+
+    containerEl.style.position = 'relative';
+    containerEl.appendChild(chip);
+
+    // Dismiss on outside tap
+    const dismiss = (e) => {
+      if (!chip.contains(e.target)) { chip.remove(); document.removeEventListener('touchstart', dismiss); document.removeEventListener('click', dismiss); }
+    };
+    setTimeout(() => {
+      document.addEventListener('touchstart', dismiss, { passive: true });
+      document.addEventListener('click', dismiss);
+    }, 100);
+
+    // Fetch definition
+    const entry = await this.fetchDictionaryEntry(word);
+    const defEl = document.getElementById('todayWordChipDef');
+    if (defEl) {
+      if (entry?.definition) {
+        const def = String(entry.definition).replace(/<[^>]+>/g, '').slice(0, 120);
+        defEl.textContent = def + (entry.definition.length > 120 ? '…' : '');
+      } else {
+        defEl.textContent = 'No definition found.';
+      }
+    }
   }
 
   displayTags(tagsString) {
@@ -3717,11 +3880,8 @@ class ChurchTapApp {
       return;
     }
     
-    tagsContainer.innerHTML = tags.map(tag => 
-      `<span class="px-2 py-1 bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 text-xs rounded-full">${tag}</span>`
-    ).join('');
-    
-    tagsContainer.classList.remove('hidden');
+    // Chips permanently hidden per UX decision — tags stored but not displayed
+    tagsContainer.classList.add('hidden');
   }
 
   showLoading() {
@@ -3820,23 +3980,34 @@ class ChurchTapApp {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
 
-    const dateStr = dateObj.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    // Legacy hidden elements (kept for compat)
+    const legacyDate = document.getElementById('currentDate');
+    if (legacyDate) legacyDate.textContent = date;
+    const legacyDesc = document.getElementById('dateDescription');
+    if (legacyDesc) legacyDesc.textContent = date === todayStr ? "Today's Verse" : date === yesterdayStr ? "Yesterday's Verse" : "Church Tap";
 
-    document.getElementById('currentDate').textContent = dateStr;
+    // Header date display (compact, right side of header bar)
+    const headerDateBtn = document.getElementById('headerDateBtn');
+    const headerDateDay = document.getElementById('headerDateDay');
+    const headerDateSub = document.getElementById('headerDateSub');
 
-    const description = document.getElementById('dateDescription');
-    if (date === todayStr) {
-      description.textContent = "Today's Verse";
-    } else if (date === yesterdayStr) {
-      description.textContent = "Yesterday's Verse";
-    } else {
-      description.textContent = "Church Tap";
+    if (headerDateBtn && headerDateDay && headerDateSub) {
+      // e.g. "Wed, Apr 15"
+      headerDateDay.textContent = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      if (date === todayStr) {
+        headerDateSub.textContent = 'Today';
+      } else if (date === yesterdayStr) {
+        headerDateSub.textContent = 'Yesterday';
+      } else {
+        headerDateSub.textContent = dateObj.toLocaleDateString('en-US', { year: 'numeric' });
+      }
+      headerDateBtn.classList.remove('hidden');
     }
+  }
+
+  hideHeaderDate() {
+    const headerDateBtn = document.getElementById('headerDateBtn');
+    if (headerDateBtn) headerDateBtn.classList.add('hidden');
   }
 
   navigateDay(direction) {
@@ -4525,17 +4696,79 @@ class ChurchTapApp {
     this.trackAnalytics('share_random_verse');
   }
 
+  // Cycle through all 4 themes (used by quick tap)
   toggleTheme() {
-    this.theme = this.theme === 'light' ? 'dark' : 'light';
+    const themes = ['light', 'dark', 'sepia', 'night'];
+    const idx = themes.indexOf(this.theme);
+    this.theme = themes[(idx + 1) % themes.length];
     this.applyTheme();
     localStorage.setItem('theme', this.theme);
+    this.showToast(
+      this.theme === 'light' ? '☀️ Light' :
+      this.theme === 'dark'  ? '🌙 Dark'  :
+      this.theme === 'sepia' ? '📜 Sepia' :
+                               '🌃 Night'
+    );
+  }
+
+  // Set a specific theme by name
+
+  randomizeCrossTile() {
+    const W = 280, H = 360;
+    const fills = {light:'rgb(120,110,100)',dark:'rgb(255,255,255)',sepia:'rgb(150,125,90)',night:'rgb(255,255,255)'};
+    const scales = {light:1,dark:1,sepia:1,night:0.7};
+    const fill = fills[this.theme] || fills.light;
+    const scale = scales[this.theme] || 1;
+    const crosses = [{vb:'0 0 403.523335 629.761280',t:'translate(-173.381420,701.000000) scale(0.100000,-0.100000)',d:'M3709 6982 l-31 -28 1 -1005 c1 -553 -1 -1013 -5 -1022 -6 -16 -70 -17 -933 -17 -720 0 -932 -3 -951 -13 -56 -28 -74 -123 -36 -182 38 -57 -16 -54 981 -57 522 -2 926 -7 934 -12 12 -8 13 -295 10 -1937 l-4 -1929 31 -31 c55 -54 151 -47 186 14 10 18 14 411 18 1957 l5 1935 900 5 c495 3 901 6 902 8 51 56 66 128 38 182 -33 64 28 60 -940 60 -672 0 -884 3 -893 12 -9 9 -12 248 -12 1016 0 669 -3 1010 -10 1023 -16 28 -63 49 -114 49 -36 0 -52 -6 -77 -28z'},{vb:'0 0 359.000000 495.726516',t:'translate(-207.000000,638.726516) scale(0.100000,-0.100000)',d:'M3399 6376 c-51 -29 -52 -33 -48 -628 l4 -553 -623 -5 -624 -5 -19 -24 c-18 -22 -19 -45 -19 -496 0 -451 1 -474 19 -496 l19 -24 624 -5 623 -5 2 -1334 c2 -1239 3 -1335 19 -1352 16 -18 40 -19 486 -19 l469 0 24 25 25 24 0 1331 0 1330 613 0 613 0 27 28 27 28 0 473 0 472 -26 24 -27 25 -607 0 -608 0 -6 23 c-3 12 -3 256 0 543 4 287 4 538 0 558 -12 65 -3 63 -506 70 -392 6 -459 4 -481 -8z m739 -868 l2 -578 608 0 c334 0 617 -3 630 -6 l22 -6 0 -259 0 -259 -627 -2 -628 -3 -5 -1345 -5 -1345 -262 -3 -263 -2 -2 1347 -3 1348 -630 5 -630 5 -3 254 c-2 197 1 257 10 263 7 5 292 8 633 7 l620 -2 2 569 c2 313 5 575 8 582 3 10 61 12 262 10 l258 -3 3 -577z'},{vb:'0 0 333.675515 510.815417',t:'translate(-217.000000,639.787762) scale(0.100000,-0.100000)',d:'M3793 6390 c-12 -5 -30 -21 -39 -35 -16 -25 -17 -76 -15 -727 2 -537 0 -702 -10 -714 -10 -12 -114 -14 -750 -14 -505 1 -745 -3 -759 -10 -23 -12 -50 -60 -50 -89 0 -35 31 -101 54 -114 16 -9 206 -13 766 -17 l745 -5 5 -1655 c5 -1748 3 -1685 50 -1710 34 -18 93 -12 125 14 l30 24 5 1664 5 1663 740 3 739 2 28 27 c57 55 60 133 6 178 l-30 25 -732 0 c-556 0 -735 3 -744 12 -9 9 -12 182 -12 715 l0 703 -27 30 c-30 34 -89 48 -130 30z'},{vb:'0 0 340.000000 563.889382',t:'translate(-212.000000,666.889382) scale(0.100000,-0.100000)',d:'M3660 6657 l-25 -13 -3 -823 c-1 -589 -5 -828 -13 -838 -9 -11 -142 -13 -739 -13 -691 0 -728 -1 -743 -18 -15 -16 -17 -45 -17 -201 0 -176 1 -183 23 -205 l23 -23 723 -7 c398 -3 728 -9 732 -12 5 -3 9 -770 9 -1720 0 -1701 0 -1714 20 -1734 18 -18 33 -20 188 -20 151 0 171 2 185 18 16 17 17 152 17 1735 0 1362 3 1717 13 1724 6 4 325 6 707 4 l696 -3 32 27 32 27 0 184 c0 171 -1 185 -20 204 -20 20 -33 20 -718 20 -615 0 -700 2 -720 16 l-22 15 0 818 c0 749 -1 820 -17 832 -23 20 -327 25 -363 6z'},{vb:'0 0 339.986750 550.095210',t:'translate(-214.000000,660.000000) scale(0.100000,-0.100000)',d:'M3695 6580 c-18 -20 -19 -55 -16 -793 l3 -772 -22 -28 -21 -27 -728 0 c-641 0 -729 -2 -749 -16 -21 -14 -22 -22 -22 -140 0 -119 1 -126 25 -149 l24 -25 724 0 c723 0 724 0 743 -21 19 -21 19 -64 19 -1751 0 -1701 0 -1730 19 -1744 28 -20 264 -20 292 0 19 14 19 44 20 1743 0 950 1 1733 2 1738 7 36 27 37 753 36 767 -2 758 -3 773 51 3 13 6 71 6 131 0 94 -2 109 -20 127 -20 20 -33 20 -750 20 l-730 0 -15 24 c-15 22 -16 106 -15 794 1 767 1 769 -20 795 -21 27 -23 27 -149 27 -116 0 -130 -2 -146 -20z'}];
+    const positions = [[12, 8, 18], [108, 2, 22], [205, 15, 15], [252, 4, 17], [55, 92, 20], [150, 85, 16], [245, 100, 22], [18, 188, 14], [115, 182, 20], [208, 195, 16], [260, 185, 18], [65, 278, 20], [170, 270, 14], [242, 288, 18], [22, 326, 16], [125, 320, 22], [230, 337, 14]];
+    const defs = '<defs>' + crosses.map((c,i) =>
+      `<symbol id="c${i}" viewBox="${c.vb}" preserveAspectRatio="xMidYMid meet">` +
+      `<g transform="${c.t}" fill="currentColor" stroke="none">` +
+      `<path d="${c.d}"/></g></symbol>`
+    ).join('') + '</defs>';
+    const instances = positions.map(([x,y,h]) => {
+      const ci = Math.floor(Math.random() * 5);
+      const [,,vw,vh] = crosses[ci].vb.split(' ').map(Number);
+      const w = (h * vw / vh).toFixed(1);
+      const op = ((0.15 + Math.random() * 0.15) * scale).toFixed(3);
+      return `<svg x="${x}" y="${y}" width="${w}" height="${h}" opacity="${op}"><use href="#c${ci}"/></svg>`;
+    }).join('');
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" color="${fill}">${defs}${instances}</svg>`;
+    document.documentElement.style.setProperty('--cross-tile', `url("data:image/svg+xml;base64,${btoa(svg)}")`);
+  }
+
+  setTheme(name) {
+    const valid = ['light', 'dark', 'sepia', 'night'];
+    this.theme = valid.includes(name) ? name : 'light';
+    this.applyTheme();
+    localStorage.setItem('theme', this.theme);
+    this.updateMenuThemeSwatches();
+    this.updateMenuIndicators();
   }
 
   applyTheme() {
-    if (this.theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+    document.documentElement.classList.remove('dark', 'sepia', 'night');
+    if (this.theme === 'dark')  document.documentElement.classList.add('dark');
+    if (this.theme === 'sepia') document.documentElement.classList.add('sepia');
+    if (this.theme === 'night') document.documentElement.classList.add('night');
+    this.randomizeCrossTile();
+  }
+
+  // Update the active swatch in the Settings page if it's open
+  updateMenuThemeSwatches() {
+    ['light', 'dark', 'sepia', 'night'].forEach(t => {
+      const el = document.getElementById(`themeSwatchBtn-${t}`);
+      if (el) el.classList.toggle('active', this.theme === t);
+    });
+    const indicator = document.getElementById('themeIndicator');
+    if (indicator) {
+      const names = { light: 'Light', dark: 'Dark', sepia: 'Sepia', night: 'Night' };
+      indicator.textContent = names[this.theme] || 'Light';
+    }
+    const icon = document.getElementById('themeMenuIcon');
+    if (icon) {
+      const icons = { light: '☀️', dark: '🌙', sepia: '📜', night: '🌃' };
+      icon.textContent = icons[this.theme] || '☀️';
     }
   }
 
@@ -5302,12 +5535,16 @@ class ChurchTapApp {
 
   updateFavoriteButton() {
     if (!this.currentVerse) return;
-    
+
+    // Update the unified save button (filled = saved)
+    const saveBtnIcon = document.getElementById('saveBtnIcon');
+    if (saveBtnIcon) {
+      saveBtnIcon.style.fill = this.favorites.includes(this.currentVerse.id) ? 'currentColor' : 'none';
+    }
+    // Legacy selector kept for any external callers
     const favoriteBtn = document.querySelector('#favoriteBtn svg');
-    if (this.favorites.includes(this.currentVerse.id)) {
-      favoriteBtn.style.fill = 'currentColor';
-    } else {
-      favoriteBtn.style.fill = 'none';
+    if (favoriteBtn) {
+      favoriteBtn.style.fill = this.favorites.includes(this.currentVerse.id) ? 'currentColor' : 'none';
     }
   }
 
@@ -5613,18 +5850,382 @@ class ChurchTapApp {
     }
   }
 
-  showToast(message, duration = 3000) {
+  // ─── Action Sheet ──────────────────────────────────
+  showActionSheet(html) {
+    let backdrop = document.getElementById('ct-sheet-backdrop');
+    let sheet    = document.getElementById('ct-action-sheet');
+
+    if (!backdrop) {
+      backdrop = document.createElement('div');
+      backdrop.id = 'ct-sheet-backdrop';
+      backdrop.className = 'ct-sheet-backdrop';
+      backdrop.addEventListener('click', () => this.closeActionSheet());
+      document.body.appendChild(backdrop);
+    }
+    if (!sheet) {
+      sheet = document.createElement('div');
+      sheet.id = 'ct-action-sheet';
+      sheet.className = 'ct-action-sheet';
+      document.body.appendChild(sheet);
+    }
+
+    sheet.innerHTML = html;
+    // Trigger animation next frame
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        backdrop.classList.add('open');
+        sheet.classList.add('open');
+      });
+    });
+  }
+
+  closeActionSheet() {
+    const sheet    = document.getElementById('ct-action-sheet');
+    const backdrop = document.getElementById('ct-sheet-backdrop');
+    if (sheet)    { sheet.classList.remove('open'); }
+    if (backdrop) { backdrop.classList.remove('open'); }
+  }
+
+  // ── Community card long-press ──────────────────────────────────────────────
+
+  setupCommunityLongPress(container) {
+    if (!container) return;
+    const cards = container.querySelectorAll('.community-card');
+    cards.forEach(card => {
+      let timer = null;
+      let didLongPress = false;
+
+      const start = (e) => {
+        didLongPress = false;
+        timer = setTimeout(() => {
+          didLongPress = true;
+          if (navigator.vibrate) navigator.vibrate(40);
+          const type    = card.dataset.communityType;
+          const id      = card.dataset.communityId;
+          const content = card.dataset.communityContent;
+          this.showCommunityActionSheet(type, id, content);
+        }, 500);
+      };
+
+      const cancel = (e) => {
+        clearTimeout(timer);
+      };
+
+      const preventTap = (e) => {
+        if (didLongPress) { e.preventDefault(); e.stopPropagation(); didLongPress = false; }
+      };
+
+      card.addEventListener('touchstart',  start,      { passive: true });
+      card.addEventListener('touchend',    cancel,     { passive: true });
+      card.addEventListener('touchmove',   cancel,     { passive: true });
+      card.addEventListener('mousedown',   start);
+      card.addEventListener('mouseup',     cancel);
+      card.addEventListener('mouseleave',  cancel);
+      card.addEventListener('click',       preventTap, { capture: true });
+    });
+  }
+
+  showCommunityActionSheet(type, id, content) {
+    const typeConfig = {
+      prayer:  { label: 'Prayer Request', icon: '🙏', primaryFn: `prayForRequest(${id})`,    primaryLabel: 'Pray for this',    color: '#3b82f6' },
+      praise:  { label: 'Praise Report',  icon: '🎉', primaryFn: `celebrateReport(${id})`,  primaryLabel: 'Celebrate this',   color: '#f59e0b' },
+      insight: { label: 'Verse Insight',  icon: '💡', primaryFn: `heartInsight(${id}, this)`, primaryLabel: 'Heart this',      color: '#a855f7' },
+    };
+    const cfg = typeConfig[type] || typeConfig.prayer;
+
+    // Quick emoji reactions (stored in memory, no backend required)
+    const quickEmojis = ['❤️','🙌','🔥','😢','😮','💪'];
+    const storedReactions = this.communityReactions?.[`${type}_${id}`] || {};
+
+    const emojiButtons = quickEmojis.map(emoji => {
+      const count = storedReactions[emoji] || 0;
+      const picked = storedReactions[`_picked_${emoji}`];
+      return `
+        <button class="community-emoji-btn ${picked ? 'picked' : ''}"
+                onclick="window.churchTapApp.addCommunityReaction('${type}', '${id}', '${emoji}'); window.churchTapApp.closeActionSheet();"
+                style="display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 10px; border-radius:12px; border:none; background: ${picked ? 'var(--ui-primary-muted, #e0f0ff)' : 'var(--ui-surface-2)'}; cursor:pointer; transition: transform 0.1s, background 0.2s; font-size:24px; line-height:1;">
+          <span>${emoji}</span>
+          ${count > 0 ? `<span style="font-size:10px; color:var(--ui-text-muted);">${count}</span>` : ''}
+        </button>
+      `;
+    }).join('');
+
+    const preview = content.length > 80 ? content.slice(0, 77) + '…' : content;
+
+    this.showActionSheet(`
+      <div class="ct-sheet-handle"></div>
+      <div class="px-4 pt-3 pb-4">
+        <div class="flex items-center gap-2 mb-3">
+          <span style="font-size:18px;">${cfg.icon}</span>
+          <span class="text-xs font-semibold" style="color:var(--ui-text-muted); text-transform:uppercase; letter-spacing:0.06em;">${cfg.label}</span>
+        </div>
+        <p class="text-sm mb-4 leading-relaxed" style="color:var(--ui-text-secondary); font-style:italic;">"${this.escapeHtml(preview)}"</p>
+
+        <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
+          ${emojiButtons}
+        </div>
+        <div style="height:1px; background:var(--ui-border); margin-bottom:12px;"></div>
+
+        <div class="grid gap-0" style="grid-template-columns: 1fr 1fr;">
+          <button class="ct-sheet-action-btn"
+                  onclick="window.churchTapApp.${cfg.primaryFn}; window.churchTapApp.closeActionSheet();">
+            <span class="icon">${cfg.icon}</span>
+            <span class="label">${cfg.primaryLabel}</span>
+          </button>
+          <button class="ct-sheet-action-btn"
+                  onclick="window.churchTapApp.shareCommunityPost('${type}', \`${this.escapeHtml(content)}\`); window.churchTapApp.closeActionSheet();">
+            <span class="icon">↗️</span>
+            <span class="label">Share</span>
+          </button>
+        </div>
+
+        <div class="mt-3">
+          <button class="w-full py-2.5 rounded-xl text-sm font-medium"
+                  style="background:var(--ui-surface-2); color:var(--ui-text-muted);"
+                  onclick="window.churchTapApp.closeActionSheet();">Cancel</button>
+        </div>
+      </div>
+    `);
+  }
+
+  addCommunityReaction(type, id, emoji) {
+    const key = `${type}_${id}`;
+    if (!this.communityReactions) this.communityReactions = {};
+    if (!this.communityReactions[key]) this.communityReactions[key] = {};
+    const reactions = this.communityReactions[key];
+    const pickedKey = `_picked_${emoji}`;
+    if (reactions[pickedKey]) {
+      // Toggle off
+      reactions[emoji] = Math.max(0, (reactions[emoji] || 1) - 1);
+      delete reactions[pickedKey];
+    } else {
+      reactions[emoji] = (reactions[emoji] || 0) + 1;
+      reactions[pickedKey] = true;
+    }
+    // Re-render the reaction bar on the card
+    const card = document.querySelector(`.community-card[data-community-type="${type}"][data-community-id="${id}"]`);
+    if (card) {
+      const bar = card.querySelector('.community-reaction-bar');
+      if (bar) bar.outerHTML = this.buildReactionBar(reactions);
+    }
+    this.showToast(`${emoji} reacted!`);
+  }
+
+  buildReactionBar(reactions) {
+    if (!reactions) return '';
+    const entries = Object.entries(reactions)
+      .filter(([k, v]) => !k.startsWith('_picked_') && v > 0);
+    if (entries.length === 0) return '<div class="community-reaction-bar" style="min-height:0;"></div>';
+    const chips = entries.map(([emoji, count]) => `
+      <span style="display:inline-flex; align-items:center; gap:3px; background:var(--ui-surface-2); border-radius:999px; padding:2px 8px; font-size:13px;">
+        ${emoji}<span style="font-size:11px; color:var(--ui-text-muted);">${count}</span>
+      </span>
+    `).join('');
+    return `<div class="community-reaction-bar" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px;">${chips}</div>`;
+  }
+
+  async shareCommunityPost(type, content) {
+    const typeLabel = { prayer: 'Prayer Request', praise: 'Praise Report', insight: 'Verse Insight' }[type] || 'Post';
+    const text = `${typeLabel} from our church community:\n\n"${content}"`;
+    if (navigator.share) {
+      try { await navigator.share({ text }); } catch(e) { /* cancelled */ }
+    } else {
+      try { await navigator.clipboard.writeText(text); this.showToast('Copied to clipboard'); } catch(e) { this.showToast('Unable to share'); }
+    }
+  }
+
+  showVerseActionSheet() {
+    const canUse = this.canUsePrivateVerseTools();
+    const currentKey = String(this.currentHighlightKey || '').trim().toLowerCase();
+
+    const hlColors = [
+      { key: 'yellow', color: '#fbbf24', label: 'Yellow' },
+      { key: 'green',  color: '#22c55e', label: 'Green'  },
+      { key: 'blue',   color: '#3b82f6', label: 'Blue'   },
+      { key: 'pink',   color: '#ec4899', label: 'Pink'   },
+    ];
+
+    const hlSection = canUse ? `
+      <div class="flex justify-center gap-2 mb-3">
+        ${hlColors.map(c => `
+          <button class="hl-swatch-btn ${currentKey === c.key ? 'active' : ''}"
+                  onclick="window.churchTapApp.setVerseHighlight('${c.key}'); window.churchTapApp.closeActionSheet();">
+            <span class="hl-swatch-circle" style="background:${c.color};"></span>
+            <span class="hl-swatch-label">${c.label}</span>
+          </button>
+        `).join('')}
+        ${currentKey ? `
+          <button class="hl-swatch-btn"
+                  onclick="window.churchTapApp.setVerseHighlight(null); window.churchTapApp.closeActionSheet();">
+            <span class="hl-swatch-circle" style="background: var(--ui-surface-2); display:flex; align-items:center; justify-content:center;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ui-text-muted)" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </span>
+            <span class="hl-swatch-label">Clear</span>
+          </button>
+        ` : ''}
+      </div>
+      <div style="height:1px; background:var(--ui-border); margin: 4px 16px 12px;"></div>
+    ` : '';
+
+    const actions = [
+      { icon: '📋', label: 'Copy',     fn: 'copyVerse'              },
+      { icon: '↗️', label: 'Share',    fn: 'shareVerse'             },
+      ...(canUse ? [
+        { icon: '⭐', label: 'Favorite', fn: 'toggleFavorite'       },
+        { icon: '📝', label: 'Note',     fn: 'showVerseNotesModal'  },
+        { icon: '🎨', label: 'Highlight',fn: 'showHighlightPicker'  },
+      ] : []),
+    ];
+
+    const ref = this.escapeHtml(this.currentVerse?.bible_reference || 'Today\'s Verse');
+
+    this.showActionSheet(`
+      <div class="ct-sheet-handle"></div>
+      <div class="px-4 pt-3 pb-2">
+        <div class="text-xs font-semibold text-center mb-4" style="color:var(--ui-text-muted); letter-spacing:0.06em; text-transform:uppercase;">${ref}</div>
+        ${hlSection}
+        <div class="grid gap-0" style="grid-template-columns: repeat(${actions.length}, 1fr);">
+          ${actions.map(a => `
+            <button class="ct-sheet-action-btn"
+                    onclick="window.churchTapApp.${a.fn}(); window.churchTapApp.closeActionSheet();">
+              <span class="icon">${a.icon}</span>
+              <span class="label">${a.label}</span>
+            </button>
+          `).join('')}
+        </div>
+        <div class="mt-3">
+          <button class="w-full py-2.5 rounded-xl text-sm font-medium"
+                  style="background:var(--ui-surface-2); color:var(--ui-text-muted);"
+                  onclick="window.churchTapApp.closeActionSheet();">Cancel</button>
+        </div>
+      </div>
+    `);
+  }
+
+  copyVerse() {
+    if (!this.currentVerse) return;
+    const text = this.currentVerse.content_type === 'text'
+      ? `"${this.plainTextFromVerseText(this.currentVerse.verse_text)}" — ${this.currentVerse.bible_reference || 'Bible'}`
+      : (this.currentVerse.bible_reference || 'Bible');
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => this.showToast('📋 Copied!'));
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      this.showToast('📋 Copied!');
+    }
+  }
+  // ─── End Action Sheet ──────────────────────────────
+
+  showToast(message, type = 'default', duration = 3000) {
+    // Remove any existing toast to avoid stacking
+    const existing = document.getElementById('ct-toast');
+    if (existing) existing.remove();
+
+    const icons = {
+      success: '✅',
+      error:   '❌',
+      info:    'ℹ️',
+      default: '',
+    };
+    const colors = {
+      success: 'background: #065f46; color: #d1fae5;',
+      error:   'background: #7f1d1d; color: #fecaca;',
+      info:    'background: #1e3a5f; color: #bfdbfe;',
+      default: 'background: var(--ui-surface-elevated, #1f2937); color: var(--ui-on-elevated, #f9fafb);',
+    };
+    const icon  = icons[type]  || '';
+    const color = colors[type] || colors.default;
+
     const toast = document.createElement('div');
-    toast.className = 'fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-800 px-4 py-2 rounded-lg z-50 animate-slide-up';
-    toast.textContent = message;
-    
+    toast.id = 'ct-toast';
+    toast.style.cssText = `
+      position: fixed;
+      bottom: calc(var(--nav-height, 64px) + 16px);
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      ${color}
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      max-width: 90vw;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+      opacity: 0;
+      transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+      pointer-events: none;
+    `;
+    if (icon) {
+      const iconSpan = document.createElement('span');
+      iconSpan.textContent = icon;
+      toast.appendChild(iconSpan);
+    }
+    const textSpan = document.createElement('span');
+    textSpan.textContent = message;
+    toast.appendChild(textSpan);
     document.body.appendChild(toast);
-    
+
+    // Animate in
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(-50%) translateY(0)';
+      });
+    });
+
+    // Animate out
     setTimeout(() => {
-      if (document.body.contains(toast)) {
-        document.body.removeChild(toast);
-      }
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(-50%) translateY(8px)';
+      setTimeout(() => { if (toast.parentNode) toast.remove(); }, 250);
     }, duration);
+  }
+
+  // Confetti burst — lightweight emoji particles for celebrations
+  showConfetti(emoji = '🎉', count = 18) {
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9998;overflow:hidden;';
+    document.body.appendChild(container);
+
+    for (let i = 0; i < count; i++) {
+      const particle = document.createElement('span');
+      const x = 20 + Math.random() * 60; // center-ish horizontally
+      const duration = 900 + Math.random() * 600;
+      const rotate   = Math.random() * 720 - 360;
+      const size     = 16 + Math.random() * 12;
+      particle.textContent = emoji;
+      particle.style.cssText = `
+        position: absolute;
+        left: ${x}%;
+        bottom: 30%;
+        font-size: ${size}px;
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) rotate(0deg);
+        transition: transform ${duration}ms cubic-bezier(0.1,0.8,0.3,1), opacity ${duration * 0.8}ms ease ${duration * 0.4}ms;
+        will-change: transform, opacity;
+      `;
+      container.appendChild(particle);
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const vy = -(60 + Math.random() * 120);
+          const vx = (Math.random() - 0.5) * 80;
+          particle.style.transform = `translateX(calc(-50% + ${vx}vw)) translateY(${vy}vh) rotate(${rotate}deg)`;
+          particle.style.opacity = '0';
+        });
+      });
+    }
+
+    setTimeout(() => { if (container.parentNode) container.remove(); }, 2000);
   }
 
   hideSplashScreen() {
@@ -8485,31 +9086,31 @@ class ChurchTapApp {
     
     container.innerHTML = prayerRequests.map(request => {
       const hasUserPrayed = this.userInteractions[`prayer_${request.id}`];
+      const reactions = this.communityReactions?.[`prayer_${request.id}`] || {};
+      const reactionBar = this.buildReactionBar(reactions);
       
       return `
-        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-          <p class="text-gray-800 dark:text-gray-200 text-sm mb-3 leading-relaxed">${this.escapeHtml(request.content)}</p>
+        <div class="community-card community-card--prayer select-none"
+             data-community-type="prayer" data-community-id="${request.id}"
+             data-community-content="${this.escapeHtml(request.content)}">
+          <p class="text-sm mb-3 leading-relaxed" style="color:var(--ui-text)">${this.escapeHtml(request.content)}</p>
+          ${reactionBar}
           <div class="flex items-center justify-between">
-            <span class="text-xs text-gray-500 dark:text-gray-400">
-              ${this.formatTimeAgo(request.created_at)}
-            </span>
+            <span class="text-xs" style="color:var(--ui-text-muted)">${this.formatTimeAgo(request.created_at)}</span>
             <button 
-              onclick="window.churchTapApp.prayForRequest(${request.id})" 
-              class="flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                hasUserPrayed 
-                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 cursor-default' 
-                  : 'bg-blue-500 hover:bg-blue-600 text-white'
-              }"
+              onclick="window.churchTapApp.prayForRequest(${request.id})"
+              class="community-interact-btn ${hasUserPrayed ? 'community-interact-btn--pray-done' : 'community-interact-btn--pray'}"
               ${hasUserPrayed ? 'disabled' : ''}
             >
               <span>🙏</span>
               <span>${hasUserPrayed ? 'Prayed' : 'Pray'}</span>
-              <span class="bg-white/20 px-1 rounded">${request.prayer_count || 0}</span>
+              <span style="opacity:0.7">${request.prayer_count || 0}</span>
             </button>
           </div>
         </div>
       `;
     }).join('');
+    this.setupCommunityLongPress(container);
   }
 
   displayVerseInsights(verseInsights) {
@@ -8517,25 +9118,31 @@ class ChurchTapApp {
     
     container.innerHTML = verseInsights.map(insight => {
       const hasUserHearted = this.userInteractions[`insight_${insight.id}`];
+      const reactions = this.communityReactions?.[`insight_${insight.id}`] || {};
+      const reactionBar = this.buildReactionBar(reactions);
       
       return `
-        <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
+        <div class="community-card community-card--insight select-none"
+             data-community-type="insight" data-community-id="${insight.id}"
+             data-community-content="${this.escapeHtml(insight.content)}">
           <div class="flex items-start justify-between mb-2">
-            <span class="text-xs text-purple-600 dark:text-purple-400 font-medium">${insight.verse_reference || 'Today\'s Verse'}</span>
-            <div class="flex items-center space-x-1">
-              <button onclick="app.heartInsight(${insight.id}, this)" class="flex items-center space-x-1 text-xs px-2 py-1 rounded-full ${hasUserHearted ? 'bg-red-100 text-red-600 cursor-not-allowed' : 'bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600'} transition-colors" ${hasUserHearted ? 'disabled' : ''}>
-                <span>❤️</span>
-                <span class="heart-count">${insight.heart_count || 0}</span>
-              </button>
-            </div>
+            <span class="text-xs font-semibold" style="color:var(--card-insight-accent)">${insight.verse_reference || 'Today\'s Verse'}</span>
+            <button onclick="app.heartInsight(${insight.id}, this)"
+              class="community-interact-btn ${hasUserHearted ? 'community-interact-btn--heart-done' : 'community-interact-btn--heart'}"
+              ${hasUserHearted ? 'disabled' : ''}>
+              <span>${hasUserHearted ? '❤️' : '🤍'}</span>
+              <span class="heart-count">${insight.heart_count || 0}</span>
+            </button>
           </div>
-          <p class="text-gray-800 dark:text-gray-200 text-sm mb-3 leading-relaxed">${this.escapeHtml(insight.content)}</p>
-          <div class="text-xs text-gray-500">
+          <p class="text-sm mb-3 leading-relaxed" style="color:var(--ui-text)">${this.escapeHtml(insight.content)}</p>
+          ${reactionBar}
+          <div class="text-xs" style="color:var(--ui-text-muted)">
             ${new Date(insight.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
           </div>
         </div>
       `;
     }).join('');
+    this.setupCommunityLongPress(container);
   }
 
   displayPraiseReports(praiseReports) {
@@ -8543,31 +9150,31 @@ class ChurchTapApp {
     
     container.innerHTML = praiseReports.map(report => {
       const hasUserCelebrated = this.userInteractions[`celebration_${report.id}`];
+      const reactions = this.communityReactions?.[`praise_${report.id}`] || {};
+      const reactionBar = this.buildReactionBar(reactions);
       
       return `
-        <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
-          <p class="text-gray-800 dark:text-gray-200 text-sm mb-3 leading-relaxed">${this.escapeHtml(report.content)}</p>
+        <div class="community-card community-card--praise select-none"
+             data-community-type="praise" data-community-id="${report.id}"
+             data-community-content="${this.escapeHtml(report.content)}">
+          <p class="text-sm mb-3 leading-relaxed" style="color:var(--ui-text)">${this.escapeHtml(report.content)}</p>
+          ${reactionBar}
           <div class="flex items-center justify-between">
-            <span class="text-xs text-gray-500 dark:text-gray-400">
-              ${this.formatTimeAgo(report.created_at)}
-            </span>
+            <span class="text-xs" style="color:var(--ui-text-muted)">${this.formatTimeAgo(report.created_at)}</span>
             <button 
-              onclick="window.churchTapApp.celebrateReport(${report.id})" 
-              class="flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                hasUserCelebrated 
-                  ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300 cursor-default' 
-                  : 'bg-yellow-500 hover:bg-yellow-600 text-white'
-              }"
+              onclick="window.churchTapApp.celebrateReport(${report.id})"
+              class="community-interact-btn ${hasUserCelebrated ? 'community-interact-btn--celebrate-done' : 'community-interact-btn--celebrate'}"
               ${hasUserCelebrated ? 'disabled' : ''}
             >
               <span>🎉</span>
               <span>${hasUserCelebrated ? 'Celebrated' : 'Celebrate'}</span>
-              <span class="bg-white/20 px-1 rounded">${report.celebration_count || 0}</span>
+              <span style="opacity:0.7">${report.celebration_count || 0}</span>
             </button>
           </div>
         </div>
       `;
     }).join('');
+    this.setupCommunityLongPress(container);
   }
 
   showEmptyCommunity() {
@@ -8752,7 +9359,9 @@ class ChurchTapApp {
       
       if (data.success) {
         this.closeModal();
-        this.showToast('🙏 Prayer request submitted!');
+        this.showToast('Prayer request submitted!', 'success');
+        this.showConfetti('🙏', 14);
+        if (navigator.vibrate) navigator.vibrate([20, 50, 20]);
         this.loadCommunity(this.currentDate); // Reload community
         this.trackAnalytics('prayer_request_submitted');
       } else {
@@ -8784,7 +9393,9 @@ class ChurchTapApp {
       
       if (data.success) {
         this.closeModal();
-        this.showToast('💭 Verse insight submitted!');
+        this.showToast('Insight shared with your community!', 'success');
+        this.showConfetti('💡', 14);
+        if (navigator.vibrate) navigator.vibrate([20, 50, 20]);
         this.loadCommunity(this.currentDate); // Reload community
         this.trackAnalytics('verse_insight_submitted');
       } else {
@@ -8815,7 +9426,9 @@ class ChurchTapApp {
       
       if (data.success) {
         this.closeModal();
-        this.showToast('🎉 Praise report submitted!');
+        this.showToast('Praise report shared!', 'success');
+        this.showConfetti('🎉', 20);
+        if (navigator.vibrate) navigator.vibrate([30, 60, 30]);
         this.loadCommunity(this.currentDate); // Reload community
         this.trackAnalytics('praise_report_submitted');
       } else {
@@ -8850,9 +9463,9 @@ class ChurchTapApp {
         // Reload community to show updated counts
         this.loadCommunity(this.currentDate);
         
-        this.showToast('🙏 Thank you for praying!');
+        this.showToast('🙏 Thank you for praying!', 'success');
         this.trackAnalytics('prayer_interaction', prayerRequestId);
-        navigator.vibrate && navigator.vibrate(25);
+        navigator.vibrate && navigator.vibrate([15, 40, 15]);
       } else {
         this.showToast(data.error || 'Failed to record prayer', 'error');
       }
@@ -8890,8 +9503,9 @@ class ChurchTapApp {
         this.userInteractions[`insight_${insightId}`] = true;
         this.saveUserInteractions();
         
-        this.showToast('❤️');
+        this.showToast('❤️ Hearted!', 'success');
         this.trackAnalytics('insight_hearted');
+        navigator.vibrate && navigator.vibrate([15, 40, 15]);
       } else {
         this.showToast(data.error || 'Already hearted!', 'info');
       }
@@ -8924,9 +9538,10 @@ class ChurchTapApp {
         // Reload community to show updated counts
         this.loadCommunity(this.currentDate);
         
-        this.showToast('🎉 Celebration added!');
+        this.showToast('🎉 Celebration added!', 'success');
+        this.showConfetti('🎉', 10);
         this.trackAnalytics('celebration_interaction', praiseReportId);
-        navigator.vibrate && navigator.vibrate(25);
+        navigator.vibrate && navigator.vibrate([15, 40, 15]);
       } else {
         this.showToast(data.error || 'Failed to record celebration', 'error');
       }
@@ -10482,18 +11097,8 @@ class ChurchTapApp {
 
   // Update menu indicators for theme and text size
   updateMenuIndicators() {
-    // Update theme indicator
-    const themeIndicator = document.getElementById('themeIndicator');
-    const themeMenuIcon = document.getElementById('themeMenuIcon');
-    if (themeIndicator && themeMenuIcon) {
-      if (this.theme === 'dark') {
-        themeIndicator.textContent = 'Dark';
-        themeMenuIcon.textContent = '🌙';
-      } else {
-        themeIndicator.textContent = 'Light';
-        themeMenuIcon.textContent = '☀️';
-      }
-    }
+    // Update theme indicator + swatches
+    this.updateMenuThemeSwatches();
 
     // Update text size indicator
     const textSizeIndicator = document.getElementById('textSizeIndicator');

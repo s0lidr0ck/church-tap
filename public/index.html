@@ -23,10 +23,10 @@
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Lora:ital,wght@0,400;0,600;1,400;1,600&display=swap" rel="stylesheet">
   
   <!-- Styles -->
-  <link href="/css/style.css?v=v3" rel="stylesheet">
+  <link href="/css/style.css?v=v4" rel="stylesheet">
   
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-Q0RCM76BL8"></script>
@@ -116,11 +116,14 @@
   </div>
 
   <!-- Main App -->
-  <div id="app" class="hidden min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-    <!-- Header -->
-    <header class="glass-effect sticky z-40 px-4 py-3 border-b border-white/20" style="top: 44px;">
-      <div class="flex items-center justify-center sm:justify-between max-w-lg mx-auto">
-        <!-- Logo/Title -->
+  <div id="app" class="hidden min-h-screen" style="background-color: var(--ct-app-bg);">
+
+    <!-- ═══════════════════════════════════════════════
+         HEADER — glass, sticky, brand logo
+    ════════════════════════════════════════════════ -->
+    <header class="app-header sticky top-0 z-40 px-4" style="padding-top: env(safe-area-inset-top, 0);">
+      <div class="flex items-center justify-between max-w-lg mx-auto h-14">
+        <!-- Logo -->
         <div class="ct-logo ct-logo--header" aria-label="Church Tap">
           <span class="sr-only">Church Tap</span>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 393.73 66.19" role="img" aria-hidden="true">
@@ -130,325 +133,336 @@
                 <path d="M362.3,13.76v4.89c1.63-1.9,3.57-3.32,5.82-4.27,2.25-.95,4.65-1.42,7.21-1.42,3.64,0,6.85.94,9.65,2.81,2.79,1.87,4.95,4.41,6.47,7.61,1.52,3.2,2.28,6.76,2.28,10.67s-.77,7.49-2.32,10.75c-1.55,3.26-3.73,5.82-6.55,7.69-2.82,1.87-6.05,2.81-9.69,2.81-2.39,0-4.68-.48-6.88-1.42s-4-2.29-5.41-4.03v16.37h-10.91V13.76h10.34ZM379.77,42.05c1.87-2.09,2.81-4.74,2.81-7.94s-.94-5.85-2.81-7.94c-1.87-2.09-4.3-3.13-7.29-3.13-2.77,0-5.08,1.03-6.92,3.09-1.85,2.06-2.77,4.72-2.77,7.98s.91,5.85,2.73,7.94c1.82,2.09,4.14,3.13,6.96,3.13,2.98,0,5.41-1.04,7.29-3.13Z" fill="#04b7b1"/>
             </g>
             <g class="logo-church">
-                <path d="M13.52,50.85c-4.23-2.41-7.55-5.71-9.93-9.89-2.39-4.18-3.58-8.79-3.58-13.84s1.19-9.48,3.58-13.64c2.39-4.15,5.7-7.44,9.93-9.85C17.75,1.21,22.52,0,27.85,0c3.58,0,6.96.58,10.14,1.75,3.18,1.17,5.96,2.81,8.35,4.93l-7,7.65c-3.09-2.66-6.7-3.99-10.83-3.99-3.15,0-5.98.75-8.51,2.24-2.52,1.49-4.51,3.51-5.94,6.07-1.44,2.55-2.16,5.37-2.16,8.47s.7,5.94,2.12,8.55c1.41,2.61,3.35,4.67,5.82,6.19,2.47,1.52,5.22,2.28,8.26,2.28,2.44,0,4.75-.46,6.92-1.38,2.17-.92,4.07-2.28,5.7-4.07l7.08,7.98c-2.61,2.5-5.59,4.42-8.96,5.78-3.37,1.36-7.03,2.04-10.99,2.04-5.32,0-10.1-1.21-14.33-3.62Z" fill="#fdfef9"/>
-                <path d="M63.99,0v17.99c2.98-3.96,7.16-5.94,12.54-5.94s8.79,1.53,11.07,4.6c2.28,3.07,3.42,7.56,3.42,13.47v23.45h-10.91v-22.06c0-3.09-.54-5.39-1.63-6.88-1.09-1.49-2.93-2.24-5.54-2.24-2.82,0-5.02.99-6.59,2.97-1.57,1.98-2.36,4.49-2.36,7.53v20.68h-10.91V0h10.91Z" fill="#fdfef9"/>
-                <path d="M101.65,50.03c-2.25-2.9-3.38-7.18-3.38-12.82V12.86h10.91v22.88c0,2.82.61,4.91,1.83,6.27,1.22,1.36,3.11,2.04,5.66,2.04,2.71,0,4.8-.99,6.27-2.97,1.47-1.98,2.2-4.44,2.2-7.37V12.86h10.91v40.71h-10.26v-5.7c-1.19,1.95-3,3.53-5.41,4.72-2.42,1.19-4.84,1.79-7.29,1.79-5.37,0-9.19-1.45-11.44-4.36Z" fill="#fdfef9"/>
-                <path d="M155.1,12.86v7.82c.76-2.17,2.32-4.15,4.68-5.94,2.36-1.79,5.55-2.69,9.57-2.69v11.89c-4.78,0-8.32,1.13-10.62,3.38-2.31,2.25-3.46,5.79-3.46,10.63v15.63h-10.91V12.86h10.75Z" fill="#fdfef9"/>
-                <path d="M184.53,51.58c-3.34-1.87-5.97-4.44-7.9-7.69-1.93-3.26-2.89-6.81-2.89-10.67s.96-7.41,2.89-10.67c1.93-3.26,4.56-5.82,7.9-7.69,3.34-1.87,6.99-2.81,10.95-2.81,5.48,0,10.34,1.74,14.57,5.21l-6.59,7.65c-2.01-1.84-4.59-2.77-7.73-2.77s-5.75,1.05-7.82,3.13c-2.06,2.09-3.09,4.74-3.09,7.94s1.02,5.92,3.05,7.98c2.04,2.06,4.76,3.09,8.18,3.09,1.68,0,3.31-.3,4.89-.9,1.57-.6,2.9-1.41,3.99-2.44l5.78,8.14c-1.95,1.68-4.25,2.99-6.88,3.91-2.63.92-5.41,1.38-8.35,1.38-3.96,0-7.61-.94-10.95-2.81Z" fill="#fdfef9"/>
-                <path d="M227.24,0v17.99c2.98-3.96,7.16-5.94,12.54-5.94s8.79,1.53,11.07,4.6c2.28,3.07,3.42,7.56,3.42,13.47v23.45h-10.91v-22.06c0-3.09-.54-5.39-1.63-6.88-1.09-1.49-2.93-2.24-5.54-2.24-2.82,0-5.02.99-6.59,2.97-1.58,1.98-2.36,4.49-2.36,7.53v20.68h-10.91V0h10.91Z" fill="#fdfef9"/>
+                <path d="M13.52,50.85c-4.23-2.41-7.55-5.71-9.93-9.89-2.39-4.18-3.58-8.79-3.58-13.84s1.19-9.48,3.58-13.64c2.39-4.15,5.7-7.44,9.93-9.85C17.75,1.21,22.52,0,27.85,0c3.58,0,6.96.58,10.14,1.75,3.18,1.17,5.96,2.81,8.35,4.93l-7,7.65c-3.09-2.66-6.7-3.99-10.83-3.99-3.15,0-5.98.75-8.51,2.24-2.52,1.49-4.51,3.51-5.94,6.07-1.44,2.55-2.16,5.37-2.16,8.47s.7,5.94,2.12,8.55c1.41,2.61,3.35,4.67,5.82,6.19,2.47,1.52,5.22,2.28,8.26,2.28,2.44,0,4.75-.46,6.92-1.38,2.17-.92,4.07-2.28,5.7-4.07l7.08,7.98c-2.61,2.5-5.59,4.42-8.96,5.78-3.37,1.36-7.03,2.04-10.99,2.04-5.32,0-10.1-1.21-14.33-3.62Z" fill="var(--ct-logo-church)"/>
+                <path d="M63.99,0v17.99c2.98-3.96,7.16-5.94,12.54-5.94s8.79,1.53,11.07,4.6c2.28,3.07,3.42,7.56,3.42,13.47v23.45h-10.91v-22.06c0-3.09-.54-5.39-1.63-6.88-1.09-1.49-2.93-2.24-5.54-2.24-2.82,0-5.02.99-6.59,2.97-1.57,1.98-2.36,4.49-2.36,7.53v20.68h-10.91V0h10.91Z" fill="var(--ct-logo-church)"/>
+                <path d="M101.65,50.03c-2.25-2.9-3.38-7.18-3.38-12.82V12.86h10.91v22.88c0,2.82.61,4.91,1.83,6.27,1.22,1.36,3.11,2.04,5.66,2.04,2.71,0,4.8-.99,6.27-2.97,1.47-1.98,2.2-4.44,2.2-7.37V12.86h10.91v40.71h-10.26v-5.7c-1.19,1.95-3,3.53-5.41,4.72-2.42,1.19-4.84,1.79-7.29,1.79-5.37,0-9.19-1.45-11.44-4.36Z" fill="var(--ct-logo-church)"/>
+                <path d="M155.1,12.86v7.82c.76-2.17,2.32-4.15,4.68-5.94,2.36-1.79,5.55-2.69,9.57-2.69v11.89c-4.78,0-8.32,1.13-10.62,3.38-2.31,2.25-3.46,5.79-3.46,10.63v15.63h-10.91V12.86h10.75Z" fill="var(--ct-logo-church)"/>
+                <path d="M184.53,51.58c-3.34-1.87-5.97-4.44-7.9-7.69-1.93-3.26-2.89-6.81-2.89-10.67s.96-7.41,2.89-10.67c1.93-3.26,4.56-5.82,7.9-7.69,3.34-1.87,6.99-2.81,10.95-2.81,5.48,0,10.34,1.74,14.57,5.21l-6.59,7.65c-2.01-1.84-4.59-2.77-7.73-2.77s-5.75,1.05-7.82,3.13c-2.06,2.09-3.09,4.74-3.09,7.94s1.02,5.92,3.05,7.98c2.04,2.06,4.76,3.09,8.18,3.09,1.68,0,3.31-.3,4.89-.9,1.57-.6,2.9-1.41,3.99-2.44l5.78,8.14c-1.95,1.68-4.25,2.99-6.88,3.91-2.63.92-5.41,1.38-8.35,1.38-3.96,0-7.61-.94-10.95-2.81Z" fill="var(--ct-logo-church)"/>
+                <path d="M227.24,0v17.99c2.98-3.96,7.16-5.94,12.54-5.94s8.79,1.53,11.07,4.6c2.28,3.07,3.42,7.56,3.42,13.47v23.45h-10.91v-22.06c0-3.09-.54-5.39-1.63-6.88-1.09-1.49-2.93-2.24-5.54-2.24-2.82,0-5.02.99-6.59,2.97-1.58,1.98-2.36,4.49-2.36,7.53v20.68h-10.91V0h10.91Z" fill="var(--ct-logo-church)"/>
             </g>
           </svg>
         </div>
 
+        <!-- Header right: date + group chip -->
+        <div class="flex items-center gap-2">
+          <!-- Compact date (Today tab only) -->
+          <button id="headerDateBtn" class="hidden text-right leading-tight" onclick="window.churchTapApp?.showDatePicker?.()" aria-label="Browse dates">
+            <div id="headerDateDay" class="text-xs font-semibold" style="color: var(--ui-text);"></div>
+            <div id="headerDateSub" class="text-xs" style="color: var(--ui-text-muted);"></div>
+          </button>
+          <!-- Group chip -->
+          <div id="headerGroupChip" class="hidden">
+            <div class="text-xs font-semibold px-3 py-1 rounded-full" style="background: color-mix(in srgb, var(--brand-primary) 10%, var(--ct-app-bg)); color: var(--brand-primary);">
+              <span id="headerGroupName"></span>
+            </div>
+          </div>
+        </div>
       </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="pb-20">
-      <!-- Date Navigation -->
-      <div id="dateNav" class="px-4 py-3">
+    <!-- ═══════════════════════════════════════════════
+         MAIN CONTENT
+    ════════════════════════════════════════════════ -->
+    <main class="pb-28">
+
+      <!-- ── Date Navigator (hidden elements kept for JS compatibility) -->
+      <div id="dateNav" class="hidden">
+        <div id="currentDate"></div>
+        <div id="dateDescription"></div>
+        <div id="todayEventPill" class="hidden"><span id="todayEventPillText"></span></div>
+      </div>
+      <!-- Event pill shown in main content when there's a church event today -->
+      <div id="todayEventBanner" class="hidden px-4 pt-2">
         <div class="max-w-lg mx-auto">
-          <button id="datePickerBtn"
-                  class="w-full text-center py-1 touch-manipulation"
-                  aria-label="Browse dates">
-            <div id="currentDate" class="text-lg font-semibold text-gray-800 dark:text-white leading-tight"></div>
-            <div class="text-sm text-gray-500 dark:text-gray-400" id="dateDescription">Today's Verse</div>
-            <!-- Today's event indicator (shown when group has events today) -->
-            <div id="todayEventPill" class="hidden mt-2 inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 text-xs border border-primary-100 dark:border-primary-800">
-              <span class="w-2 h-2 rounded-full bg-primary-600"></span>
-              <span id="todayEventPillText">Event today</span>
-            </div>
-          </button>
+          <div id="todayEventBannerInner" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold" style="background: color-mix(in srgb, var(--brand-primary) 10%, var(--ct-app-bg)); color: var(--brand-primary);">
+            <span class="w-1.5 h-1.5 rounded-full" style="background: var(--brand-primary);"></span>
+            <span id="todayEventBannerText">Event today</span>
+          </div>
         </div>
       </div>
 
-      <!-- Page Container (Favorites / Collections / My Prayers) -->
+      <!-- ── Page Container (sub-pages: Favorites, Collections, etc.) ── -->
       <div id="pageContainer" class="hidden px-4">
         <div class="max-w-lg mx-auto">
           <!-- Populated by JavaScript -->
         </div>
       </div>
 
-      <!-- Verse Container -->
-      <div id="verseContainer" class="px-4">
+      <!-- ── Verse Container ─────────────────────── -->
+      <div id="verseContainer" class="px-4 mt-1">
         <div class="verse-container max-w-lg mx-auto fade-in-up">
+
           <!-- Loading State -->
-          <div id="loadingVerse" class="text-center py-12">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-            <p class="mt-4 text-gray-600 dark:text-gray-400">Loading verse...</p>
+          <div id="loadingVerse" class="py-6">
+            <!-- Skeleton verse card -->
+            <div class="skeleton-card rounded-2xl p-6 mb-4">
+              <div class="skeleton-line w-1/3 h-3 rounded mb-5"></div>
+              <div class="skeleton-line w-full h-4 rounded mb-3"></div>
+              <div class="skeleton-line w-5/6 h-4 rounded mb-3"></div>
+              <div class="skeleton-line w-4/6 h-4 rounded mb-5"></div>
+              <div class="skeleton-line w-1/4 h-3 rounded ml-auto"></div>
+            </div>
+            <div class="flex gap-3 mt-4">
+              <div class="skeleton-line flex-1 h-10 rounded-xl"></div>
+              <div class="skeleton-line flex-1 h-10 rounded-xl"></div>
+            </div>
           </div>
 
           <!-- Verse Content -->
           <div id="verseContent" class="hidden">
-            <!-- Text Verse -->
+
+            <!-- ── Text Verse ──────────────────── -->
             <div id="textVerse" class="hidden">
-              <blockquote id="verseText" class="verse-text text-gray-800 dark:text-gray-200 mb-6"></blockquote>
-              <div class="mb-4">
-                <!-- Mobile: Stack buttons and reference vertically -->
-                <div class="flex flex-col space-y-3 sm:hidden">
-                  <div class="flex flex-col space-y-2">
-                    <button id="textChapterBtn" onclick="app.readFullChapter(app.currentVerse?.bible_reference)" 
-                            class="text-xs bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 px-3 py-2 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors">
-                      📖 Read Full Chapter
-                    </button>
-                    <button id="textTranslationBtn" onclick="app.viewInTranslation(app.currentVerse?.bible_reference)" 
-                            class="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-3 py-2 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors">
-                      📚 View in Translation
-                    </button>
-                  </div>
-                  <div id="verseReference" class="text-sm font-medium text-primary-600 dark:text-primary-400 text-center"></div>
-                </div>
-                <!-- Desktop: Keep horizontal layout -->
-                <div class="hidden sm:flex justify-between items-center">
-                  <div class="flex space-x-2">
-                    <button id="textChapterBtnDesktop" onclick="app.readFullChapter(app.currentVerse?.bible_reference)" 
-                            class="text-xs bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 px-3 py-1 rounded-full hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors">
-                      📖 Read Full Chapter
-                    </button>
-                    <button id="textTranslationBtnDesktop" onclick="app.viewInTranslation(app.currentVerse?.bible_reference)" 
-                            class="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors">
-                      📚 View in Translation
-                    </button>
-                  </div>
-                  <div id="verseReferenceDesktop" class="text-sm font-medium text-primary-600 dark:text-primary-400"></div>
-                </div>
+
+              <blockquote id="verseText" class="verse-text mb-5" style="font-family: 'Lora', Georgia, serif;"></blockquote>
+
+              <!-- Reference row (unified — JS fills both mobile & desktop spans) -->
+              <div class="flex items-center justify-between gap-3 mb-5">
+                <div id="verseReference" class="verse-reference" style="min-width: 0; word-break: break-word;"></div>
+                <!-- Desktop alias (JS may update this separately) -->
+                <div id="verseReferenceDesktop" class="verse-reference hidden sm:block" style="text-align: right; min-width: 0;"></div>
               </div>
-              <div id="verseContext" class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed hidden"></div>
+
+              <!-- Chapter / Translation buttons -->
+              <div class="flex gap-2 mb-0">
+                <button id="textChapterBtn"
+                        onclick="app.readFullChapter(app.currentVerse?.bible_reference)"
+                        class="verse-action-link flex-1 justify-center"
+                        style="background: var(--ui-primary); color: var(--ui-on-primary);">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+                  Read Chapter
+                </button>
+                <button id="textTranslationBtn"
+                        onclick="app.viewInTranslation(app.currentVerse?.bible_reference)"
+                        class="verse-action-link flex-1 justify-center"
+                        style="background: color-mix(in srgb, var(--ui-secondary) 14%, var(--ui-surface)); color: color-mix(in srgb, var(--ui-secondary) 80%, black); border: 1px solid color-mix(in srgb, var(--ui-secondary) 30%, var(--ui-border));">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+                  Translation
+                </button>
+                <!-- Desktop duplicates (IDs preserved for JS compat) -->
+                <button id="textChapterBtnDesktop" class="hidden"></button>
+                <button id="textTranslationBtnDesktop" class="hidden"></button>
+              </div>
+
+              <!-- Context (collapsed by default, JS shows it) -->
+              <div id="verseContext" class="verse-context hidden mt-3"></div>
             </div>
 
-            <!-- Image Verse -->
+            <!-- ── Image Verse ──────────────────── -->
             <div id="imageVerse" class="hidden text-center">
-              <img id="verseImage" class="verse-image mx-auto" alt="Daily verse image">
-              <div class="mt-4 mb-4">
-                <!-- Mobile: Stack buttons and reference vertically -->
-                <div class="flex flex-col space-y-3 sm:hidden">
-                  <div class="flex flex-col space-y-2">
-                    <button id="imageChapterBtn" onclick="app.readFullChapter(app.currentVerse?.bible_reference)" 
-                            class="text-xs bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 px-3 py-2 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors">
-                      📖 Read Full Chapter
-                    </button>
-                    <button id="imageTranslationBtn" onclick="app.viewInTranslation(app.currentVerse?.bible_reference)" 
-                            class="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-3 py-2 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors">
-                      📚 View in Translation
-                    </button>
-                  </div>
-                  <div id="imageReference" class="text-sm font-medium text-primary-600 dark:text-primary-400 text-center"></div>
-                </div>
-                <!-- Desktop: Keep horizontal layout -->
-                <div class="hidden sm:flex justify-between items-center">
-                  <div class="flex space-x-2">
-                    <button id="imageChapterBtnDesktop" onclick="app.readFullChapter(app.currentVerse?.bible_reference)" 
-                            class="text-xs bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 px-3 py-1 rounded-full hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors">
-                      📖 Read Full Chapter
-                    </button>
-                    <button id="imageTranslationBtnDesktop" onclick="app.viewInTranslation(app.currentVerse?.bible_reference)" 
-                            class="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors">
-                      📚 View in Translation
-                    </button>
-                  </div>
-                  <div id="imageReferenceDesktop" class="text-sm font-medium text-primary-600 dark:text-primary-400"></div>
+              <img id="verseImage" class="verse-image mx-auto" alt="Daily verse">
+              <div class="mt-5 mb-1">
+                <div id="imageReference" class="verse-reference text-center mb-4"></div>
+                <div id="imageReferenceDesktop" class="hidden"></div>
+                <div class="flex gap-2">
+                  <button id="imageChapterBtn"
+                          onclick="app.readFullChapter(app.currentVerse?.bible_reference)"
+                          class="verse-action-link flex-1 justify-center"
+                          style="background: var(--ui-primary); color: var(--ui-on-primary);">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+                    Read Chapter
+                  </button>
+                  <button id="imageTranslationBtn"
+                          onclick="app.viewInTranslation(app.currentVerse?.bible_reference)"
+                          class="verse-action-link flex-1 justify-center"
+                          style="background: color-mix(in srgb, var(--ui-secondary) 14%, var(--ui-surface)); color: color-mix(in srgb, var(--ui-secondary) 80%, black); border: 1px solid color-mix(in srgb, var(--ui-secondary) 30%, var(--ui-border));">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+                    Translation
+                  </button>
+                  <button id="imageChapterBtnDesktop" class="hidden"></button>
+                  <button id="imageTranslationBtnDesktop" class="hidden"></button>
                 </div>
               </div>
-              <div id="imageContext" class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed hidden"></div>
+              <div id="imageContext" class="verse-context hidden mt-4 text-left"></div>
+            </div>
+
+            <!-- Engagement strip — sits below both text and image verse variants -->
+            <div id="engagementStripInline" class="flex items-center justify-center gap-1 mt-3 px-0 py-2 rounded-2xl" style="background: var(--ui-surface-2); border: 1px solid var(--ui-border);">
+              <button id="heartBtn" class="action-btn flex-1" aria-label="Like this verse">
+                <svg class="action-btn__icon heart-btn" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                </svg>
+                <span id="heartCount" class="action-btn__label" aria-live="polite">0</span>
+              </button>
+              <div class="w-px h-8" style="background: var(--ui-border);"></div>
+              <button id="saveBtn" class="action-btn flex-1" aria-label="Save this verse">
+                <svg id="saveBtnIcon" class="action-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3-7 3V5z"/>
+                </svg>
+                <span class="action-btn__label">Save</span>
+              </button>
+              <div class="w-px h-8" style="background: var(--ui-border);"></div>
+              <button id="topicsBtn" class="action-btn flex-1" aria-label="Browse topics">
+                <svg class="action-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                </svg>
+                <span class="action-btn__label">Topics</span>
+              </button>
+              <button id="randomVerseBtn" class="action-btn flex-1 hidden" aria-label="Get random verse">
+                <svg class="action-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                <span class="action-btn__label">Random</span>
+              </button>
             </div>
 
             <!-- Personalization Badge -->
-            <div id="personalizationBadge" class="hidden mt-4 mb-2">
-              <div class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-800 dark:text-primary-200">
-                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                </svg>
+            <div id="personalizationBadge" class="hidden mt-4 mb-1">
+              <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
+                   style="background: color-mix(in srgb, var(--brand-secondary) 12%, var(--ui-surface)); color: color-mix(in srgb, var(--brand-secondary) 70%, black);">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                 <span id="personalizationText">Personalized for you</span>
               </div>
             </div>
 
-            <!-- Verse Tags -->
-            <div id="verseTags" class="flex flex-wrap gap-2 mt-4 hidden"></div>
-          </div>
+            <!-- Verse Tags (hidden — chips removed per UX decision) -->
+            <div id="verseTags" class="hidden"></div>
+
+          </div><!-- /verseContent -->
 
           <!-- No Verse State -->
-          <div id="noVerse" class="hidden text-center py-12">
-            <div class="text-6xl mb-4">📖</div>
-            <h3 class="text-lg font-medium text-gray-800 dark:text-white mb-2">No verse for this date</h3>
-            <p class="text-gray-600 dark:text-gray-400 mb-4">Check back tomorrow for a new verse!</p>
+          <div id="noVerse" class="hidden text-center py-14">
+            <div class="text-5xl mb-4">📖</div>
+            <h3 class="text-base font-semibold mb-2" style="color: var(--ui-text);">No verse for this date</h3>
+            <p class="text-sm mb-6" style="color: var(--ui-text-muted);">Check back tomorrow for a new verse!</p>
             <button id="backToToday" class="btn-primary">Back to Today</button>
           </div>
-        </div>
-      </div>
 
-      <!-- Engagement Actions -->
-      <div id="engagementActions" class="px-4 mt-6 hidden">
-        <div class="flex items-center justify-center gap-6 sm:gap-10 max-w-lg mx-auto">
-          <!-- Heart Button -->
-          <button id="heartBtn" class="flex flex-col items-center space-y-1 p-2 sm:p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation min-h-[52px] sm:min-h-[60px] min-w-[72px]" aria-label="Like this verse">
-            <svg class="w-6 h-6 heart-btn" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-            </svg>
-            <span id="heartCount" class="text-xs text-gray-600 dark:text-gray-400" aria-live="polite">0</span>
-          </button>
+        </div><!-- /verse-container -->
+      </div><!-- /verseContainer -->
 
-          <!-- Favorite Button -->
-          <button id="favoriteBtn" class="hidden flex flex-col items-center space-y-1 p-2 sm:p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation min-h-[52px] sm:min-h-[60px] min-w-[72px]" aria-label="Favorite this verse">
-            <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
-            </svg>
-            <span class="text-xs text-gray-600 dark:text-gray-400">Favorite</span>
-          </button>
+      <!-- Engagement strip moved into verse card (above) — this outer wrapper kept for JS show/hide compat -->
+      <div id="engagementActions" class="hidden" aria-hidden="true" style="display:none!important;"></div>
 
-          <!-- Add to Collection Button -->
-          <button id="addToCollectionBtn" class="flex flex-col items-center space-y-1 p-2 sm:p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation min-h-[52px] sm:min-h-[60px] min-w-[72px]" aria-label="Save to a collection">
-            <svg class="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3-7 3V5z"></path>
-            </svg>
-            <span class="text-xs text-gray-600 dark:text-gray-400">Save</span>
-          </button>
-
-          <!-- Random Verse Button -->
-          <button id="randomVerseBtn" class="hidden flex flex-col items-center space-y-1 p-2 sm:p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation min-w-[52px] min-h-[52px] sm:min-w-[60px] sm:min-h-[60px]" aria-label="Get random verse">
-            <svg class="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h16v16H4V4zM8 8h.01M16 8h.01M8 16h.01M16 16h.01M12 12h.01"></path>
-            </svg>
-            <span class="text-xs text-gray-600 dark:text-gray-400">Random</span>
-          </button>
-          <!-- Topics Button -->
-          <button id="topicsBtn" class="flex flex-col items-center space-y-1 p-2 sm:p-3 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation min-h-[52px] sm:min-h-[60px] min-w-[72px]" aria-label="Browse topics">
-            <svg class="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-            </svg>
-            <span class="text-xs text-gray-600 dark:text-gray-400">Topics</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Community Section (Home) -->
-      <div id="communitySection" class="px-4 mt-8 hidden">
+      <!-- ── Community Section ───────────────────── -->
+      <div id="communitySection" class="px-4 mt-5 hidden">
         <div class="max-w-lg mx-auto">
-          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h3 id="communityDateHeader" class="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-center">
-              Today's Community
-            </h3>
-            
-            <!-- Submit Buttons -->
-            <div class="flex space-x-1 sm:space-x-2 mb-6">
-              <button id="submitPrayerBtn" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-2 sm:px-3 py-3 rounded-lg font-medium transition-colors duration-200 flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-2">
-                <span class="text-lg sm:text-base">🙏</span>
-                <span class="text-xs sm:text-sm leading-tight text-center">
-                  <span class="sm:hidden">Prayer</span>
-                  <span class="hidden sm:inline">Prayer Request</span>
-                </span>
-              </button>
-              <button id="submitPraiseBtn" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-2 sm:px-3 py-3 rounded-lg font-medium transition-colors duration-200 flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-2">
-                <span class="text-lg sm:text-base">🎉</span>
-                <span class="text-xs sm:text-sm leading-tight text-center">
-                  <span class="sm:hidden">Praise</span>
-                  <span class="hidden sm:inline">Praise Report</span>
-                </span>
-              </button>
-              <button id="submitInsightBtn" class="flex-1 bg-purple-500 hover:bg-purple-600 text-white px-2 sm:px-3 py-3 rounded-lg font-medium transition-colors duration-200 flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-2">
-                <span class="text-lg sm:text-base">💭</span>
-                <span class="text-xs sm:text-sm leading-tight text-center">
-                  <span class="sm:hidden">Insight</span>
-                  <span class="hidden sm:inline">Share Insight</span>
-                </span>
-              </button>
+
+          <!-- Section label -->
+          <div class="flex items-center justify-between mb-3 px-1">
+            <h3 id="communityDateHeader" class="section-header mb-0">Today's Community</h3>
+          </div>
+
+          <!-- Submit Buttons -->
+          <div class="flex gap-2.5 mb-4">
+            <button id="submitPrayerBtn" class="submit-btn submit-btn--prayer flex-1">
+              <span style="font-size: 1.25rem; line-height: 1;">🙏</span>
+              <span>Prayer</span>
+            </button>
+            <button id="submitPraiseBtn" class="submit-btn submit-btn--praise flex-1 bg-yellow-500">
+              <span style="font-size: 1.25rem; line-height: 1;">🎉</span>
+              <span>Praise</span>
+            </button>
+            <button id="submitInsightBtn" class="submit-btn submit-btn--insight flex-1 bg-purple-500">
+              <span style="font-size: 1.25rem; line-height: 1;">💭</span>
+              <span>Insight</span>
+            </button>
+          </div>
+
+          <!-- Community content area -->
+          <div id="communityContent">
+            <!-- Loading -->
+            <div id="loadingCommunity" class="py-4">
+              <!-- Skeleton community cards -->
+              <div class="skeleton-card rounded-xl p-4 mb-3">
+                <div class="skeleton-line w-full h-3 rounded mb-2"></div>
+                <div class="skeleton-line w-4/5 h-3 rounded mb-4"></div>
+                <div class="flex justify-between items-center">
+                  <div class="skeleton-line w-1/4 h-3 rounded"></div>
+                  <div class="skeleton-line w-20 h-7 rounded-full"></div>
+                </div>
+              </div>
+              <div class="skeleton-card rounded-xl p-4 mb-3">
+                <div class="skeleton-line w-full h-3 rounded mb-2"></div>
+                <div class="skeleton-line w-3/5 h-3 rounded mb-4"></div>
+                <div class="flex justify-between items-center">
+                  <div class="skeleton-line w-1/4 h-3 rounded"></div>
+                  <div class="skeleton-line w-20 h-7 rounded-full"></div>
+                </div>
+              </div>
             </div>
 
-            <!-- Community Content -->
-            <div id="communityContent">
-              <!-- Loading -->
-              <div id="loadingCommunity" class="text-center py-8">
-                <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading community...</p>
+            <!-- Prayer Requests -->
+            <div id="prayerRequestsSection" class="hidden mb-5">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="text-sm font-bold" style="color: var(--brand-primary);">🙏 Prayer Requests</span>
               </div>
+              <div id="prayerRequestsList" class="space-y-2.5"></div>
+            </div>
 
-              <!-- Prayer Requests -->
-              <div id="prayerRequestsSection" class="hidden">
-                <h4 class="text-md font-medium text-gray-800 dark:text-white mb-3 flex items-center">
-                  <span class="mr-2">🙏</span>
-                  Prayer Requests
-                </h4>
-                <div id="prayerRequestsList" class="space-y-3 mb-6">
-                  <!-- Prayer requests will be loaded here -->
-                </div>
+            <!-- Verse Insights -->
+            <div id="verseInsightsSection" class="hidden mb-5">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="text-sm font-bold" style="color: var(--brand-accent);">💭 Verse Insights</span>
               </div>
+              <div id="verseInsightsList" class="space-y-2.5"></div>
+            </div>
 
-              <!-- Verse Insights -->
-              <div id="verseInsightsSection" class="hidden">
-                <h4 class="text-md font-medium text-gray-800 dark:text-white mb-3 flex items-center">
-                  <span class="mr-2">💭</span>
-                  Verse Insights
-                </h4>
-                <div id="verseInsightsList" class="space-y-3 mb-6">
-                  <!-- Verse insights will be loaded here -->
-                </div>
+            <!-- Praise Reports -->
+            <div id="praiseReportsSection" class="hidden mb-5">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="text-sm font-bold" style="color: var(--brand-secondary);">🎉 Praise Reports</span>
               </div>
+              <div id="praiseReportsList" class="space-y-2.5"></div>
+            </div>
 
-              <!-- Praise Reports -->
-              <div id="praiseReportsSection" class="hidden">
-                <h4 class="text-md font-medium text-gray-800 dark:text-white mb-3 flex items-center">
-                  <span class="mr-2">🎉</span>
-                  Praise Reports
-                </h4>
-                <div id="praiseReportsList" class="space-y-3">
-                  <!-- Praise reports will be loaded here -->
-                </div>
-              </div>
-
-              <!-- Empty State -->
-              <div id="emptyCommunity" class="hidden text-center py-8">
-                <div class="text-4xl mb-2">💝</div>
-                <p class="text-gray-600 dark:text-gray-400 mb-4">Be the first to share today!</p>
-                <p class="text-sm text-gray-500 dark:text-gray-500">Submit a prayer request or praise report to build community.</p>
-              </div>
+            <!-- Empty State -->
+            <div id="emptyCommunity" class="hidden text-center py-10">
+              <div class="text-4xl mb-3">💝</div>
+              <p class="text-sm font-medium mb-1" style="color: var(--ui-text);">Be the first to share today!</p>
+              <p class="text-xs" style="color: var(--ui-text-muted);">Submit a prayer request, praise report, or insight.</p>
             </div>
           </div>
+
         </div>
       </div>
+
     </main>
 
-    <!-- Bottom Navigation -->
-    <nav class="fixed bottom-0 left-0 right-0 glass-effect border-t border-white/20 px-4 py-2 z-30">
-      <div class="flex items-center justify-around max-w-lg mx-auto">
-        <button id="tabTodayBtn" data-tab="today" class="flex flex-col items-center space-y-1 p-2 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation">
-          <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" data-tab-icon="today" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+    <!-- ═══════════════════════════════════════════════
+         BOTTOM NAVIGATION
+    ════════════════════════════════════════════════ -->
+    <nav class="bottom-nav fixed bottom-0 left-0 right-0 z-30 px-2" style="padding-bottom: env(safe-area-inset-bottom, 8px);">
+      <div class="flex items-center justify-around max-w-lg mx-auto py-1">
+
+        <button id="tabTodayBtn" data-tab="today" class="nav-item" aria-label="Today">
+          <svg data-tab-icon="today" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1M4.22 4.22l.707.707m12.02 12.02.707.707M3 12H2m20 0h-1M4.22 19.78l.707-.707M18.364 5.636l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/>
           </svg>
-          <span class="text-xs text-gray-600 dark:text-gray-400" data-tab-label="today">Today</span>
+          <span class="nav-item__label" data-tab-label="today">Today</span>
         </button>
 
-        <button id="tabExploreBtn" data-tab="explore" class="flex flex-col items-center space-y-1 p-2 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation">
-          <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" data-tab-icon="explore" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-6-10h6m0 0v6m0-6L10 14"></path>
+        <button id="tabExploreBtn" data-tab="explore" class="nav-item" aria-label="Explore">
+          <svg data-tab-icon="explore" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
-          <span class="text-xs text-gray-600 dark:text-gray-400" data-tab-label="explore">Explore</span>
+          <span class="nav-item__label" data-tab-label="explore">Explore</span>
         </button>
 
-        <button id="tabLinksBtn" data-tab="links" class="relative flex flex-col items-center space-y-1 p-2 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation" aria-label="Quick Links" aria-expanded="false" style="display: none;">
-          <div class="relative inline-flex">
-            <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" data-tab-icon="links" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-1.414 1.414a4 4 0 01-5.656 0 4 4 0 010-5.656l1.414-1.414m4.242-4.242l1.414-1.414a4 4 0 015.656 0 4 4 0 010 5.656l-1.414 1.414m-4.242 4.242L10.172 13.828"></path>
+        <button id="tabLinksBtn" data-tab="links" class="nav-item relative" aria-label="Links" aria-expanded="false" style="display: none;">
+          <div class="relative">
+            <svg data-tab-icon="links" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-1.414 1.414a4 4 0 01-5.656 0 4 4 0 010-5.656l1.414-1.414m4.242-4.242l1.414-1.414a4 4 0 015.656 0 4 4 0 010 5.656l-1.414 1.414m-4.242 4.242L10.172 13.828"/>
             </svg>
-            <span id="linksFundraisingBadge" class="hidden absolute right-0 top-0 h-2 w-2 translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-900"></span>
+            <span id="linksFundraisingBadge" class="hidden absolute -right-1 -top-1 h-2 w-2 rounded-full bg-red-500"></span>
           </div>
-          <span class="text-xs text-gray-600 dark:text-gray-400" data-tab-label="links">Links</span>
+          <span class="nav-item__label" data-tab-label="links">Links</span>
         </button>
 
-        <button id="menuToggle" data-tab="menu" class="flex flex-col items-center space-y-1 p-2 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation" aria-label="Open menu" aria-expanded="false">
-          <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" data-tab-icon="menu" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+        <!-- Settings moved to Me tab -->
+        <button id="menuToggle" data-tab="menu" class="nav-item hidden" aria-label="Menu" aria-expanded="false" aria-hidden="true"></button>
+
+        <button id="tabMeBtn" data-tab="me" class="nav-item" aria-label="Me">
+          <svg data-tab-icon="me" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
-          <span class="text-xs text-gray-600 dark:text-gray-400" data-tab-label="menu">Menu</span>
+          <span class="nav-item__label" data-tab-label="me">Me</span>
         </button>
 
-        <button id="tabMeBtn" data-tab="me" class="flex flex-col items-center space-y-1 p-2 rounded-lg hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors touch-manipulation">
-          <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" data-tab-icon="me" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A9 9 0 1118.88 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-          </svg>
-          <span class="text-xs text-gray-600 dark:text-gray-400" data-tab-label="me">Me</span>
-        </button>
       </div>
     </nav>
-  </div>
+
+  </div><!-- /app -->
 
   <!-- Calendar Modal -->
   <div id="calendarModal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
