@@ -1912,16 +1912,29 @@ class ChurchTapApp {
 
           <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
 
-          <button class="menu-row w-full" onclick="window.churchTapApp.toggleTheme(); window.churchTapApp.updateMenuIndicators();">
-            <div class="menu-row__left">
-              <div class="menu-row__icon"><span id="themeMenuIcon">🌙</span></div>
-              <div class="text-sm font-medium" style="color: var(--ui-text);">Theme</div>
+          <div class="menu-row" style="cursor:default; align-items:center;">
+            <div class="menu-row__left" style="flex:1; min-width:0;">
+              <div class="menu-row__icon"><span id="themeMenuIcon">☀️</span></div>
+              <div>
+                <div class="text-sm font-medium" style="color: var(--ui-text);">Theme</div>
+                <div class="text-xs mt-0.5" style="color: var(--ui-text-muted);" id="themeIndicator">Light</div>
+              </div>
             </div>
-            <div class="menu-row__right">
-              <span id="themeIndicator" class="text-xs font-semibold" style="color: var(--ui-primary);">Light</span>
-              <span style="color: var(--ui-text-muted);">›</span>
+            <div class="flex items-center gap-2 pr-1">
+              <button id="themeSwatchBtn-light" class="theme-swatch-btn" title="Light"
+                style="background: #FDFEF9;"
+                onclick="window.churchTapApp.setTheme('light')"></button>
+              <button id="themeSwatchBtn-dark" class="theme-swatch-btn" title="Dark"
+                style="background: #14080e;"
+                onclick="window.churchTapApp.setTheme('dark')"></button>
+              <button id="themeSwatchBtn-sepia" class="theme-swatch-btn" title="Sepia"
+                style="background: #f3ede0;"
+                onclick="window.churchTapApp.setTheme('sepia')"></button>
+              <button id="themeSwatchBtn-night" class="theme-swatch-btn" title="Night"
+                style="background: #080f1c;"
+                onclick="window.churchTapApp.setTheme('night')"></button>
             </div>
-          </button>
+          </div>
 
           <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
 
@@ -2787,6 +2800,10 @@ class ChurchTapApp {
     const inner = pageContainer?.querySelector('.max-w-lg');
     if (!inner) return;
     inner.innerHTML = html;
+    // Page enter animation
+    inner.classList.remove('page-enter');
+    void inner.offsetWidth; // force reflow
+    inner.classList.add('page-enter');
   }
 
   renderAuthRequired(title, message) {
@@ -3434,13 +3451,13 @@ class ChurchTapApp {
       lastTap = currentTime;
     });
 
-    // Long press for quick share
+    // Long press → verse action sheet (highlight, copy, share, note)
     let pressTimer;
     document.getElementById('verseContainer').addEventListener('touchstart', (e) => {
       pressTimer = setTimeout(() => {
-        navigator.vibrate && navigator.vibrate(50);
-        this.shareVerse();
-      }, 800);
+        navigator.vibrate && navigator.vibrate(40);
+        this.showVerseActionSheet();
+      }, 550);
     });
 
     document.getElementById('verseContainer').addEventListener('touchend', () => {
@@ -3757,10 +3774,11 @@ class ChurchTapApp {
     if (el.dataset) el.dataset.studyWordTapToday = '1';
 
     el.style.cursor = 'text';
+    el.style.userSelect = 'text';
 
+    // Word tap: works for everyone (not gated to study mode).
+    // Shows a definition chip on the Today screen for any tapped word.
     el.addEventListener('click', async (e) => {
-      if (!this.isStudyModeEnabled()) return;
-
       // If user is selecting text, don't hijack taps.
       const sel = window.getSelection?.();
       if (sel && !sel.isCollapsed && String(sel.toString() || '').trim()) return;
@@ -3768,8 +3786,68 @@ class ChurchTapApp {
       const word = this.getWordFromPoint(e.clientX, e.clientY);
       if (!word) return;
 
-      await this.showDefinitionForWord(word);
+      // Clean punctuation
+      const clean = word.replace(/[^a-zA-Z'-]/g, '').trim();
+      if (!clean || clean.length < 3) return;
+
+      await this.showTodayWordChip(clean, el, e);
     });
+  }
+
+  // Show an inline word chip (definition popup) near the tapped word
+  async showTodayWordChip(word, containerEl, event) {
+    // Remove any existing chip
+    const existing = document.getElementById('todayWordChip');
+    if (existing) existing.remove();
+
+    const chip = document.createElement('div');
+    chip.id = 'todayWordChip';
+    chip.className = 'word-def-chip';
+    chip.style.cssText = 'position:absolute; z-index:800;';
+    chip.innerHTML = `
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-xs font-bold uppercase" style="color:var(--ui-primary); letter-spacing:0.05em;">${this.escapeHtml(word)}</span>
+        <button onclick="document.getElementById('todayWordChip')?.remove()" style="color:var(--ui-text-muted); font-size:1rem; line-height:1; padding:2px 4px;">×</button>
+      </div>
+      <div id="todayWordChipDef" class="text-xs" style="color:var(--ui-text-muted);">Looking up…</div>
+      <button class="mt-2 text-xs font-semibold" style="color:var(--ui-primary);"
+              onclick="window.churchTapApp.studyDefineSelectedWord('${this.escapeHtml(word.replace(/'/g, "\\'"))}'); document.getElementById('todayWordChip')?.remove();">
+        Full Study →
+      </button>
+    `;
+
+    // Position near the tap
+    const rect = containerEl.getBoundingClientRect();
+    const scrollTop = window.scrollY || document.documentElement.scrollTop;
+    const tapY = event.clientY + scrollTop - rect.top + containerEl.scrollTop;
+
+    chip.style.top = `${tapY - 10}px`;
+    chip.style.left = '50%';
+    chip.style.transform = 'translateX(-50%)';
+
+    containerEl.style.position = 'relative';
+    containerEl.appendChild(chip);
+
+    // Dismiss on outside tap
+    const dismiss = (e) => {
+      if (!chip.contains(e.target)) { chip.remove(); document.removeEventListener('touchstart', dismiss); document.removeEventListener('click', dismiss); }
+    };
+    setTimeout(() => {
+      document.addEventListener('touchstart', dismiss, { passive: true });
+      document.addEventListener('click', dismiss);
+    }, 100);
+
+    // Fetch definition
+    const entry = await this.fetchDictionaryEntry(word);
+    const defEl = document.getElementById('todayWordChipDef');
+    if (defEl) {
+      if (entry?.definition) {
+        const def = String(entry.definition).replace(/<[^>]+>/g, '').slice(0, 120);
+        defEl.textContent = def + (entry.definition.length > 120 ? '…' : '');
+      } else {
+        defEl.textContent = 'No definition found.';
+      }
+    }
   }
 
   displayTags(tagsString) {
@@ -3787,8 +3865,8 @@ class ChurchTapApp {
       return;
     }
     
-    tagsContainer.innerHTML = tags.map(tag => 
-      `<span class="px-2 py-1 bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 text-xs rounded-full">${tag}</span>`
+    tagsContainer.innerHTML = tags.map(tag =>
+      `<span style="display:inline-block; padding:2px 8px; border-radius:99px; font-size:0.65rem; font-weight:600; letter-spacing:0.04em; color:var(--ui-text-muted); border:1px solid var(--ui-border); text-transform:uppercase;">${tag}</span>`
     ).join('');
     
     tagsContainer.classList.remove('hidden');
@@ -4595,17 +4673,53 @@ class ChurchTapApp {
     this.trackAnalytics('share_random_verse');
   }
 
+  // Cycle through all 4 themes (used by quick tap)
   toggleTheme() {
-    this.theme = this.theme === 'light' ? 'dark' : 'light';
+    const themes = ['light', 'dark', 'sepia', 'night'];
+    const idx = themes.indexOf(this.theme);
+    this.theme = themes[(idx + 1) % themes.length];
     this.applyTheme();
     localStorage.setItem('theme', this.theme);
+    this.showToast(
+      this.theme === 'light' ? '☀️ Light' :
+      this.theme === 'dark'  ? '🌙 Dark'  :
+      this.theme === 'sepia' ? '📜 Sepia' :
+                               '🌃 Night'
+    );
+  }
+
+  // Set a specific theme by name
+  setTheme(name) {
+    const valid = ['light', 'dark', 'sepia', 'night'];
+    this.theme = valid.includes(name) ? name : 'light';
+    this.applyTheme();
+    localStorage.setItem('theme', this.theme);
+    this.updateMenuThemeSwatches();
+    this.updateMenuIndicators();
   }
 
   applyTheme() {
-    if (this.theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+    document.documentElement.classList.remove('dark', 'sepia', 'night');
+    if (this.theme === 'dark')  document.documentElement.classList.add('dark');
+    if (this.theme === 'sepia') document.documentElement.classList.add('sepia');
+    if (this.theme === 'night') document.documentElement.classList.add('night');
+  }
+
+  // Update the active swatch in the Settings page if it's open
+  updateMenuThemeSwatches() {
+    ['light', 'dark', 'sepia', 'night'].forEach(t => {
+      const el = document.getElementById(`themeSwatchBtn-${t}`);
+      if (el) el.classList.toggle('active', this.theme === t);
+    });
+    const indicator = document.getElementById('themeIndicator');
+    if (indicator) {
+      const names = { light: 'Light', dark: 'Dark', sepia: 'Sepia', night: 'Night' };
+      indicator.textContent = names[this.theme] || 'Light';
+    }
+    const icon = document.getElementById('themeMenuIcon');
+    if (icon) {
+      const icons = { light: '☀️', dark: '🌙', sepia: '📜', night: '🌃' };
+      icon.textContent = icons[this.theme] || '☀️';
     }
   }
 
@@ -5682,6 +5796,129 @@ class ChurchTapApp {
       this.currentModal = null;
     }
   }
+
+  // ─── Action Sheet ──────────────────────────────────
+  showActionSheet(html) {
+    let backdrop = document.getElementById('ct-sheet-backdrop');
+    let sheet    = document.getElementById('ct-action-sheet');
+
+    if (!backdrop) {
+      backdrop = document.createElement('div');
+      backdrop.id = 'ct-sheet-backdrop';
+      backdrop.className = 'ct-sheet-backdrop';
+      backdrop.addEventListener('click', () => this.closeActionSheet());
+      document.body.appendChild(backdrop);
+    }
+    if (!sheet) {
+      sheet = document.createElement('div');
+      sheet.id = 'ct-action-sheet';
+      sheet.className = 'ct-action-sheet';
+      document.body.appendChild(sheet);
+    }
+
+    sheet.innerHTML = html;
+    // Trigger animation next frame
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        backdrop.classList.add('open');
+        sheet.classList.add('open');
+      });
+    });
+  }
+
+  closeActionSheet() {
+    const sheet    = document.getElementById('ct-action-sheet');
+    const backdrop = document.getElementById('ct-sheet-backdrop');
+    if (sheet)    { sheet.classList.remove('open'); }
+    if (backdrop) { backdrop.classList.remove('open'); }
+  }
+
+  showVerseActionSheet() {
+    const canUse = this.canUsePrivateVerseTools();
+    const currentKey = String(this.currentHighlightKey || '').trim().toLowerCase();
+
+    const hlColors = [
+      { key: 'yellow', color: '#fbbf24', label: 'Yellow' },
+      { key: 'green',  color: '#22c55e', label: 'Green'  },
+      { key: 'blue',   color: '#3b82f6', label: 'Blue'   },
+      { key: 'pink',   color: '#ec4899', label: 'Pink'   },
+    ];
+
+    const hlSection = canUse ? `
+      <div class="flex justify-center gap-2 mb-3">
+        ${hlColors.map(c => `
+          <button class="hl-swatch-btn ${currentKey === c.key ? 'active' : ''}"
+                  onclick="window.churchTapApp.setVerseHighlight('${c.key}'); window.churchTapApp.closeActionSheet();">
+            <span class="hl-swatch-circle" style="background:${c.color};"></span>
+            <span class="hl-swatch-label">${c.label}</span>
+          </button>
+        `).join('')}
+        ${currentKey ? `
+          <button class="hl-swatch-btn"
+                  onclick="window.churchTapApp.setVerseHighlight(null); window.churchTapApp.closeActionSheet();">
+            <span class="hl-swatch-circle" style="background: var(--ui-surface-2); display:flex; align-items:center; justify-content:center;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ui-text-muted)" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </span>
+            <span class="hl-swatch-label">Clear</span>
+          </button>
+        ` : ''}
+      </div>
+      <div style="height:1px; background:var(--ui-border); margin: 4px 16px 12px;"></div>
+    ` : '';
+
+    const actions = [
+      { icon: '📋', label: 'Copy',     fn: 'copyVerse'              },
+      { icon: '↗️', label: 'Share',    fn: 'shareVerse'             },
+      ...(canUse ? [
+        { icon: '⭐', label: 'Favorite', fn: 'toggleFavorite'       },
+        { icon: '📝', label: 'Note',     fn: 'showVerseNotesModal'  },
+        { icon: '🎨', label: 'Highlight',fn: 'showHighlightPicker'  },
+      ] : []),
+    ];
+
+    const ref = this.escapeHtml(this.currentVerse?.bible_reference || 'Today\'s Verse');
+
+    this.showActionSheet(`
+      <div class="ct-sheet-handle"></div>
+      <div class="px-4 pt-3 pb-2">
+        <div class="text-xs font-semibold text-center mb-4" style="color:var(--ui-text-muted); letter-spacing:0.06em; text-transform:uppercase;">${ref}</div>
+        ${hlSection}
+        <div class="grid gap-0" style="grid-template-columns: repeat(${actions.length}, 1fr);">
+          ${actions.map(a => `
+            <button class="ct-sheet-action-btn"
+                    onclick="window.churchTapApp.${a.fn}(); window.churchTapApp.closeActionSheet();">
+              <span class="icon">${a.icon}</span>
+              <span class="label">${a.label}</span>
+            </button>
+          `).join('')}
+        </div>
+        <div class="mt-3">
+          <button class="w-full py-2.5 rounded-xl text-sm font-medium"
+                  style="background:var(--ui-surface-2); color:var(--ui-text-muted);"
+                  onclick="window.churchTapApp.closeActionSheet();">Cancel</button>
+        </div>
+      </div>
+    `);
+  }
+
+  copyVerse() {
+    if (!this.currentVerse) return;
+    const text = this.currentVerse.content_type === 'text'
+      ? `"${this.plainTextFromVerseText(this.currentVerse.verse_text)}" — ${this.currentVerse.bible_reference || 'Bible'}`
+      : (this.currentVerse.bible_reference || 'Bible');
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => this.showToast('📋 Copied!'));
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      this.showToast('📋 Copied!');
+    }
+  }
+  // ─── End Action Sheet ──────────────────────────────
 
   showToast(message, duration = 3000) {
     const toast = document.createElement('div');
@@ -10552,18 +10789,8 @@ class ChurchTapApp {
 
   // Update menu indicators for theme and text size
   updateMenuIndicators() {
-    // Update theme indicator
-    const themeIndicator = document.getElementById('themeIndicator');
-    const themeMenuIcon = document.getElementById('themeMenuIcon');
-    if (themeIndicator && themeMenuIcon) {
-      if (this.theme === 'dark') {
-        themeIndicator.textContent = 'Dark';
-        themeMenuIcon.textContent = '🌙';
-      } else {
-        themeIndicator.textContent = 'Light';
-        themeMenuIcon.textContent = '☀️';
-      }
-    }
+    // Update theme indicator + swatches
+    this.updateMenuThemeSwatches();
 
     // Update text size indicator
     const textSizeIndicator = document.getElementById('textSizeIndicator');

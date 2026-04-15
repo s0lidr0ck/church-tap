@@ -652,6 +652,82 @@ html.dark body {
   color: var(--ui-text);
 }
 
+/* ─── Sepia Theme ──────────────────────────────── */
+
+html.sepia {
+  --ct-app-bg: #f3ede0;
+  --ct-logo-church: #6b3e1e;
+  --ct-logo-tap: #b87a3d;
+  --ui-text: #3b2412;
+  --ui-text-muted: #8b6347;
+  --ui-border: rgba(160, 110, 70, 0.25);
+  --ui-surface: #faf5eb;
+  --ui-surface-2: #f5efdf;
+  --ui-primary: #8b5e2e;
+  --ui-primary-hover: #6b4520;
+  --ui-on-primary: #faf5eb;
+  --ui-accent: #c0622a;
+  --ui-accent-hover: #9e4e20;
+  --ui-secondary: #6b8c6e;
+  --ui-secondary-hover: #547057;
+  --verse-card-bg: #faf5eb;
+  --verse-card-shadow: 0 4px 32px -8px rgba(107,62,30,0.18), 0 1px 4px rgba(107,62,30,0.08);
+  --verse-text-color: #2e1c0a;
+  --nav-bg: rgba(243,237,224,0.95);
+  --nav-border: rgba(160,110,70,0.2);
+  --nav-active-color: #8b5e2e;
+  --nav-inactive-color: #b89070;
+  --header-bg: rgba(243,237,224,0.93);
+  --card-prayer-accent: #8b5e2e;
+  --card-praise-accent: #6b8c6e;
+  --card-insight-accent: #c0622a;
+}
+
+html.sepia body {
+  background-color: var(--ct-app-bg);
+  color: var(--ui-text);
+}
+
+/* ─── Night Theme ─────────────────────────────── */
+
+html.night {
+  --ct-app-bg: #080f1c;
+  --ct-logo-church: #7faacc;
+  --ct-logo-tap: #4b8fb5;
+  --ui-text: #b8cde0;
+  --ui-text-muted: #5880a0;
+  --ui-border: rgba(80, 130, 180, 0.12);
+  --ui-surface: #0d1a2e;
+  --ui-surface-2: #0a1525;
+  --ui-primary: #5890b8;
+  --ui-primary-hover: #7aaad0;
+  --ui-on-primary: #080f1c;
+  --ui-accent: #c0622a;
+  --ui-accent-hover: #e07840;
+  --ui-secondary: #2e8b7a;
+  --ui-secondary-hover: #40a890;
+  --verse-card-bg: #0d1a2e;
+  --verse-card-shadow: 0 4px 32px -8px rgba(0,0,0,0.6), 0 1px 4px rgba(0,0,0,0.5);
+  --verse-text-color: #c8dcf0;
+  --nav-bg: rgba(8,15,28,0.97);
+  --nav-border: rgba(80,130,180,0.1);
+  --nav-active-color: #5890b8;
+  --nav-inactive-color: #3a5c7a;
+  --header-bg: rgba(8,15,28,0.95);
+  --card-prayer-accent: #5890b8;
+  --card-praise-accent: #2e8b7a;
+  --card-insight-accent: #c0622a;
+}
+
+html.night body {
+  background-color: var(--ct-app-bg);
+  color: var(--ui-text);
+}
+
+html.night #app {
+  background-color: var(--ct-app-bg) !important;
+}
+
 #app {
   background-color: var(--ct-app-bg) !important;
   background-image: none !important;
@@ -2495,6 +2571,10 @@ html.dark #textTranslationBtn,
   justify-content: space-around;
 }
 
+.gap-0 {
+  gap: 0px;
+}
+
 .gap-1 {
   gap: 0.25rem;
 }
@@ -3463,6 +3543,10 @@ html.dark #textTranslationBtn,
   padding-left: 1rem;
 }
 
+.pr-1 {
+  padding-right: 0.25rem;
+}
+
 .pr-3 {
   padding-right: 0.75rem;
 }
@@ -3937,6 +4021,11 @@ html.dark #textTranslationBtn,
 
 .blur-3xl {
   --tw-blur: blur(64px);
+  filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow);
+}
+
+.sepia {
+  --tw-sepia: sepia(100%);
   filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow);
 }
 
@@ -4445,37 +4534,7 @@ html.dark {
   --hl-green-bg: rgba(220,252,231,0.13);
 }
 
-.ct-highlight-yellow .verse-container {
-  background: var(--hl-yellow-bg) !important;
-}
-
-.ct-highlight-amber .verse-container {
-  background: var(--hl-amber-bg) !important;
-}
-
-.ct-highlight-orange .verse-container {
-  background: var(--hl-orange-bg) !important;
-}
-
-.ct-highlight-red .verse-container {
-  background: var(--hl-red-bg) !important;
-}
-
-.ct-highlight-pink .verse-container {
-  background: var(--hl-pink-bg) !important;
-}
-
-.ct-highlight-purple .verse-container {
-  background: var(--hl-purple-bg) !important;
-}
-
-.ct-highlight-blue .verse-container {
-  background: var(--hl-blue-bg) !important;
-}
-
-.ct-highlight-green .verse-container {
-  background: var(--hl-green-bg) !important;
-}
+/* highlight classes are now defined globally below (with left border accent) */
 
 /* ─────────────────────────────────────────────────────
    COMPONENTS
@@ -4488,6 +4547,252 @@ html.dark {
 /* ─────────────────────────────────────────────────────
    GLOBAL STYLES (outside layers)
 ───────────────────────────────────────────────────── */
+
+/* ─────────────────────────────────────────────────────
+   ACTION SHEET
+───────────────────────────────────────────────────── */
+
+.ct-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 890;
+  background: rgba(0, 0, 0, 0);
+  pointer-events: none;
+  transition: background 0.28s ease;
+}
+
+.ct-sheet-backdrop.open {
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+.ct-action-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 891;
+  background: var(--ui-surface);
+  border-radius: 20px 20px 0 0;
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.22), 0 -1px 0 var(--ui-border);
+  transform: translateY(102%);
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
+}
+
+.ct-action-sheet.open {
+  transform: translateY(0);
+}
+
+.ct-sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ui-border);
+  margin: 12px auto 0;
+}
+
+.ct-sheet-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 6px;
+  border-radius: 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ct-sheet-action-btn:active {
+  background: color-mix(in srgb, var(--ui-primary) 10%, transparent);
+  transform: scale(0.93);
+}
+
+.ct-sheet-action-btn .icon {
+  font-size: 1.375rem;
+  line-height: 1;
+}
+
+.ct-sheet-action-btn .label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ui-text);
+  white-space: nowrap;
+}
+
+/* Highlight swatches in action sheet */
+
+.hl-swatch-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hl-swatch-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.hl-swatch-btn:active .hl-swatch-circle {
+  transform: scale(0.9);
+}
+
+.hl-swatch-btn.active .hl-swatch-circle {
+  box-shadow: 0 0 0 3px var(--ui-primary), 0 2px 8px rgba(0,0,0,0.22);
+}
+
+.hl-swatch-label {
+  font-size: 0.65rem;
+  color: var(--ui-text-muted);
+  font-weight: 500;
+}
+
+/* ─────────────────────────────────────────────────────
+   THEME SWATCHES
+───────────────────────────────────────────────────── */
+
+.theme-swatch-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid var(--ui-border);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  outline: none;
+}
+
+.theme-swatch-btn.active {
+  border-color: var(--ui-primary);
+  box-shadow: 0 0 0 2px var(--ui-primary);
+  transform: scale(1.1);
+}
+
+.theme-swatch-btn:active {
+  transform: scale(0.92);
+}
+
+/* ─────────────────────────────────────────────────────
+   VERSE WORD TAP
+───────────────────────────────────────────────────── */
+
+.verse-word {
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.15s ease;
+  -webkit-tap-highlight-color: rgba(5,80,137,0.12);
+}
+
+.verse-word:active,
+.verse-word.tapped {
+  background: color-mix(in srgb, var(--ui-primary) 14%, transparent);
+}
+
+.word-def-chip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+  z-index: 800;
+  min-width: 200px;
+  max-width: 280px;
+  animation: chipPop 0.2s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+
+@keyframes chipPop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.88);
+  }
+
+  to   {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+/* ─────────────────────────────────────────────────────
+   PAGE TRANSITIONS
+───────────────────────────────────────────────────── */
+
+.page-enter {
+  animation: pageEnter 0.26s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.99);
+  }
+
+  to   {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ─────────────────────────────────────────────────────
+   HIGHLIGHT STRIP — verse card left border on highlight
+───────────────────────────────────────────────────── */
+
+.ct-highlight-yellow .verse-container {
+  background: var(--hl-yellow-bg) !important;
+  box-shadow: inset 4px 0 0 #fbbf24, var(--verse-card-shadow) !important;
+}
+
+.ct-highlight-amber  .verse-container {
+  background: var(--hl-amber-bg)  !important;
+  box-shadow: inset 4px 0 0 #f59e0b, var(--verse-card-shadow) !important;
+}
+
+.ct-highlight-orange .verse-container {
+  background: var(--hl-orange-bg) !important;
+  box-shadow: inset 4px 0 0 #f97316, var(--verse-card-shadow) !important;
+}
+
+.ct-highlight-red    .verse-container {
+  background: var(--hl-red-bg)    !important;
+  box-shadow: inset 4px 0 0 #ef4444, var(--verse-card-shadow) !important;
+}
+
+.ct-highlight-pink   .verse-container {
+  background: var(--hl-pink-bg)   !important;
+  box-shadow: inset 4px 0 0 #ec4899, var(--verse-card-shadow) !important;
+}
+
+.ct-highlight-purple .verse-container {
+  background: var(--hl-purple-bg) !important;
+  box-shadow: inset 4px 0 0 #a855f7, var(--verse-card-shadow) !important;
+}
+
+.ct-highlight-blue   .verse-container {
+  background: var(--hl-blue-bg)   !important;
+  box-shadow: inset 4px 0 0 #3b82f6, var(--verse-card-shadow) !important;
+}
+
+.ct-highlight-green  .verse-container {
+  background: var(--hl-green-bg)  !important;
+  box-shadow: inset 4px 0 0 #22c55e, var(--verse-card-shadow) !important;
+}
 
 /* Scrollbar */
 
