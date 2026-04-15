@@ -9090,27 +9090,21 @@ class ChurchTapApp {
       const reactionBar = this.buildReactionBar(reactions);
       
       return `
-        <div class="community-card bg-gray-50 dark:bg-gray-700 rounded-xl p-4 select-none"
+        <div class="community-card community-card--prayer select-none"
              data-community-type="prayer" data-community-id="${request.id}"
              data-community-content="${this.escapeHtml(request.content)}">
-          <p class="text-gray-800 dark:text-gray-200 text-sm mb-3 leading-relaxed">${this.escapeHtml(request.content)}</p>
+          <p class="text-sm mb-3 leading-relaxed" style="color:var(--ui-text)">${this.escapeHtml(request.content)}</p>
           ${reactionBar}
           <div class="flex items-center justify-between">
-            <span class="text-xs text-gray-500 dark:text-gray-400">
-              ${this.formatTimeAgo(request.created_at)}
-            </span>
+            <span class="text-xs" style="color:var(--ui-text-muted)">${this.formatTimeAgo(request.created_at)}</span>
             <button 
-              onclick="window.churchTapApp.prayForRequest(${request.id})" 
-              class="flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                hasUserPrayed 
-                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 cursor-default' 
-                  : 'bg-blue-500 hover:bg-blue-600 text-white'
-              }"
+              onclick="window.churchTapApp.prayForRequest(${request.id})"
+              class="community-interact-btn ${hasUserPrayed ? 'community-interact-btn--pray-done' : 'community-interact-btn--pray'}"
               ${hasUserPrayed ? 'disabled' : ''}
             >
               <span>🙏</span>
               <span>${hasUserPrayed ? 'Prayed' : 'Pray'}</span>
-              <span class="bg-white/20 px-1 rounded">${request.prayer_count || 0}</span>
+              <span style="opacity:0.7">${request.prayer_count || 0}</span>
             </button>
           </div>
         </div>
@@ -9128,21 +9122,21 @@ class ChurchTapApp {
       const reactionBar = this.buildReactionBar(reactions);
       
       return `
-        <div class="community-card bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 select-none"
+        <div class="community-card community-card--insight select-none"
              data-community-type="insight" data-community-id="${insight.id}"
              data-community-content="${this.escapeHtml(insight.content)}">
           <div class="flex items-start justify-between mb-2">
-            <span class="text-xs text-purple-600 dark:text-purple-400 font-medium">${insight.verse_reference || 'Today\'s Verse'}</span>
-            <div class="flex items-center space-x-1">
-              <button onclick="app.heartInsight(${insight.id}, this)" class="flex items-center space-x-1 text-xs px-2 py-1 rounded-full ${hasUserHearted ? 'bg-red-100 text-red-600 cursor-not-allowed' : 'bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600'} transition-colors" ${hasUserHearted ? 'disabled' : ''}>
-                <span>❤️</span>
-                <span class="heart-count">${insight.heart_count || 0}</span>
-              </button>
-            </div>
+            <span class="text-xs font-semibold" style="color:var(--card-insight-accent)">${insight.verse_reference || 'Today\'s Verse'}</span>
+            <button onclick="app.heartInsight(${insight.id}, this)"
+              class="community-interact-btn ${hasUserHearted ? 'community-interact-btn--heart-done' : 'community-interact-btn--heart'}"
+              ${hasUserHearted ? 'disabled' : ''}>
+              <span>${hasUserHearted ? '❤️' : '🤍'}</span>
+              <span class="heart-count">${insight.heart_count || 0}</span>
+            </button>
           </div>
-          <p class="text-gray-800 dark:text-gray-200 text-sm mb-3 leading-relaxed">${this.escapeHtml(insight.content)}</p>
+          <p class="text-sm mb-3 leading-relaxed" style="color:var(--ui-text)">${this.escapeHtml(insight.content)}</p>
           ${reactionBar}
-          <div class="text-xs text-gray-500">
+          <div class="text-xs" style="color:var(--ui-text-muted)">
             ${new Date(insight.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
           </div>
         </div>
@@ -9160,27 +9154,21 @@ class ChurchTapApp {
       const reactionBar = this.buildReactionBar(reactions);
       
       return `
-        <div class="community-card bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 select-none"
+        <div class="community-card community-card--praise select-none"
              data-community-type="praise" data-community-id="${report.id}"
              data-community-content="${this.escapeHtml(report.content)}">
-          <p class="text-gray-800 dark:text-gray-200 text-sm mb-3 leading-relaxed">${this.escapeHtml(report.content)}</p>
+          <p class="text-sm mb-3 leading-relaxed" style="color:var(--ui-text)">${this.escapeHtml(report.content)}</p>
           ${reactionBar}
           <div class="flex items-center justify-between">
-            <span class="text-xs text-gray-500 dark:text-gray-400">
-              ${this.formatTimeAgo(report.created_at)}
-            </span>
+            <span class="text-xs" style="color:var(--ui-text-muted)">${this.formatTimeAgo(report.created_at)}</span>
             <button 
-              onclick="window.churchTapApp.celebrateReport(${report.id})" 
-              class="flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                hasUserCelebrated 
-                  ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300 cursor-default' 
-                  : 'bg-yellow-500 hover:bg-yellow-600 text-white'
-              }"
+              onclick="window.churchTapApp.celebrateReport(${report.id})"
+              class="community-interact-btn ${hasUserCelebrated ? 'community-interact-btn--celebrate-done' : 'community-interact-btn--celebrate'}"
               ${hasUserCelebrated ? 'disabled' : ''}
             >
               <span>🎉</span>
               <span>${hasUserCelebrated ? 'Celebrated' : 'Celebrate'}</span>
-              <span class="bg-white/20 px-1 rounded">${report.celebration_count || 0}</span>
+              <span style="opacity:0.7">${report.celebration_count || 0}</span>
             </button>
           </div>
         </div>
