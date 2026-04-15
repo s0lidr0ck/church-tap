@@ -916,9 +916,9 @@
 
   /* ─── Admin UI (preserve) ─────────────────────── */
   .modern-card {
-    background-image: linear-gradient(180deg, var(--brand-bg), #ffffff);
+    background-image: linear-gradient(180deg, var(--brand-bg), var(--ui-surface));
     @apply rounded-xl shadow-md border dark:border-gray-700 transition-colors;
-    border-color: var(--brand-muted);
+    border-color: var(--ui-border);
   }
   .btn-primary-modern {
     background-color: var(--brand-accent);
@@ -930,15 +930,17 @@
   .btn-secondary-modern {
     @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 dark:text-gray-200 bg-gradient-to-r from-white to-gray-50 dark:from-gray-800 dark:to-gray-700 border border-gray-300 dark:border-gray-700 hover:from-gray-50 hover:to-white dark:hover:from-gray-700 dark:hover:to-gray-600 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-600;
   }
-  .admin-table thead {
-    background-image: linear-gradient(90deg, color-mix(in srgb, var(--brand-muted) 20%, white), var(--brand-bg));
+  .admin-table thead,
+  .admin-table-head {
+    background-image: linear-gradient(90deg, color-mix(in srgb, var(--brand-muted) 20%, var(--ui-surface)), var(--brand-bg));
   }
-  .admin-table thead th {
+  .admin-table thead th,
+  .admin-table-head th {
     @apply px-6 py-3 text-left text-xs font-medium uppercase tracking-wider;
     color: var(--brand-primary);
   }
-  .admin-table tbody tr:nth-child(even) { @apply bg-indigo-50/20 dark:bg-gray-800/30; }
-  .admin-table tbody tr:hover { @apply bg-indigo-50/40 dark:bg-gray-800/80; }
+  .admin-table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--brand-primary) 4%, var(--ui-surface)); }
+  .admin-table tbody tr:hover { background: color-mix(in srgb, var(--brand-primary) 7%, var(--ui-surface)); }
   .status-badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
   .status-badge.status-published {
     background-color: color-mix(in srgb, var(--brand-success) 15%, white);
@@ -1572,7 +1574,7 @@
 .admin-more-drawer {
   position: fixed;
   bottom: 62px; left: 0; right: 0;
-  background: white;
+  background: var(--ui-surface);
   border-radius: 18px 18px 0 0;
   z-index: 46;
   padding: 16px 16px 8px;
@@ -1584,7 +1586,7 @@
 .admin-more-drawer.open { transform: translateY(0); }
 .admin-more-drawer-handle {
   width: 36px; height: 4px;
-  background: #d1d5db;
+  background: var(--ui-border);
   border-radius: 2px;
   margin: 0 auto 14px;
 }
@@ -1594,7 +1596,7 @@
   gap: 14px;
   padding: 13px 12px;
   border-radius: 12px;
-  color: #1f2937;
+  color: var(--ui-text);
   font-size: 15px;
   font-weight: 500;
   cursor: pointer;
@@ -1602,7 +1604,7 @@
   -webkit-tap-highlight-color: transparent;
   border: none; background: none; width: 100%; text-align: left;
 }
-.admin-more-item:active, .admin-more-item:hover { background: #f3f4f6; }
+.admin-more-item:active, .admin-more-item:hover { background: var(--ui-surface-2); }
 .admin-more-item svg { width: 20px; height: 20px; color: var(--brand-primary); flex-shrink: 0; }
 .admin-more-item-icon {
   width: 40px; height: 40px;
@@ -1614,15 +1616,15 @@
 .admin-more-item-icon svg { color: var(--brand-primary); }
 .admin-more-section-label {
   font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
-  text-transform: uppercase; color: #9ca3af;
+  text-transform: uppercase; color: var(--ui-text-muted);
   padding: 4px 12px 8px;
 }
 
 /* Admin stat cards — unified */
 .admin-stat-card {
   @apply rounded-xl shadow-sm border p-5 flex items-center gap-4;
-  background: white;
-  border-color: color-mix(in srgb, var(--brand-muted) 60%, white);
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
 }
 .admin-stat-icon {
   width: 44px; height: 44px; border-radius: 12px;
@@ -1630,16 +1632,16 @@
   flex-shrink: 0;
   font-size: 20px;
 }
-.admin-stat-label { font-size: 13px; color: #6b7280; font-weight: 500; }
-.admin-stat-value { font-size: 22px; font-weight: 700; color: #111827; line-height: 1.1; }
+.admin-stat-label { font-size: 13px; color: var(--ui-text-muted); font-weight: 500; }
+.admin-stat-value { font-size: 22px; font-weight: 700; color: var(--ui-text); line-height: 1.1; }
 
 /* Admin page header */
 .admin-page-header {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
   margin-bottom: 20px; flex-wrap: wrap;
 }
-.admin-page-title { font-size: 22px; font-weight: 700; color: #111827; line-height: 1.2; }
-.admin-page-subtitle { font-size: 14px; color: #6b7280; margin-top: 2px; }
+.admin-page-title { font-size: 22px; font-weight: 700; color: var(--ui-text); line-height: 1.2; }
+.admin-page-subtitle { font-size: 14px; color: var(--ui-text-muted); margin-top: 2px; }
 
 /* Main content area needs bottom padding when bottom nav shows */
 @media (max-width: 1023px) {
@@ -1649,21 +1651,21 @@
 /* Admin section cards (replace bare bg-white shadow) */
 .admin-section-card {
   @apply rounded-xl shadow-sm border overflow-hidden;
-  background: white;
-  border-color: color-mix(in srgb, var(--brand-muted) 60%, white);
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
 }
 .admin-section-card-header {
   @apply px-5 py-4 border-b;
-  border-color: color-mix(in srgb, var(--brand-muted) 40%, white);
+  border-color: var(--ui-border);
 }
-.admin-section-card-title { font-size: 16px; font-weight: 600; color: #111827; }
-.admin-section-card-subtitle { font-size: 13px; color: #6b7280; margin-top: 2px; }
+.admin-section-card-title { font-size: 16px; font-weight: 600; color: var(--ui-text); }
+.admin-section-card-subtitle { font-size: 13px; color: var(--ui-text-muted); margin-top: 2px; }
 
 /* Modal backgrounds — clean white */
 .admin-modal-inner {
-  background: white;
+  background: var(--ui-surface);
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--ui-border);
   box-shadow: 0 20px 60px rgba(0,0,0,0.15);
 }
 
@@ -1706,4 +1708,24 @@
   );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+/* ── Admin: override generic Tailwind grays with brand tokens ────────── */
+#adminDashboard .text-gray-900,
+#adminDashboard .text-gray-800 { color: var(--ui-text); }
+#adminDashboard .text-gray-700 { color: var(--ui-text); }
+#adminDashboard .text-gray-500,
+#adminDashboard .text-gray-600 { color: var(--ui-text-muted); }
+#adminDashboard .text-gray-400 { color: var(--ui-text-muted); opacity: 0.7; }
+#adminDashboard table .bg-white,
+#adminDashboard .bg-white:not(.admin-bottom-nav *):not(.admin-more-drawer *) { background-color: var(--ui-surface) !important; }
+#adminDashboard .bg-gray-50 { background-color: var(--ui-surface-2) !important; }
+#adminDashboard .bg-gray-100 { background-color: var(--ui-surface-2) !important; }
+#adminDashboard .divide-gray-200 > * + * { border-color: var(--ui-border); }
+#adminDashboard .border-gray-200 { border-color: var(--ui-border) !important; }
+#adminDashboard .border-gray-300 { border-color: var(--ui-border) !important; }
+#adminDashboard .placeholder-gray-400::placeholder { color: var(--ui-text-muted); opacity: 0.6; }
+/* Admin: modern card uses brand-bg gradient */
+#adminDashboard .modern-card {
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
 }
