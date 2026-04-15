@@ -6068,18 +6068,111 @@ class ChurchTapApp {
   }
   // ─── End Action Sheet ──────────────────────────────
 
-  showToast(message, duration = 3000) {
+  showToast(message, type = 'default', duration = 3000) {
+    // Remove any existing toast to avoid stacking
+    const existing = document.getElementById('ct-toast');
+    if (existing) existing.remove();
+
+    const icons = {
+      success: '✅',
+      error:   '❌',
+      info:    'ℹ️',
+      default: '',
+    };
+    const colors = {
+      success: 'background: #065f46; color: #d1fae5;',
+      error:   'background: #7f1d1d; color: #fecaca;',
+      info:    'background: #1e3a5f; color: #bfdbfe;',
+      default: 'background: var(--ui-surface-elevated, #1f2937); color: var(--ui-on-elevated, #f9fafb);',
+    };
+    const icon  = icons[type]  || '';
+    const color = colors[type] || colors.default;
+
     const toast = document.createElement('div');
-    toast.className = 'fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-800 px-4 py-2 rounded-lg z-50 animate-slide-up';
-    toast.textContent = message;
-    
+    toast.id = 'ct-toast';
+    toast.style.cssText = `
+      position: fixed;
+      bottom: calc(var(--nav-height, 64px) + 16px);
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      ${color}
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      max-width: 90vw;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+      opacity: 0;
+      transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+      pointer-events: none;
+    `;
+    if (icon) {
+      const iconSpan = document.createElement('span');
+      iconSpan.textContent = icon;
+      toast.appendChild(iconSpan);
+    }
+    const textSpan = document.createElement('span');
+    textSpan.textContent = message;
+    toast.appendChild(textSpan);
     document.body.appendChild(toast);
-    
+
+    // Animate in
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(-50%) translateY(0)';
+      });
+    });
+
+    // Animate out
     setTimeout(() => {
-      if (document.body.contains(toast)) {
-        document.body.removeChild(toast);
-      }
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(-50%) translateY(8px)';
+      setTimeout(() => { if (toast.parentNode) toast.remove(); }, 250);
     }, duration);
+  }
+
+  // Confetti burst — lightweight emoji particles for celebrations
+  showConfetti(emoji = '🎉', count = 18) {
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9998;overflow:hidden;';
+    document.body.appendChild(container);
+
+    for (let i = 0; i < count; i++) {
+      const particle = document.createElement('span');
+      const x = 20 + Math.random() * 60; // center-ish horizontally
+      const duration = 900 + Math.random() * 600;
+      const rotate   = Math.random() * 720 - 360;
+      const size     = 16 + Math.random() * 12;
+      particle.textContent = emoji;
+      particle.style.cssText = `
+        position: absolute;
+        left: ${x}%;
+        bottom: 30%;
+        font-size: ${size}px;
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) rotate(0deg);
+        transition: transform ${duration}ms cubic-bezier(0.1,0.8,0.3,1), opacity ${duration * 0.8}ms ease ${duration * 0.4}ms;
+        will-change: transform, opacity;
+      `;
+      container.appendChild(particle);
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const vy = -(60 + Math.random() * 120);
+          const vx = (Math.random() - 0.5) * 80;
+          particle.style.transform = `translateX(calc(-50% + ${vx}vw)) translateY(${vy}vh) rotate(${rotate}deg)`;
+          particle.style.opacity = '0';
+        });
+      });
+    }
+
+    setTimeout(() => { if (container.parentNode) container.remove(); }, 2000);
   }
 
   hideSplashScreen() {
@@ -9225,7 +9318,9 @@ class ChurchTapApp {
       
       if (data.success) {
         this.closeModal();
-        this.showToast('🙏 Prayer request submitted!');
+        this.showToast('Prayer request submitted!', 'success');
+        this.showConfetti('🙏', 14);
+        if (navigator.vibrate) navigator.vibrate([20, 50, 20]);
         this.loadCommunity(this.currentDate); // Reload community
         this.trackAnalytics('prayer_request_submitted');
       } else {
@@ -9257,7 +9352,9 @@ class ChurchTapApp {
       
       if (data.success) {
         this.closeModal();
-        this.showToast('💭 Verse insight submitted!');
+        this.showToast('Insight shared with your community!', 'success');
+        this.showConfetti('💡', 14);
+        if (navigator.vibrate) navigator.vibrate([20, 50, 20]);
         this.loadCommunity(this.currentDate); // Reload community
         this.trackAnalytics('verse_insight_submitted');
       } else {
@@ -9288,7 +9385,9 @@ class ChurchTapApp {
       
       if (data.success) {
         this.closeModal();
-        this.showToast('🎉 Praise report submitted!');
+        this.showToast('Praise report shared!', 'success');
+        this.showConfetti('🎉', 20);
+        if (navigator.vibrate) navigator.vibrate([30, 60, 30]);
         this.loadCommunity(this.currentDate); // Reload community
         this.trackAnalytics('praise_report_submitted');
       } else {
@@ -9323,9 +9422,9 @@ class ChurchTapApp {
         // Reload community to show updated counts
         this.loadCommunity(this.currentDate);
         
-        this.showToast('🙏 Thank you for praying!');
+        this.showToast('🙏 Thank you for praying!', 'success');
         this.trackAnalytics('prayer_interaction', prayerRequestId);
-        navigator.vibrate && navigator.vibrate(25);
+        navigator.vibrate && navigator.vibrate([15, 40, 15]);
       } else {
         this.showToast(data.error || 'Failed to record prayer', 'error');
       }
@@ -9363,8 +9462,9 @@ class ChurchTapApp {
         this.userInteractions[`insight_${insightId}`] = true;
         this.saveUserInteractions();
         
-        this.showToast('❤️');
+        this.showToast('❤️ Hearted!', 'success');
         this.trackAnalytics('insight_hearted');
+        navigator.vibrate && navigator.vibrate([15, 40, 15]);
       } else {
         this.showToast(data.error || 'Already hearted!', 'info');
       }
@@ -9397,9 +9497,10 @@ class ChurchTapApp {
         // Reload community to show updated counts
         this.loadCommunity(this.currentDate);
         
-        this.showToast('🎉 Celebration added!');
+        this.showToast('🎉 Celebration added!', 'success');
+        this.showConfetti('🎉', 10);
         this.trackAnalytics('celebration_interaction', praiseReportId);
-        navigator.vibrate && navigator.vibrate(25);
+        navigator.vibrate && navigator.vibrate([15, 40, 15]);
       } else {
         this.showToast(data.error || 'Failed to record celebration', 'error');
       }

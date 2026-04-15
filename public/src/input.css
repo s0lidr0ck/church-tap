@@ -1279,3 +1279,37 @@
 /* Content dividers */
 .content-divider { border-left: 1px solid var(--ui-border); }
 .admin-header-divider { border-bottom: 1px solid var(--ui-border); }
+
+/* ── Skeleton loaders ───────────────────────────────────────── */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.skeleton-card {
+  background: var(--ui-surface-2, #f3f4f6);
+}
+.dark .skeleton-card {
+  background: var(--ui-surface-2, #1f2937);
+}
+
+.skeleton-line {
+  background: linear-gradient(
+    90deg,
+    var(--ui-surface-2, #e5e7eb) 25%,
+    color-mix(in srgb, var(--ui-surface-2, #e5e7eb) 60%, white) 50%,
+    var(--ui-surface-2, #e5e7eb) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+.dark .skeleton-line {
+  background: linear-gradient(
+    90deg,
+    var(--ui-surface-2, #374151) 25%,
+    color-mix(in srgb, var(--ui-surface-2, #374151) 60%, #6b7280) 50%,
+    var(--ui-surface-2, #374151) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
