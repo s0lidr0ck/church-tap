@@ -1564,125 +1564,123 @@ class ChurchTapApp {
   renderExplorePage() {
     const studyEnabled = this.isStudyModeEnabled();
     const studyTile = studyEnabled
-      ? `
-          <button id="exploreStudyTile" class="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-gray-200 dark:border-gray-700 text-left hover:bg-purple-100 dark:hover:bg-purple-800 transition-colors"
-                  onclick="window.churchTapApp.navigate('/study')">
-            <div class="text-lg">📚</div>
-            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Study</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Definitions • Commentary</div>
-          </button>
-        `
-      : `
-          <button id="exploreStudyTile" class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  onclick="window.churchTapApp.navigate('/menu'); window.churchTapApp.showToast('Turn on Study Mode in Menu to unlock Study tools')">
-            <div class="text-lg">🔒</div>
-            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Study</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Turn on Study Mode in Menu</div>
-          </button>
-        `;
+      ? `<button id="exploreStudyTile" class="explore-tile explore-tile--study"
+                onclick="window.churchTapApp.navigate('/study')">
+            <span class="explore-tile__emoji">📚</span>
+            <div class="explore-tile__title">Study</div>
+            <div class="explore-tile__subtitle">Definitions · Commentary</div>
+          </button>`
+      : `<button id="exploreStudyTile" class="explore-tile explore-tile--locked"
+                onclick="window.churchTapApp.navigate('/menu'); window.churchTapApp.showToast('Turn on Study Mode in Settings to unlock Study tools')">
+            <span class="explore-tile__emoji">🔒</span>
+            <div class="explore-tile__title" style="color: var(--ui-text);">Study</div>
+            <div class="explore-tile__subtitle">Enable in Settings</div>
+          </button>`;
 
     this.setPageContent(`
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Explore</h2>
-          <button class="btn-secondary text-sm" onclick="window.churchTapApp.goToToday()">Today</button>
+      <div class="max-w-lg mx-auto px-1 pt-2 pb-4">
+        <!-- Page header -->
+        <div class="flex items-center justify-between mb-5 px-1">
+          <h2 class="page-title">Explore</h2>
+          <button class="btn-secondary text-xs py-1.5 px-3" onclick="window.churchTapApp.goToToday()">← Today</button>
         </div>
 
-        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Search, browse history, or discover something new.
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <button id="exploreReadTile" class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        <!-- Primary tiles (colored) -->
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <button id="exploreReadTile" class="explore-tile explore-tile--read"
                   onclick="window.churchTapApp.showBibleReadModal()">
-            <div class="text-lg">📖</div>
-            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Read</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Book • Chapter • Verse</div>
-          </button>
-
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  onclick="window.churchTapApp.showVerseSearchModal()">
-            <div class="text-lg">🔍</div>
-            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Search</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Verses & Bible</div>
+            <span class="explore-tile__emoji">📖</span>
+            <div class="explore-tile__title">Read</div>
+            <div class="explore-tile__subtitle">Book · Chapter · Verse</div>
           </button>
 
           ${studyTile}
+        </div>
 
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        <!-- Secondary tiles -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <button class="explore-tile"
+                  onclick="window.churchTapApp.showVerseSearchModal()">
+            <span class="explore-tile__emoji">🔍</span>
+            <div class="explore-tile__title">Search</div>
+            <div class="explore-tile__subtitle">Verses & Bible</div>
+          </button>
+
+          <button class="explore-tile"
                   onclick="window.churchTapApp.showHistory()">
-            <div class="text-lg">🕐</div>
-            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">History</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Last 60 days</div>
+            <span class="explore-tile__emoji">🕐</span>
+            <div class="explore-tile__title">History</div>
+            <div class="explore-tile__subtitle">Last 60 days</div>
           </button>
 
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          <button class="explore-tile"
                   onclick="window.churchTapApp.openCalendarModal()">
-            <div class="text-lg">📅</div>
-            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Calendar</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Pick a date</div>
+            <span class="explore-tile__emoji">📅</span>
+            <div class="explore-tile__title">Calendar</div>
+            <div class="explore-tile__subtitle">Pick a date</div>
           </button>
 
-          <button class="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          <button class="explore-tile"
                   onclick="window.churchTapApp.showRandomVerse()">
-            <div class="text-lg">🎲</div>
-            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">Random</div>
-            <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Surprise me</div>
+            <span class="explore-tile__emoji">🎲</span>
+            <div class="explore-tile__title">Random</div>
+            <div class="explore-tile__subtitle">Surprise me</div>
           </button>
         </div>
 
-        <div class="mt-4">
-          <button class="w-full btn-primary" onclick="window.churchTapApp.showTopicsWordCloud()">
-            🏷️ Browse Topics
-          </button>
-        </div>
+        <!-- Browse Topics CTA -->
+        <button class="w-full btn-primary py-3 rounded-2xl text-sm"
+                onclick="window.churchTapApp.showTopicsWordCloud()">
+          🏷️ Browse Topics
+        </button>
       </div>
     `);
   }
 
   renderSavedPage() {
     this.setPageContent(`
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Saved</h2>
-          <button class="btn-secondary text-sm" onclick="window.churchTapApp.goToToday()">Today</button>
-        </div>
-        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Your collections and personal prayers.
+      <div class="max-w-lg mx-auto px-1 pt-2 pb-4">
+        <div class="flex items-center justify-between mb-5 px-1">
+          <h2 class="page-title">Saved</h2>
+          <button class="btn-secondary text-xs py-1.5 px-3" onclick="window.churchTapApp.goToToday()">← Today</button>
         </div>
 
-        <div class="space-y-3">
-          <button class="w-full p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
-                  onclick="window.churchTapApp.navigate('/collections')">
-            <div class="flex items-center justify-between">
+        <div class="page-card mx-0 px-0 py-2">
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/collections')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">📚</div>
               <div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white">📚 Collections</div>
-                <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Group verses by theme</div>
+                <div class="text-sm font-semibold" style="color: var(--ui-text);">Collections</div>
+                <div class="text-xs" style="color: var(--ui-text-muted);">Group verses by theme</div>
               </div>
-              <div class="text-gray-400">›</div>
             </div>
+            <div class="menu-row__right">›</div>
           </button>
 
-          <button class="w-full p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
-                  onclick="window.churchTapApp.navigate('/my-prayers')">
-            <div class="flex items-center justify-between">
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/my-prayers')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">🙏</div>
               <div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white">🙏 My Prayers</div>
-                <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Personal prayer list</div>
+                <div class="text-sm font-semibold" style="color: var(--ui-text);">My Prayers</div>
+                <div class="text-xs" style="color: var(--ui-text-muted);">Personal prayer list</div>
               </div>
-              <div class="text-gray-400">›</div>
             </div>
+            <div class="menu-row__right">›</div>
           </button>
 
-          <button class="w-full p-4 rounded-lg border border-gray-200 dark:border-gray-700 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
-                  onclick="window.churchTapApp.showMyStuffSearchModal()">
-            <div class="flex items-center justify-between">
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button class="menu-row w-full" onclick="window.churchTapApp.showMyStuffSearchModal()">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">🔍</div>
               <div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-white">🔍 Search My Stuff</div>
-                <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Notes, collections, and prayers</div>
+                <div class="text-sm font-semibold" style="color: var(--ui-text);">Search My Stuff</div>
+                <div class="text-xs" style="color: var(--ui-text-muted);">Notes, collections, prayers</div>
               </div>
-              <div class="text-gray-400">›</div>
             </div>
+            <div class="menu-row__right">›</div>
           </button>
         </div>
       </div>
@@ -1692,56 +1690,97 @@ class ChurchTapApp {
   renderMePage() {
     const name = this.currentUser?.displayName || this.currentUser?.firstName || null;
     const title = name ? this.escapeHtml(String(name)) : 'Account';
+    const email = this.currentUser?.email ? this.escapeHtml(String(this.currentUser.email)) : '';
     const isLoggedIn = !!this.currentUser;
+    const initials = name ? name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2) : '👤';
 
     this.setPageContent(`
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Me</h2>
-          <button class="btn-secondary text-sm" onclick="window.churchTapApp.goToToday()">Today</button>
-        </div>
-        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          ${isLoggedIn ? `Signed in as <span class="font-medium text-gray-900 dark:text-gray-200">${title}</span>` : 'Sign in to sync favorites and join groups.'}
+      <div class="max-w-lg mx-auto px-1 pt-2 pb-4">
+        <div class="flex items-center justify-between mb-5 px-1">
+          <h2 class="page-title">Me</h2>
+          <button class="btn-secondary text-xs py-1.5 px-3" onclick="window.churchTapApp.goToToday()">← Today</button>
         </div>
 
-        <div class="space-y-3">
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/favorites')">
-            ❤️ Favorites
-          </button>
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/collections')">
-            📚 My Categories
-          </button>
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/my-prayers')">
-            🙏 My Prayers
-          </button>
-
-          <div class="pt-2 border-t border-gray-200 dark:border-gray-700"></div>
-
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/my-highlights')">
-            🖍️ My Highlights
-          </button>
-
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.navigate('/my-notes')">
-            📝 My Notes
-          </button>
-
-          <button class="w-full btn-secondary" onclick="window.churchTapApp.currentUser ? window.churchTapApp.showProfileModal() : window.churchTapApp.showLoginModal()">
-            👤 Profile
+        <!-- Profile Card -->
+        <div class="page-card mx-0 mb-4 flex items-center gap-4">
+          <div class="profile-avatar">${isLoggedIn ? initials : '👤'}</div>
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold text-sm" style="color: var(--ui-text);">${isLoggedIn ? title : 'Guest'}</div>
+            ${email ? `<div class="text-xs truncate" style="color: var(--ui-text-muted);">${email}</div>` : ''}
+            ${!isLoggedIn ? `<div class="text-xs" style="color: var(--ui-text-muted);">Sign in to sync your data</div>` : ''}
+          </div>
+          <button class="btn-outline text-xs py-1.5 px-3 shrink-0"
+                  onclick="window.churchTapApp.currentUser ? window.churchTapApp.showProfileModal() : window.churchTapApp.showLoginModal()">
+            ${isLoggedIn ? 'Edit' : 'Sign in'}
           </button>
         </div>
 
-        <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3">
+        <!-- Personal Library -->
+        <div class="section-header">My Library</div>
+        <div class="page-card mx-0 px-0 py-2 mb-4">
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/favorites')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">❤️</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Favorites</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/collections')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">📚</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Collections</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/my-prayers')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">🙏</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">My Prayers</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/my-highlights')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">🖍️</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Highlights</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button class="menu-row w-full" onclick="window.churchTapApp.navigate('/my-notes')">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">📝</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Notes</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+        </div>
+
+        <!-- Auth actions -->
+        <div class="space-y-2">
           ${isLoggedIn ? `
-            <button class="w-full px-4 py-2 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 transition-colors"
+            <button class="w-full py-2.5 px-4 rounded-xl text-sm font-medium transition-colors"
+                    style="background: color-mix(in srgb, #ef4444 8%, var(--ui-surface)); color: #ef4444; border: 1px solid color-mix(in srgb, #ef4444 20%, var(--ui-border));"
                     onclick="window.churchTapApp.handleLogout()">
-              🚪 Logout
+              🚪 Sign Out
             </button>
           ` : `
-            <button class="w-full btn-primary" onclick="window.churchTapApp.showLoginModal()">
-              🔑 Sign in
+            <button class="w-full btn-primary py-3 rounded-2xl" onclick="window.churchTapApp.showLoginModal()">
+              🔑 Sign In
             </button>
-            <button class="w-full btn-secondary" onclick="window.churchTapApp.showRegisterModal()">
-              ✨ Create account
+            <button class="w-full btn-outline py-3 rounded-2xl" onclick="window.churchTapApp.showRegisterModal()">
+              ✨ Create Account
             </button>
           `}
         </div>
@@ -1759,46 +1798,47 @@ class ChurchTapApp {
   // ===========================
   renderLinksPage() {
     this.setPageContent(`
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Links</h2>
-          <button class="btn-secondary text-sm" onclick="window.churchTapApp.goToToday()">Today</button>
-        </div>
-        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Quick links from your current group.
+      <div class="max-w-lg mx-auto px-1 pt-2 pb-4">
+        <div class="flex items-center justify-between mb-5 px-1">
+          <h2 class="page-title">Links</h2>
+          <button class="btn-secondary text-xs py-1.5 px-3" onclick="window.churchTapApp.goToToday()">← Today</button>
         </div>
 
-        <!-- Fundraising (if active) -->
-        <button id="fundraisingCard" class="hidden w-full text-left px-3 py-3 mb-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+        <!-- Fundraising card (hidden by default, loaded dynamically) -->
+        <button id="fundraisingCard" class="hidden w-full text-left mb-4 rounded-2xl overflow-hidden"
+                style="background: linear-gradient(135deg, var(--brand-primary) 0%, color-mix(in srgb, var(--brand-primary) 80%, var(--brand-secondary)) 100%); color: white; padding: 1rem 1.25rem;"
                 onclick="window.churchTapApp.openFundraisingModal()">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
               <div class="flex items-center justify-between gap-2">
-                <div class="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-                  🎯 <span id="fundraisingTitle">Fundraising</span>
-                </div>
-                <div id="fundraisingPct" class="text-xs font-semibold text-green-700 dark:text-green-300 tabular-nums whitespace-nowrap">0%</div>
+                <div class="text-sm font-bold truncate">🎯 <span id="fundraisingTitle">Fundraising</span></div>
+                <div id="fundraisingPct" class="text-sm font-bold tabular-nums whitespace-nowrap opacity-90">0%</div>
               </div>
-
               <div class="mt-2 flex items-center gap-2">
-                <div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-                  <div id="fundraisingProgressBar" class="h-1.5 bg-green-600" style="width:0%"></div>
+                <div class="flex-1 rounded-full h-1.5 overflow-hidden" style="background: rgba(255,255,255,0.3);">
+                  <div id="fundraisingProgressBar" class="h-1.5" style="width:0%; background: white;"></div>
                 </div>
-                <div id="fundraisingAmounts" class="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">--</div>
+                <div id="fundraisingAmounts" class="text-xs opacity-80 whitespace-nowrap">--</div>
               </div>
-
-              <div id="fundraisingDeadline" class="mt-2 text-xs text-gray-500 dark:text-gray-400"></div>
+              <div id="fundraisingDeadline" class="mt-1.5 text-xs opacity-70"></div>
             </div>
           </div>
         </button>
 
-        <button id="playlistBtn" class="hidden w-full text-left px-3 py-2 mb-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
+        <!-- Worship Playlist (hidden by default) -->
+        <button id="playlistBtn" class="hidden w-full text-left menu-row mb-3 rounded-2xl"
+                style="background: var(--ui-surface); border: 1px solid var(--ui-border);"
                 onclick="window.churchTapApp.openPlaylistModal()">
-          📺 Worship Playlist
+          <div class="menu-row__left">
+            <div class="menu-row__icon">📺</div>
+            <div class="text-sm font-medium" style="color: var(--ui-text);">Worship Playlist</div>
+          </div>
+          <div class="menu-row__right">›</div>
         </button>
 
-        <div id="linksPageList" class="space-y-1">
-          <div class="text-sm text-gray-500 dark:text-gray-400 py-2">Loading…</div>
+        <!-- Dynamic links list -->
+        <div id="linksPageList" class="space-y-2">
+          <div class="text-sm py-3 text-center" style="color: var(--ui-text-muted);">Loading…</div>
         </div>
       </div>
     `);
@@ -1809,48 +1849,45 @@ class ChurchTapApp {
   }
 
   // ===========================
-  // Menu Page (/menu)
+  // Menu Page (/menu)  [now "Settings"]
   // ===========================
   renderMenuPage() {
     this.setPageContent(`
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mt-4">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-lg font-semibold text-gray-800 dark:text-white">Menu</h2>
-          <button class="btn-secondary text-sm" onclick="window.churchTapApp.goToToday()">Today</button>
-        </div>
-        <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Tools and settings.
+      <div class="max-w-lg mx-auto px-1 pt-2 pb-4">
+        <div class="flex items-center justify-between mb-5 px-1">
+          <h2 class="page-title">Settings</h2>
+          <button class="btn-secondary text-xs py-1.5 px-3" onclick="window.churchTapApp.goToToday()">← Today</button>
         </div>
 
-        <div class="mb-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/20">
-          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
-            Defaults
-          </div>
-
+        <!-- Bible Defaults -->
+        <div class="section-header">Bible Defaults</div>
+        <div class="page-card mx-0 mb-4">
           <div class="space-y-3">
             <div>
-              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Bible Translation</label>
+              <label class="block text-xs font-semibold mb-1.5" style="color: var(--ui-text-muted);">Translation</label>
               <select id="menuDefaultTranslationSelect"
-                      class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                      class="w-full px-3 py-2 rounded-xl text-sm"
+                      style="background: var(--ui-surface-2); border: 1px solid var(--ui-border); color: var(--ui-text);"
                       onchange="window.churchTapApp.handleMenuDefaultTranslationChange(this.value)">
                 <option value="">Loading…</option>
               </select>
-              <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">Used for “View in Translation” and full chapter reading.</div>
+              <div class="mt-1 text-xs" style="color: var(--ui-text-muted);">Used for "View in Translation" and chapter reading.</div>
             </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Commentary</label>
+                <label class="block text-xs font-semibold mb-1.5" style="color: var(--ui-text-muted);">Commentary</label>
                 <select id="menuDefaultCommentarySelect"
-                        class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                        class="w-full px-3 py-2 rounded-xl text-sm"
+                        style="background: var(--ui-surface-2); border: 1px solid var(--ui-border); color: var(--ui-text);"
                         onchange="window.churchTapApp.handleMenuDefaultCommentaryChange(this.value)">
                   <option value="">Loading…</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Dictionary</label>
+                <label class="block text-xs font-semibold mb-1.5" style="color: var(--ui-text-muted);">Dictionary</label>
                 <select id="menuDefaultDictionarySelect"
-                        class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm"
+                        class="w-full px-3 py-2 rounded-xl text-sm"
+                        style="background: var(--ui-surface-2); border: 1px solid var(--ui-border); color: var(--ui-text);"
                         onchange="window.churchTapApp.handleMenuDefaultDictionaryChange(this.value)">
                   <option value="">Loading…</option>
                 </select>
@@ -1859,89 +1896,122 @@ class ChurchTapApp {
           </div>
         </div>
 
-        <div class="space-y-2">
-          <button class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  onclick="window.location.href='/store'">
-            🛍️ Store
-          </button>
-        </div>
-
-        <div id="groupSection" class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
-          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-1">
-            Current Group
-          </div>
-
-          <div id="currentGroupDisplay" class="px-1 mb-2">
-            <div class="text-sm font-medium text-gray-700 dark:text-gray-300" id="currentGroupName">Loading...</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">Tap a chip to switch quickly</div>
-          </div>
-
-          <div id="groupQuickList" class="mb-2"></div>
-
-          <button id="changeGroupBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  onclick="window.churchTapApp.changeGroup()">
-            🔄 Switch Group
-          </button>
-          <button id="requestGroupBtn" class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  onclick="window.churchTapApp.requestGroup()">
-            ➕ Join a Group
-          </button>
-        </div>
-
-        <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
-          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-1">
-            Settings
-          </div>
-
-          <button class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center justify-between"
-                  onclick="window.churchTapApp.cycleTextSize(); window.churchTapApp.updateMenuIndicators();">
-            <span class="flex items-center space-x-2"><span>📝</span><span>Text Size</span></span>
-            <span id="textSizeIndicator" class="text-sm text-gray-500 dark:text-gray-400">Medium</span>
+        <!-- Appearance -->
+        <div class="section-header">Appearance</div>
+        <div class="page-card mx-0 px-0 py-2 mb-4">
+          <button class="menu-row w-full" onclick="window.churchTapApp.cycleTextSize(); window.churchTapApp.updateMenuIndicators();">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">📝</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Text Size</div>
+            </div>
+            <div class="menu-row__right">
+              <span id="textSizeIndicator" class="text-xs font-semibold" style="color: var(--ui-primary);">Medium</span>
+              <span style="color: var(--ui-text-muted);">›</span>
+            </div>
           </button>
 
-          <button class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center justify-between"
-                  onclick="window.churchTapApp.toggleTheme(); window.churchTapApp.updateMenuIndicators();">
-            <span class="flex items-center space-x-2"><span id="themeMenuIcon">🌙</span><span>Theme</span></span>
-            <span id="themeIndicator" class="text-sm text-gray-500 dark:text-gray-400">Light</span>
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button class="menu-row w-full" onclick="window.churchTapApp.toggleTheme(); window.churchTapApp.updateMenuIndicators();">
+            <div class="menu-row__left">
+              <div class="menu-row__icon"><span id="themeMenuIcon">🌙</span></div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Theme</div>
+            </div>
+            <div class="menu-row__right">
+              <span id="themeIndicator" class="text-xs font-semibold" style="color: var(--ui-primary);">Light</span>
+              <span style="color: var(--ui-text-muted);">›</span>
+            </div>
           </button>
 
-          <label class="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-            <span class="flex items-center space-x-2"><span>📚</span><span>Study Mode</span></span>
-            <input id="studyModeMenuToggle" type="checkbox" class="h-5 w-5 accent-primary-600"
-                   onchange="window.churchTapApp.handleStudyModeToggle(this.checked); window.churchTapApp.updateMenuIndicators();"
-                   aria-label="Toggle Study Mode" />
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <label class="menu-row w-full cursor-pointer" style="user-select: none;">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">📚</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Study Mode</div>
+            </div>
+            <div class="menu-row__right">
+              <input id="studyModeMenuToggle" type="checkbox" class="h-5 w-5 rounded"
+                     style="accent-color: var(--brand-primary);"
+                     onchange="window.churchTapApp.handleStudyModeToggle(this.checked); window.churchTapApp.updateMenuIndicators();"
+                     aria-label="Toggle Study Mode" />
+            </div>
           </label>
+        </div>
+
+        <!-- Group -->
+        <div class="section-header">Group</div>
+        <div id="groupSection" class="page-card mx-0 px-0 py-2 mb-4">
+          <div class="px-4 py-2">
+            <div class="text-sm font-semibold" id="currentGroupName" style="color: var(--ui-text);">Loading…</div>
+            <div class="text-xs mt-0.5" style="color: var(--ui-text-muted);">Tap a chip to switch quickly</div>
+          </div>
+          <div id="currentGroupDisplay" class="px-4 pb-1"></div>
+          <div id="groupQuickList" class="px-4 pb-2"></div>
+
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button id="changeGroupBtn" class="menu-row w-full" onclick="window.churchTapApp.changeGroup()">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">🔄</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Switch Group</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button id="requestGroupBtn" class="menu-row w-full" onclick="window.churchTapApp.requestGroup()">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">➕</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Join a Group</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+        </div>
+
+        <!-- More -->
+        <div class="section-header">More</div>
+        <div class="page-card mx-0 px-0 py-2 mb-4">
+          <button class="menu-row w-full" onclick="window.location.href='/store'">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">🛍️</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Store</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
+
+          <div style="height: 1px; background: var(--ui-border); margin: 0 14px;"></div>
+
+          <button class="menu-row w-full" onclick="window.churchTapApp.openFeedback()">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">💬</div>
+              <div class="text-sm font-medium" style="color: var(--ui-text);">Send Feedback</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
 
           <div id="menuInstallInsertPoint"></div>
+
+          <button id="adminPanelBtn" class="hidden menu-row w-full" onclick="window.location.href='/admin'">
+            <div class="menu-row__left">
+              <div class="menu-row__icon">🛠️</div>
+              <div class="text-sm font-medium" style="color: var(--brand-primary);">Admin Panel</div>
+            </div>
+            <div class="menu-row__right">›</div>
+          </button>
         </div>
 
-        <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
-          <button id="adminPanelBtn" class="hidden w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-indigo-700 dark:text-indigo-300"
-                  onclick="window.location.href='/admin'">
-            🛠️ Admin Panel
-          </button>
-
-          <div id="tagSessionInfo" class="hidden pt-2">
-            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-1">
-              NFC Session
+        <!-- NFC Session (hidden by default) -->
+        <div id="tagSessionInfo" class="hidden mb-4">
+          <div class="section-header">NFC Session</div>
+          <div class="page-card mx-0 px-4 py-3" style="background: color-mix(in srgb, var(--brand-primary) 8%, var(--ui-surface));">
+            <div class="flex items-center gap-2 text-sm" style="color: var(--brand-primary);">
+              <span>🏷️</span>
+              <span class="font-medium">NFC Connected</span>
             </div>
-            <div class="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg mb-2">
-              <div class="flex items-center justify-between">
-                <div class="text-sm">
-                  <span class="text-blue-600 dark:text-blue-400">🏷️</span>
-                  <span class="text-gray-700 dark:text-gray-300">NFC Connected</span>
-                </div>
-              </div>
-              <div class="hidden">
-                <span id="tagSessionId">NFC Connected</span>
-              </div>
-            </div>
+            <div class="hidden"><span id="tagSessionId">NFC Connected</span></div>
           </div>
-
-          <button class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  onclick="window.churchTapApp.openFeedback()">
-            💬 Send Feedback
-          </button>
         </div>
       </div>
     `);
