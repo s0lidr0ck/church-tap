@@ -4737,7 +4737,7 @@ class ChurchTapApp {
     document.documentElement.style.setProperty('--cross-tile', `url("data:image/svg+xml;base64,${btoa(svg)}")`);
   }
 
-  setTheme(name) { {
+  setTheme(name) {
     const valid = ['light', 'dark', 'sepia', 'night'];
     this.theme = valid.includes(name) ? name : 'light';
     this.applyTheme();
