@@ -1520,8 +1520,7 @@ class ChurchTapApp {
     const pageContainer = document.getElementById('pageContainer');
     if (pageContainer) pageContainer.classList.add('hidden');
 
-    const dateNav = document.getElementById('dateNav');
-    if (dateNav) dateNav.classList.remove('hidden');
+    // dateNav permanently hidden — date lives in header bar now
 
     const verseContainer = document.getElementById('verseContainer');
     if (verseContainer) verseContainer.classList.remove('hidden');
@@ -3881,11 +3880,8 @@ class ChurchTapApp {
       return;
     }
     
-    tagsContainer.innerHTML = tags.map(tag =>
-      `<span style="display:inline-block; padding:2px 8px; border-radius:99px; font-size:0.65rem; font-weight:600; letter-spacing:0.04em; color:var(--ui-text-muted); border:1px solid var(--ui-border); text-transform:uppercase;">${tag}</span>`
-    ).join('');
-    
-    tagsContainer.classList.remove('hidden');
+    // Chips permanently hidden per UX decision — tags stored but not displayed
+    tagsContainer.classList.add('hidden');
   }
 
   showLoading() {
